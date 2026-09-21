@@ -25,6 +25,7 @@ public class MainActivity extends Activity {
 
 	Button btn_developer;
 	Button btn_import;
+	Button btn_generate_entries;
 
 	Button btn_quick_add;
 
@@ -48,6 +49,7 @@ public class MainActivity extends Activity {
 
 		btn_developer = findViewById(R.id.btn_developer);
 		btn_import = findViewById(R.id.btn_import);
+		btn_generate_entries = findViewById(R.id.btn_generate_entries);
 
 		btn_quick_add = findViewById(R.id.btn_quick_add);
 		
@@ -172,6 +174,19 @@ public class MainActivity extends Activity {
 					Intent intent = new Intent(
 						MainActivity.this,
 						Importexcelactivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_generate_entries.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						GenerateEntriesActivity.class
 					);
 
 					startActivity(intent);

@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:id="@+id/tv_line_config_title"
+            style="@style/PageTitle"
+            android:text="Configure" />
+
+        <!-- Purchase/Sale: read-only item header (already chosen in the
+             multi-select list). -->
+        <LinearLayout
+            android:id="@+id/group_line_item_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="14dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tv_line_item_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Item Name"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_line_item_code"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="A001 - Stock: 0"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+        </LinearLayout>
+
+        <!-- Payment (always), or Purchase/Sale in "different party per
+             item" mode: party picker for this line. -->
+        <LinearLayout
+            android:id="@+id/group_line_party"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tv_line_party_label"
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:text="Party" />
+
+            <AutoCompleteTextView
+                android:id="@+id/actv_line_party"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_input"
+                android:hint="Select party"
+                android:inputType="text|textNoSuggestions"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="13dp"
+                android:paddingBottom="13dp"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:textSize="15sp" />
+
+        </LinearLayout>
+
+        <!-- Expense only: free-text description. -->
+        <LinearLayout
+            android:id="@+id/group_line_description"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:text="Expense Item" />
+
+            <EditText
+                android:id="@+id/et_line_description"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. Electricity Bill"
+                android:inputType="text" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_line_unit_value_label"
+            style="@style/FieldLabel"
+            android:text="Price" />
+
+        <EditText
+            android:id="@+id/et_line_unit_value"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal" />
+
+        <TextView
+            style="@style/FieldLabel"
+            android:text="Dates" />
+
+        <com.mujeer.businesserp.CalendarTapView
+            android:id="@+id/calendar_line"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:id="@+id/tv_line_summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="0 dates selected · Total: 0.00"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btn_line_save"
+            style="@style/AppButton"
+            android:layout_width="match_parent"
+            android:layout_marginTop="16dp"
+            android:text="Save Line" />
+
+    </LinearLayout>
+
+</ScrollView>

@@ -18,6 +18,9 @@
     <dimen name="fab_size">56dp</dimen>
     <dimen name="icon_badge">44dp</dimen>
 
+    <dimen name="calendar_cell_size">40dp</dimen>
+    <dimen name="calendar_badge_size">16dp</dimen>
+
     <dimen name="text_headline">22sp</dimen>
     <dimen name="text_title">17sp</dimen>
     <dimen name="text_body">15sp</dimen>

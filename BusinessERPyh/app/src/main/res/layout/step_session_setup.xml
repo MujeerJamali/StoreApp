@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:id="@+id/tv_setup_title"
+            style="@style/PageTitle"
+            android:text="Setup" />
+
+        <!-- Purchase/Sale: one party for every item, or a different party per item. -->
+        <LinearLayout
+            android:id="@+id/group_party_mode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tv_party_mode_label"
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:text="Supplier" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_party_mode_same"
+                    style="@style/AppButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:text="Same for all items" />
+
+                <Button
+                    android:id="@+id/btn_party_mode_different"
+                    style="@style/AppButton.Outline"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:text="Different per item" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Payment: direction toggle. -->
+        <LinearLayout
+            android:id="@+id/group_payment_direction"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:text="Direction" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_direction_in"
+                    style="@style/AppButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:text="Payment In" />
+
+                <Button
+                    android:id="@+id/btn_direction_out"
+                    style="@style/AppButton.Outline"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:text="Payment Out" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Shared party field: session-wide party for Purchase/Sale "same for
+             all items" mode. -->
+        <LinearLayout
+            android:id="@+id/field_session_party"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tv_session_party_label"
+                style="@style/FieldLabel"
+                android:text="Party" />
+
+            <AutoCompleteTextView
+                android:id="@+id/actv_session_party"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_input"
+                android:hint="Select party"
+                android:inputType="text|textNoSuggestions"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="13dp"
+                android:paddingBottom="13dp"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:textSize="15sp" />
+
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_setup_continue"
+            style="@style/AppButton"
+            android:layout_width="match_parent"
+            android:layout_marginTop="24dp"
+            android:text="Continue" />
+
+    </LinearLayout>
+
+</ScrollView>

@@ -141,6 +141,11 @@
             android:name=".Partyrankingreportactivity"
             android:label="Party Ranking" />
 
+        <!-- Bulk "generate entries" via calendar taps -->
+        <activity
+            android:name=".GenerateEntriesActivity"
+            android:label="Generate Entries" />
+
         <!-- Main (dashboard) -->
         <activity
             android:name=".MainActivity"
