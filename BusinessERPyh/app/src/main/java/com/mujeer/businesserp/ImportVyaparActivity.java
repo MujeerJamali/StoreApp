@@ -1,0 +1,1196 @@
+package com.mujeer.businesserp;
+
+import android.app.Activity;
+import android.content.ContentResolver;
+import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
+// =====================
+// Imports directly from a Vyapar (.vyb) backup file - a zip that wraps a
+// real SQLite database. This is a completely separate import path from
+// Importexcelactivity/DatabaseHelper's Excel-import helpers: it never
+// touches Excel, and it never modifies an existing row, so the Excel
+// importer stays fully usable as a fallback while this is being tested.
+//
+// It reuses DatabaseHelper's existing bulk-insert helpers (the same ones
+// the Excel importer uses) for every table it writes to, plus a small
+// set of Vyapar-specific additions (insertItemBulk, insertPartyTransferBulk,
+// getVybLocalId/saveVybLocalId) added alongside them.
+//
+// Import order (matches the relationships in Vyapar's own schema):
+// Parties -> Items -> Purchases -> Purchase Line Items -> Sales ->
+// Sale Line Items -> Payment In -> Payment Out -> Party to Party transfers.
+// =====================
+public class ImportVyaparActivity extends Activity {
+
+    private static final int REQUEST_PICK_VYB = 2001;
+
+    private Button btn_pick_vyb;
+    private Button btn_view_skipped_vyb;
+    private TextView tv_vyb_result;
+
+    // =====================
+    // One row that was left out of the import - either an unsupported
+    // Vyapar transaction type, a row with a missing/unresolvable party or
+    // item, or a duplicate of a row already imported previously.
+    // =====================
+    static class SkippedRow {
+        String table;
+        String vyaparId;
+        String reason;
+
+        String toDisplayString() {
+            return table + " (Vyapar id " + vyaparId + ")\nReason: " + reason;
+        }
+    }
+
+    // In-memory only, for the "View skipped rows" screen right after an
+    // import finishes - same pattern as Importexcelactivity.lastSkippedRows.
+    static ArrayList<SkippedRow> lastSkippedRows = new ArrayList<SkippedRow>();
+
+    // =====================
+    // Running totals for the summary screen.
+    // =====================
+    private static class Counts {
+        int partiesImported, partiesDuplicate;
+        int itemsImported, itemsDuplicate;
+        int purchasesImported, purchasesDuplicate;
+        int purchaseItemsImported, purchaseItemsDuplicate;
+        int salesImported, salesDuplicate;
+        int saleItemsImported, saleItemsDuplicate;
+        int paymentInImported, paymentInDuplicate;
+        int paymentOutImported, paymentOutDuplicate;
+        int transfersImported, transfersDuplicate;
+        int expensesImported, expensesDuplicate;
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.import_vyapar);
+
+        btn_pick_vyb = (Button) findViewById(R.id.btn_pick_vyb);
+        btn_view_skipped_vyb = (Button) findViewById(R.id.btn_view_skipped_vyb);
+        tv_vyb_result = (TextView) findViewById(R.id.tv_vyb_result);
+
+        btn_pick_vyb.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    btn_view_skipped_vyb.setVisibility(View.GONE);
+                    openVybPicker();
+                }
+            });
+
+        btn_view_skipped_vyb.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startActivity(new Intent(
+									  ImportVyaparActivity.this,
+									  ImportVyaparSkippedRowsActivity.class
+								  ));
+                }
+            });
+    }
+
+    private void openVybPicker() {
+
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+
+        intent.setType("*/*");
+
+        startActivityForResult(intent, REQUEST_PICK_VYB);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, final Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_PICK_VYB
+            && resultCode == RESULT_OK
+            && data != null
+            && data.getData() != null) {
+
+            final Uri uri = data.getData();
+
+            new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        runImport(uri);
+                    }
+                }).start();
+        }
+    }
+
+    private void setStatus(final String text) {
+
+        runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    tv_vyb_result.setText(text);
+                }
+            });
+    }
+
+    // =====================
+    // Whole import run: prepare the file, then walk the 9 steps in
+    // order inside a single DatabaseHelper transaction so a failure
+    // partway through leaves nothing half-written.
+    // =====================
+    private void runImport(Uri uri) {
+
+        setStatus("Reading backup file...");
+
+        File rawFile = new File(getCacheDir(), "vyb_import_raw.tmp");
+        File extractedFile = new File(getCacheDir(), "vyb_import_extracted.tmp");
+        SQLiteDatabase vyaparDb = null;
+        DatabaseHelper helper = null;
+        boolean success = false;
+
+        ArrayList<SkippedRow> skipped = new ArrayList<SkippedRow>();
+        Counts counts = new Counts();
+        StringBuilder fatalError = new StringBuilder();
+
+        try {
+
+            File dbFile = prepareVyaparDatabaseFile(uri, rawFile, extractedFile);
+
+            vyaparDb = SQLiteDatabase.openDatabase(
+                dbFile.getAbsolutePath(),
+                null,
+                SQLiteDatabase.OPEN_READONLY
+            );
+
+            // Sanity check - make sure this really is a Vyapar backup
+            // before writing anything.
+            Cursor check = vyaparDb.rawQuery(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('kb_names','kb_transactions','kb_lineitems')",
+                null
+            );
+            int foundTables = check.getCount();
+            check.close();
+
+            if (foundTables < 3) {
+                throw new Exception("This file doesn't look like a Vyapar backup (expected tables not found).");
+            }
+
+            helper = new DatabaseHelper(this);
+            helper.beginTransaction();
+            SQLiteDatabase db = helper.getMigrationDatabase();
+
+            HashMap<Long, Integer> partyIdMap = new HashMap<Long, Integer>();
+            HashMap<Long, Integer> itemIdMap = new HashMap<Long, Integer>();
+            HashMap<Long, Long> purchaseIdMap = new HashMap<Long, Long>();
+            HashMap<Long, Long> saleIdMap = new HashMap<Long, Long>();
+
+            setStatus("Importing parties...");
+            importParties(vyaparDb, helper, db, partyIdMap, skipped, counts);
+
+            setStatus("Importing items...");
+            importItems(vyaparDb, helper, db, itemIdMap, skipped, counts);
+
+            setStatus("Importing purchases...");
+            importPurchases(vyaparDb, helper, db, partyIdMap, purchaseIdMap, skipped, counts);
+
+            setStatus("Importing purchase line items...");
+            importPurchaseLineItems(vyaparDb, helper, db, purchaseIdMap, itemIdMap, skipped, counts);
+
+            setStatus("Importing sales...");
+            importSales(vyaparDb, helper, db, partyIdMap, saleIdMap, skipped, counts);
+
+            setStatus("Importing sale line items...");
+            importSaleLineItems(vyaparDb, helper, db, saleIdMap, itemIdMap, skipped, counts);
+
+            setStatus("Importing payments in...");
+            importPayments(vyaparDb, helper, db, partyIdMap, skipped, counts, 3, true);
+
+            setStatus("Importing payments out...");
+            importPayments(vyaparDb, helper, db, partyIdMap, skipped, counts, 4, false);
+
+            setStatus("Importing party to party transfers...");
+            importPartyTransfers(vyaparDb, helper, db, partyIdMap, skipped, counts);
+
+            setStatus("Importing expenses...");
+            importExpenses(vyaparDb, helper, db, skipped, counts);
+
+            setStatus("Logging unsupported transaction types...");
+            logUnsupportedTypes(vyaparDb, skipped);
+
+            success = true;
+
+        } catch (Exception e) {
+
+            fatalError.append(e.toString());
+
+        } finally {
+
+            if (helper != null) {
+                helper.endTransaction(success);
+            }
+
+            if (vyaparDb != null) {
+                vyaparDb.close();
+            }
+
+            if (extractedFile.exists()) {
+                extractedFile.delete();
+            }
+
+            if (rawFile.exists()) {
+                rawFile.delete();
+            }
+        }
+
+        ImportVyaparActivity.lastSkippedRows = skipped;
+
+        final boolean finalSuccess = success;
+        final String finalError = fatalError.toString();
+        final Counts finalCounts = counts;
+        final int finalSkippedCount = skipped.size();
+
+        runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+
+                    if (!finalSuccess) {
+
+                        tv_vyb_result.setText(
+                            "Import failed - nothing was written.\n\n" + finalError
+                        );
+
+                        return;
+                    }
+
+                    StringBuilder summary = new StringBuilder();
+
+                    summary.append("Parties: " + finalCounts.partiesImported
+								   + " imported, " + finalCounts.partiesDuplicate + " already imported\n");
+                    summary.append("Items: " + finalCounts.itemsImported
+								   + " imported, " + finalCounts.itemsDuplicate + " already imported\n");
+                    summary.append("Purchases: " + finalCounts.purchasesImported
+								   + " imported, " + finalCounts.purchasesDuplicate + " already imported\n");
+                    summary.append("Purchase line items: " + finalCounts.purchaseItemsImported
+								   + " imported, " + finalCounts.purchaseItemsDuplicate + " already imported\n");
+                    summary.append("Sales: " + finalCounts.salesImported
+								   + " imported, " + finalCounts.salesDuplicate + " already imported\n");
+                    summary.append("Sale line items: " + finalCounts.saleItemsImported
+								   + " imported, " + finalCounts.saleItemsDuplicate + " already imported\n");
+                    summary.append("Payment In: " + finalCounts.paymentInImported
+								   + " imported, " + finalCounts.paymentInDuplicate + " already imported\n");
+                    summary.append("Payment Out: " + finalCounts.paymentOutImported
+								   + " imported, " + finalCounts.paymentOutDuplicate + " already imported\n");
+                    summary.append("Party to party transfers: " + finalCounts.transfersImported
+								   + " imported, " + finalCounts.transfersDuplicate + " already imported\n");
+                    summary.append("Expenses: " + finalCounts.expensesImported
+								   + " imported, " + finalCounts.expensesDuplicate + " already imported\n");
+
+                    summary.append("\nRows not imported: " + finalSkippedCount);
+
+                    tv_vyb_result.setText(summary.toString());
+
+                    if (finalSkippedCount > 0) {
+                        btn_view_skipped_vyb.setText(
+                            "View rows not imported (" + finalSkippedCount + ")");
+                        btn_view_skipped_vyb.setVisibility(View.VISIBLE);
+                    } else {
+                        btn_view_skipped_vyb.setVisibility(View.GONE);
+                    }
+                }
+            });
+    }
+
+    // =====================
+    // FILE PREPARATION
+    // A .vyb file is a zip wrapping a real SQLite database. Copies the
+    // picked content:// URI to local storage, then unzips it if needed.
+    // Streams both the copy and the unzip in fixed-size chunks, so this
+    // stays memory-efficient regardless of backup size.
+    // =====================
+    private File prepareVyaparDatabaseFile(Uri uri, File rawFile, File extractedFile) throws Exception {
+
+        ContentResolver resolver = getContentResolver();
+        InputStream in = resolver.openInputStream(uri);
+
+        if (in == null) {
+            throw new Exception("Could not open the selected file.");
+        }
+
+        OutputStream out = new FileOutputStream(rawFile);
+        byte[] buffer = new byte[8192];
+        int len;
+
+        while ((len = in.read(buffer)) > 0) {
+            out.write(buffer, 0, len);
+        }
+
+        out.close();
+        in.close();
+
+        // Detect zip (PK..) vs an already-raw SQLite file ("SQLite format 3").
+        boolean isZip = false;
+
+        InputStream headerCheck = new FileInputStream(rawFile);
+        byte[] header = new byte[2];
+        int read = headerCheck.read(header);
+        headerCheck.close();
+
+        if (read == 2 && header[0] == 'P' && header[1] == 'K') {
+            isZip = true;
+        }
+
+        if (!isZip) {
+            return rawFile;
+        }
+
+        ZipInputStream zis = new ZipInputStream(new FileInputStream(rawFile));
+        ZipEntry entry;
+        boolean found = false;
+
+        while ((entry = zis.getNextEntry()) != null) {
+
+            if (entry.isDirectory()) {
+                continue;
+            }
+
+            OutputStream fos = new FileOutputStream(extractedFile);
+
+            while ((len = zis.read(buffer)) > 0) {
+                fos.write(buffer, 0, len);
+            }
+
+            fos.close();
+            found = true;
+            break;
+        }
+
+        zis.close();
+        rawFile.delete();
+
+        if (!found) {
+            throw new Exception("The selected .vyb file did not contain a database.");
+        }
+
+        return extractedFile;
+    }
+
+    // =====================
+    // Converts Vyapar's txn_time (integer seconds since midnight) to the
+    // app's "HH:mm" time format.
+    // =====================
+    private String formatTime(int secondsSinceMidnight) {
+
+        if (secondsSinceMidnight < 0) {
+            secondsSinceMidnight = 0;
+        }
+
+        int hours = (secondsSinceMidnight / 3600) % 24;
+        int minutes = (secondsSinceMidnight % 3600) / 60;
+
+        return String.format("%02d:%02d", hours, minutes);
+    }
+
+    // Vyapar stores dates as "yyyy-MM-dd 00:00:00" - the app's date
+    // columns just want the "yyyy-MM-dd" part.
+    private String formatDate(String vyaparDate) {
+
+        if (vyaparDate == null || vyaparDate.length() < 10) {
+            return "";
+        }
+
+        return vyaparDate.substring(0, 10);
+    }
+
+    private void addSkipped(ArrayList<SkippedRow> skipped, String table, long vyaparId, String reason) {
+
+        SkippedRow row = new SkippedRow();
+        row.table = table;
+        row.vyaparId = String.valueOf(vyaparId);
+        row.reason = reason;
+
+        skipped.add(row);
+    }
+
+    // =====================
+    // STEP 1 - PARTIES (kb_names, name_type=1)
+    // name_type=2 is Vyapar's own expense/category labels, not parties,
+    // and is intentionally excluded.
+    // =====================
+    private void importParties(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> partyIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT name_id, full_name FROM kb_names WHERE name_type=1", null);
+
+        while (c.moveToNext()) {
+
+            long nameId = c.getLong(0);
+            String fullName = c.getString(1);
+            String importKey = "vyb_party_" + nameId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+
+                Long localId = helper.getVybLocalId(db, "party", nameId);
+
+                if (localId != null) {
+                    partyIdMap.put(nameId, localId.intValue());
+                }
+
+                counts.partiesDuplicate++;
+                continue;
+            }
+
+            if (fullName == null || fullName.trim().length() == 0) {
+                addSkipped(skipped, "party", nameId, "Blank party name");
+                continue;
+            }
+
+            int localId = (int) helper.getOrCreatePartyIdBulk(db, fullName.trim());
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            helper.saveVybLocalId(db, "party", nameId, localId);
+
+            partyIdMap.put(nameId, localId);
+            counts.partiesImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // STEP 2 - ITEMS (kb_items)
+    // Item names are imported exactly as they appear in the Vyapar
+    // backup - no reformatting is applied. This is the only place a raw
+    // Vyapar product name enters the ERP - purchase and sale line items
+    // only ever carry an item_id (resolved through itemIdMap/
+    // getVybLocalId back to this same items row), so leaving the name
+    // untouched here is enough for it to show up consistently everywhere
+    // in the imported database.
+    //
+    // kb_items is NOT exclusively real inventory. Vyapar also auto-creates
+    // an item_type=2 ("Service") row for every distinct expense
+    // name/description a user has ever typed when logging an Expense
+    // (txn_type=7) - e.g. "milk", "haircut", "father's pocket money" -
+    // purely so the expense transaction can carry it as a kb_lineitems
+    // row the same way a real purchase/sale carries its line items.
+    // Confirmed against this importer's own data: every item_id used by
+    // a txn_type=7 line item is item_type=2, and no item_type=2 item is
+    // ever used by a real purchase/sale (txn_type 1/2) line item - the
+    // two sets are completely disjoint. Those rows are expense line
+    // items, not inventory, so they must never be inserted into
+    // TABLE_ITEMS (see importExpenses() below for where their text
+    // actually belongs). The OR clause is a defensive fallback only: if
+    // some other backup ever did legitimately sell/purchase an
+    // item_type=2 row, it stays included.
+    // =====================
+    private void importItems(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> itemIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT item_id, item_code, item_name, item_purchase_unit_price, item_sale_unit_price " +
+            "FROM kb_items " +
+            "WHERE item_type != 2 " +
+            "   OR item_id IN (" +
+            "       SELECT DISTINCT li.item_id FROM kb_lineitems li " +
+            "       JOIN kb_transactions t ON li.lineitem_txn_id = t.txn_id " +
+            "       WHERE t.txn_type IN (1,2)" +
+            "   )",
+            null);
+
+        while (c.moveToNext()) {
+
+            long itemId = c.getLong(0);
+            String code = c.getString(1);
+            String name = c.getString(2);
+            double purchasePrice = c.getDouble(3);
+            double salePrice = c.getDouble(4);
+            String importKey = "vyb_item_" + itemId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+
+                Long localId = helper.getVybLocalId(db, "item", itemId);
+
+                if (localId != null) {
+                    itemIdMap.put(itemId, localId.intValue());
+                }
+
+                counts.itemsDuplicate++;
+                continue;
+            }
+
+            long localId = helper.insertItemBulk(db, code, name, purchasePrice, salePrice);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            helper.saveVybLocalId(db, "item", itemId, localId);
+
+            itemIdMap.put(itemId, (int) localId);
+            counts.itemsImported++;
+        }
+
+        c.close();
+    }
+
+    // Resolves a Vyapar name_id to a local party id, checking the
+    // in-memory map first (fast path for this run) and falling back to
+    // the persistent vyb_import_map (for a party imported in an earlier
+    // run of this same importer).
+    private Integer resolveParty(
+        DatabaseHelper helper, SQLiteDatabase db, HashMap<Long, Integer> partyIdMap, Long nameId) {
+
+        if (nameId == null) {
+            return null;
+        }
+
+        Integer id = partyIdMap.get(nameId);
+
+        if (id != null) {
+            return id;
+        }
+
+        Long fromMap = helper.getVybLocalId(db, "party", nameId);
+
+        if (fromMap != null) {
+            partyIdMap.put(nameId, fromMap.intValue());
+            return fromMap.intValue();
+        }
+
+        return null;
+    }
+
+    private Integer resolveItem(
+        DatabaseHelper helper, SQLiteDatabase db, HashMap<Long, Integer> itemIdMap, long itemId) {
+
+        Integer id = itemIdMap.get(itemId);
+
+        if (id != null) {
+            return id;
+        }
+
+        Long fromMap = helper.getVybLocalId(db, "item", itemId);
+
+        if (fromMap != null) {
+            itemIdMap.put(itemId, fromMap.intValue());
+            return fromMap.intValue();
+        }
+
+        return null;
+    }
+
+    // =====================
+    // STEP 3 - PURCHASES (kb_transactions, txn_type=2)
+    // grand_total = txn_cash_amount + txn_balance_amount and
+    // amount_paid = txn_cash_amount, confirmed against
+    // SUM(kb_lineitems.total_amount) for this backup's own data.
+    // =====================
+    private void importPurchases(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> partyIdMap,
+        HashMap<Long, Long> purchaseIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        // NOTE: txn_type=2 is the real Purchase type in this backup (stock
+        // line items, priced per unit, always tied to a supplier party).
+        // txn_type=7 is Expense (see importExpenses below) - every row has
+        // a txn_category_id pointing at an expense label in kb_names
+        // (name_type=2) and never a party, which is why it was wrongly
+        // showing up as "party not found" when this was misread as Purchase.
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT txn_id, txn_name_id, txn_date, txn_time, txn_cash_amount, txn_balance_amount, " +
+            "txn_invoice_prefix, txn_ref_number_char, txn_description " +
+            "FROM kb_transactions WHERE txn_type=2", null);
+
+        while (c.moveToNext()) {
+
+            long txnId = c.getLong(0);
+            Long nameId = c.isNull(1) ? null : c.getLong(1);
+            String txnDate = c.getString(2);
+            int txnTime = c.getInt(3);
+            double cash = c.getDouble(4);
+            double balance = c.getDouble(5);
+            String prefix = c.getString(6);
+            String ref = c.getString(7);
+            String description = c.getString(8);
+
+            String importKey = "vyb_purchase_" + txnId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+
+                Long localId = helper.getVybLocalId(db, "purchase", txnId);
+
+                if (localId != null) {
+                    purchaseIdMap.put(txnId, localId);
+                }
+
+                counts.purchasesDuplicate++;
+                continue;
+            }
+
+            Integer partyId;
+
+            if (nameId == null) {
+                partyId = (int) helper.getOrCreatePartyIdBulk(db, "Cash Purchase");
+            } else {
+                partyId = resolveParty(helper, db, partyIdMap, nameId);
+            }
+
+            if (partyId == null) {
+                addSkipped(skipped, "purchase", txnId, "Party for this purchase was not found/imported");
+                continue;
+            }
+
+            String invoiceNumber = ((prefix == null ? "" : prefix) + (ref == null ? "" : ref)).trim();
+
+            double grandTotal = cash + balance;
+
+            long localId = helper.insertPurchaseBulk(
+                db,
+                partyId,
+                formatDate(txnDate),
+                formatTime(txnTime),
+                invoiceNumber,
+                grandTotal,
+                cash,
+                description == null ? "" : description
+            );
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            helper.saveVybLocalId(db, "purchase", txnId, localId);
+
+            purchaseIdMap.put(txnId, localId);
+            counts.purchasesImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // STEP 4 - PURCHASE LINE ITEMS
+    // Joined straight from kb_lineitems to kb_transactions on
+    // lineitem_txn_id = txn_id, exactly the relationship in the task
+    // requirements, rather than matching on invoice numbers.
+    // =====================
+    private void importPurchaseLineItems(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Long> purchaseIdMap,
+        HashMap<Long, Integer> itemIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT li.lineitem_id, li.lineitem_txn_id, li.item_id, li.quantity, li.priceperunit, li.total_amount " +
+            "FROM kb_lineitems li JOIN kb_transactions t ON li.lineitem_txn_id = t.txn_id " +
+            "WHERE t.txn_type=2", null);
+
+        while (c.moveToNext()) {
+
+            long lineItemId = c.getLong(0);
+            long txnId = c.getLong(1);
+            long itemId = c.getLong(2);
+            double quantity = c.getDouble(3);
+            double pricePerUnit = c.getDouble(4);
+            double totalAmount = c.getDouble(5);
+
+            String importKey = "vyb_purchase_item_" + lineItemId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.purchaseItemsDuplicate++;
+                continue;
+            }
+
+            Long localPurchaseId = purchaseIdMap.get(txnId);
+
+            if (localPurchaseId == null) {
+                localPurchaseId = helper.getVybLocalId(db, "purchase", txnId);
+            }
+
+            if (localPurchaseId == null) {
+                addSkipped(skipped, "purchase_line_item", lineItemId, "Parent purchase was not imported");
+                continue;
+            }
+
+            Integer localItemId = resolveItem(helper, db, itemIdMap, itemId);
+
+            if (localItemId == null) {
+                addSkipped(skipped, "purchase_line_item", lineItemId, "Item was not found/imported");
+                continue;
+            }
+
+            helper.insertPurchaseItemBulk(
+                db, localPurchaseId, localItemId, quantity, pricePerUnit, totalAmount);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.purchaseItemsImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // STEP 5 - SALES (kb_transactions, txn_type=1)
+    // txn_type=2 is not a credit note/sale return as originally assumed -
+    // it's Purchase (see STEP 3 above), based on the actual data: item
+    // line items priced per unit and always tied to a supplier party.
+    // =====================
+    private void importSales(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> partyIdMap,
+        HashMap<Long, Long> saleIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT txn_id, txn_name_id, txn_date, txn_time, txn_cash_amount, txn_balance_amount, " +
+            "txn_invoice_prefix, txn_ref_number_char, txn_description, txn_discount_amount, txn_tax_amount " +
+            "FROM kb_transactions WHERE txn_type=1", null);
+
+        while (c.moveToNext()) {
+
+            long txnId = c.getLong(0);
+            Long nameId = c.isNull(1) ? null : c.getLong(1);
+            String txnDate = c.getString(2);
+            int txnTime = c.getInt(3);
+            double cash = c.getDouble(4);
+            double balance = c.getDouble(5);
+            String prefix = c.getString(6);
+            String ref = c.getString(7);
+            String description = c.getString(8);
+            double discount = c.getDouble(9);
+            double tax = c.getDouble(10);
+
+            String importKey = "vyb_sale_" + txnId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+
+                Long localId = helper.getVybLocalId(db, "sale", txnId);
+
+                if (localId != null) {
+                    saleIdMap.put(txnId, localId);
+                }
+
+                counts.salesDuplicate++;
+                continue;
+            }
+
+            Integer partyId;
+
+            if (nameId == null) {
+                partyId = (int) helper.getOrCreatePartyIdBulk(db, "Cash Sale");
+            } else {
+                partyId = resolveParty(helper, db, partyIdMap, nameId);
+            }
+
+            if (partyId == null) {
+                addSkipped(skipped, "sale", txnId, "Party for this sale was not found/imported");
+                continue;
+            }
+
+            String invoiceNumber = ((prefix == null ? "" : prefix) + (ref == null ? "" : ref)).trim();
+
+            double grandTotal = cash + balance;
+
+            HashMap<String, Object> saleData = new HashMap<String, Object>();
+            saleData.put("invoice_no", invoiceNumber);
+            saleData.put("date", formatDate(txnDate));
+            saleData.put("time", formatTime(txnTime));
+            saleData.put("party_id", partyId);
+            // subtotal isn't stored separately in Vyapar's schema in a way
+            // that's cleanly re-derivable, so it mirrors grand_total here -
+            // discount/tax are still preserved in their own fields.
+            saleData.put("subtotal", grandTotal);
+            saleData.put("discount", discount);
+            saleData.put("other_charges", tax);
+            saleData.put("grand_total", grandTotal);
+            saleData.put("paid_amount", cash);
+            saleData.put("balance", balance);
+            saleData.put("notes", description == null ? "" : description);
+
+            long localId = helper.insertSaleBulk(db, saleData);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            helper.saveVybLocalId(db, "sale", txnId, localId);
+
+            saleIdMap.put(txnId, localId);
+            counts.salesImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // STEP 6 - SALE LINE ITEMS
+    // =====================
+    private void importSaleLineItems(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Long> saleIdMap,
+        HashMap<Long, Integer> itemIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT li.lineitem_id, li.lineitem_txn_id, li.item_id, li.quantity, li.priceperunit, li.total_amount " +
+            "FROM kb_lineitems li JOIN kb_transactions t ON li.lineitem_txn_id = t.txn_id " +
+            "WHERE t.txn_type=1", null);
+
+        while (c.moveToNext()) {
+
+            long lineItemId = c.getLong(0);
+            long txnId = c.getLong(1);
+            long itemId = c.getLong(2);
+            double quantity = c.getDouble(3);
+            double pricePerUnit = c.getDouble(4);
+            double totalAmount = c.getDouble(5);
+
+            String importKey = "vyb_sale_item_" + lineItemId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.saleItemsDuplicate++;
+                continue;
+            }
+
+            Long localSaleId = saleIdMap.get(txnId);
+
+            if (localSaleId == null) {
+                localSaleId = helper.getVybLocalId(db, "sale", txnId);
+            }
+
+            if (localSaleId == null) {
+                addSkipped(skipped, "sale_line_item", lineItemId, "Parent sale was not imported");
+                continue;
+            }
+
+            Integer localItemId = resolveItem(helper, db, itemIdMap, itemId);
+
+            if (localItemId == null) {
+                addSkipped(skipped, "sale_line_item", lineItemId, "Item was not found/imported");
+                continue;
+            }
+
+            HashMap<String, Object> itemData = new HashMap<String, Object>();
+            itemData.put("sale_id", localSaleId);
+            itemData.put("item_id", localItemId);
+            itemData.put("qty", quantity);
+            itemData.put("rate", pricePerUnit);
+            itemData.put("amount", totalAmount);
+
+            helper.insertSaleItemBulk(db, itemData);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.saleItemsImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // STEPS 7 & 8 - PAYMENT IN (txn_type=3) / PAYMENT OUT (txn_type=4)
+    // One method handles both directions - txn_id is unique across all
+    // Vyapar transaction types, so the import key stays unique too.
+    // =====================
+    private void importPayments(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> partyIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts,
+        int vyaparTxnType,
+        boolean isPaymentIn) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT txn_id, txn_name_id, txn_date, txn_time, txn_cash_amount, txn_description " +
+            "FROM kb_transactions WHERE txn_type=?",
+            new String[]{String.valueOf(vyaparTxnType)});
+
+        while (c.moveToNext()) {
+
+            long txnId = c.getLong(0);
+            Long nameId = c.isNull(1) ? null : c.getLong(1);
+            String txnDate = c.getString(2);
+            int txnTime = c.getInt(3);
+            double amount = c.getDouble(4);
+            String description = c.getString(5);
+
+            String importKey = "vyb_payment_" + txnId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+
+                if (isPaymentIn) {
+                    counts.paymentInDuplicate++;
+                } else {
+                    counts.paymentOutDuplicate++;
+                }
+
+                continue;
+            }
+
+            Integer partyId = resolveParty(helper, db, partyIdMap, nameId);
+
+            if (partyId == null) {
+                addSkipped(skipped, isPaymentIn ? "payment_in" : "payment_out", txnId,
+						   "Party for this payment was not found/imported");
+                continue;
+            }
+
+            helper.insertPaymentBulk(
+                db,
+                isPaymentIn ? DatabaseHelper.PAYMENT_IN : DatabaseHelper.PAYMENT_OUT,
+                partyId,
+                formatDate(txnDate),
+                formatTime(txnTime),
+                amount,
+                description == null ? "" : description
+            );
+
+            helper.markImportKeyUsedBulk(db, importKey);
+
+            if (isPaymentIn) {
+                counts.paymentInImported++;
+            } else {
+                counts.paymentOutImported++;
+            }
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // STEP 9 - PARTY TO PARTY TRANSFERS (party_to_party_transfer)
+    // The paying side's balance moves the same direction as a Payment In
+    // and the receiving side's the same as a Payment Out - see the
+    // comment on DatabaseHelper.insertPartyTransferBulk() for why, and
+    // verify a few of these against Vyapar's own party ledgers.
+    // =====================
+    private void importPartyTransfers(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> partyIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT p_txn_id, p_amount, p_received_txn_id, p_paid_txn_id, p_txn_date, p_txn_description " +
+            "FROM party_to_party_transfer", null);
+
+        while (c.moveToNext()) {
+
+            long pTxnId = c.getLong(0);
+            double amount = c.getDouble(1);
+            long receivedTxnId = c.getLong(2);
+            long paidTxnId = c.getLong(3);
+            String txnDate = c.getString(4);
+            String description = c.getString(5);
+
+            String importKey = "vyb_p2p_" + pTxnId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.transfersDuplicate++;
+                continue;
+            }
+
+            Long fromNameId = lookupTxnNameId(vyaparDb, paidTxnId);
+            Long toNameId = lookupTxnNameId(vyaparDb, receivedTxnId);
+
+            Integer fromPartyId = resolveParty(helper, db, partyIdMap, fromNameId);
+            Integer toPartyId = resolveParty(helper, db, partyIdMap, toNameId);
+
+            if (fromPartyId == null || toPartyId == null) {
+                addSkipped(skipped, "party_transfer", pTxnId, "One or both parties for this transfer were not found/imported");
+                continue;
+            }
+
+            int time = lookupTxnTime(vyaparDb, paidTxnId);
+
+            helper.insertPartyTransferBulk(
+                db,
+                fromPartyId,
+                toPartyId,
+                formatDate(txnDate),
+                formatTime(time),
+                amount,
+                description == null ? "" : description
+            );
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.transfersImported++;
+        }
+
+        c.close();
+    }
+
+    private Long lookupTxnNameId(SQLiteDatabase vyaparDb, long txnId) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT txn_name_id FROM kb_transactions WHERE txn_id=?",
+            new String[]{String.valueOf(txnId)});
+
+        Long result = null;
+
+        if (c.moveToFirst() && !c.isNull(0)) {
+            result = c.getLong(0);
+        }
+
+        c.close();
+
+        return result;
+    }
+
+    private int lookupTxnTime(SQLiteDatabase vyaparDb, long txnId) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT txn_time FROM kb_transactions WHERE txn_id=?",
+            new String[]{String.valueOf(txnId)});
+
+        int result = 0;
+
+        if (c.moveToFirst()) {
+            result = c.getInt(0);
+        }
+
+        c.close();
+
+        return result;
+    }
+
+    // =====================
+    // Logs any Vyapar transaction outside the types this importer
+    // handles - 1 (Sale), 2 (Purchase), 3 (Payment In), 4 (Payment Out),
+    // 7 (Expense), 50/51 (party transfer legs) - as skipped, so nothing
+    // silently disappears without a trace in the summary.
+    // =====================
+    private void logUnsupportedTypes(SQLiteDatabase vyaparDb, ArrayList<SkippedRow> skipped) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT txn_id, txn_type FROM kb_transactions " +
+            "WHERE txn_type NOT IN (1,2,3,4,7,50,51)", null);
+
+        while (c.moveToNext()) {
+            addSkipped(skipped, "transaction", c.getLong(0),
+					   "Unsupported Vyapar transaction type (" + c.getInt(1) + ")");
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // STEP 10 - EXPENSES (kb_transactions, txn_type=7)
+    // Every txn_type=7 row's txn_category_id points at an expense label
+    // in kb_names (name_type=2) - "food", "pocket money", "medical", etc
+    // - and none of them carry a party. That's expected: these are
+    // personal/business expenses, not supplier purchases, which is why
+    // treating them as purchases used to fail on "party not found".
+    //
+    // An expense transaction can also carry its own kb_lineitems, each
+    // pointing at an item_type=2 row in kb_items whose item_name is the
+    // actual expense name/description the user typed (e.g. "milk",
+    // "haircut") - distinct from and more specific than the broader
+    // category above (e.g. "food"). Per the importItems() note above,
+    // those item_type=2 rows are never imported into TABLE_ITEMS and no
+    // item_id is ever assigned to an expense - the line-item text is
+    // read directly out of Vyapar's kb_items here and written straight
+    // into expenses.item as a plain String, exactly as it appears in the
+    // backup. A transaction with more than one line item (e.g. several
+    // things paid for in one go) has all of its names joined with ", "
+    // so nothing is dropped; a transaction with no line items at all
+    // falls back to the category name, and then "Uncategorized", exactly
+    // as before.
+    // =====================
+    private void importExpenses(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT t.txn_id, t.txn_date, t.txn_time, t.txn_cash_amount, t.txn_description, n.full_name, " +
+            "  (SELECT GROUP_CONCAT(item_name, ', ') FROM (" +
+            "      SELECT ki.item_name AS item_name " +
+            "      FROM kb_lineitems li JOIN kb_items ki ON li.item_id = ki.item_id " +
+            "      WHERE li.lineitem_txn_id = t.txn_id " +
+            "      ORDER BY li.lineitem_id" +
+            "  )) AS line_item_names " +
+            "FROM kb_transactions t LEFT JOIN kb_names n ON t.txn_category_id = n.name_id " +
+            "WHERE t.txn_type=7", null);
+
+        while (c.moveToNext()) {
+
+            long txnId = c.getLong(0);
+            String txnDate = c.getString(1);
+            int txnTime = c.getInt(2);
+            double amount = c.getDouble(3);
+            String description = c.getString(4);
+            String categoryName = c.getString(5);
+            String lineItemNames = c.getString(6);
+
+            String importKey = "vyb_expense_" + txnId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.expensesDuplicate++;
+                continue;
+            }
+
+            // Prefer the expense's own line-item name(s) - the specific
+            // "what was this for" text - over the broader category, and
+            // only fall back when a transaction has no line items at all.
+            String item;
+
+            if (lineItemNames != null && lineItemNames.trim().length() > 0) {
+                item = lineItemNames.trim();
+            } else if (categoryName != null && categoryName.trim().length() > 0) {
+                item = categoryName.trim();
+            } else {
+                item = "Uncategorized";
+            }
+
+            helper.insertExpenseBulk(
+                db,
+                item,
+                formatDate(txnDate),
+                formatTime(txnTime),
+                amount,
+                description == null ? "" : description
+            );
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.expensesImported++;
+        }
+
+        c.close();
+    }
+}

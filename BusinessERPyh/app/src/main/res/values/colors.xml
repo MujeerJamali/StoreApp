@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Brand -->
+    <color name="primary">#4F46E5</color>
+    <color name="primary_dark">#4338CA</color>
+    <color name="primary_light">#EEF2FF</color>
+    <color name="accent">#14B8A6</color>
+
+    <!-- Surfaces -->
+    <color name="background">#F5F6FB</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="stroke">#EAECF3</color>
+    <color name="input_bg">#F3F4F6</color>
+    <color name="ripple">#1F2937</color>
+
+    <!-- Text -->
+    <color name="text_primary">#1F2937</color>
+    <color name="text_secondary">#6B7280</color>
+    <color name="text_hint">#9CA3AF</color>
+    <color name="text_on_primary">#FFFFFF</color>
+
+    <!-- Status -->
+    <color name="success">#16A34A</color>
+    <color name="success_bg">#DCFCE7</color>
+    <color name="danger">#DC2626</color>
+    <color name="danger_bg">#FEE2E2</color>
+    <color name="warning">#D97706</color>
+    <color name="warning_bg">#FEF3C7</color>
+
+    <!-- Module accents -->
+    <color name="mod_parties">#6366F1</color>
+    <color name="mod_items">#0D9488</color>
+    <color name="mod_sales">#16A34A</color>
+    <color name="mod_purchase">#D97706</color>
+    <color name="mod_payments">#2563EB</color>
+    <color name="mod_expenses">#DC2626</color>
+    <color name="mod_developer">#475569</color>
+    <color name="mod_import">#7C3AED</color>
+    <color name="mod_reports">#0EA5E9</color>
+
+</resources>

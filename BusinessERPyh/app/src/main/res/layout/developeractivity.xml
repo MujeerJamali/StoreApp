@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView style="@style/PageTitle" android:text="Developer" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_card"
+        android:elevation="@dimen/elevation_card"
+        android:orientation="vertical"
+        android:padding="18dp">
+
+        <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Party Name for saving" />
+        <EditText
+            android:id="@+id/et_party_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Party Name for saving" 
+        android:inputType="text|textNoSuggestions"
+        />
+
+        <Button
+            android:id="@+id/btn_save_party"
+            style="@style/AppButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Save" />
+
+    </LinearLayout>
+
+    <ListView
+        android:id="@+id/lv_parties"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="16dp"
+        android:clipToPadding="false"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="10dp"
+        android:scrollbars="none" />
+
+</LinearLayout>

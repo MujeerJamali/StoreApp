@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView style="@style/PageTitle" android:text="Import Excel" />
+
+    <Button
+        android:id="@+id/btn_import_items"
+        style="@style/AppButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Import Items" />
+
+    <Button
+        android:id="@+id/btn_import_transactions"
+        style="@style/AppButton.Outline"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Import Parties, Purchases, Sales" />
+
+    <Button
+        android:id="@+id/btn_view_skipped"
+        style="@style/AppButton.Outline.Small"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="View rows not imported"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/btn_import_vyapar"
+        style="@style/AppButton.Outline"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Import Vyapar Backup (.vyb)" />
+
+    <Button
+        android:id="@+id/btn_bulk_purchase_import"
+        style="@style/AppButton.Outline"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Bulk Purchase Import" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_card"
+        android:elevation="@dimen/elevation_card"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <TextView
+                android:id="@+id/tv_result"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Ready..."
+                android:textColor="@color/text_secondary"
+                android:textSize="15sp" />
+
+        </ScrollView>
+
+    </LinearLayout>
+
+</LinearLayout>

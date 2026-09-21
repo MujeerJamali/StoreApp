@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	package="com.mujeer.businesserp"
+	android:versionCode="1"
+	android:versionName="1.0">
+
+	<uses-sdk
+		android:minSdkVersion="21"
+		android:targetSdkVersion="29"/>
+
+	<application
+		android:allowBackup="true"
+		android:icon="@drawable/ic_launcher"
+		android:label="@string/app_name"
+		android:resizeableActivity="true"
+		android:theme="@style/AppTheme">
+
+		<activity
+			android:name=".Developeractivity"
+			android:label="Developer"/>
+
+		<activity
+			android:name=".Paymentviewactivity"
+			android:label="Payment"/>
+
+		<activity
+			android:name=".Transactionactivity"
+			android:label="Transactions"/>
+
+		<activity
+			android:name=".Transactioneditactivity"
+			android:label="Transaction"
+			android:windowSoftInputMode="adjustResize">
+
+			<intent-filter>
+
+				<action
+					android:name="android.intent.action.MAIN"/>
+
+				<category
+					android:name="android.intent.category.LAUNCHER"/>
+
+			</intent-filter>
+
+		</activity>
+
+		<activity
+			android:name=".Transactionviewactivity"
+			android:label="Transaction View"/>
+
+		<activity
+			android:name=".BulkPurchaseImportActivity"
+			android:label="Bulk Import"/>
+
+		<activity
+			android:name=".BulkPurchaseImportErrorsActivity"
+			android:label="Bulk Import Errors"/>
+
+		<activity
+			android:name=".Paymentactivity"
+			android:label="Payments"/>
+
+		<activity
+			android:name=".Paymenteditactivity"
+			android:label="Payment"/>
+
+		<activity
+			android:name=".Paymentviewactivity"
+			android:label="Payment View"/>
+
+		<activity
+			android:name=".Partiesactivity"
+			android:label="Parties"/>
+
+		<activity
+			android:name=".Addpartyactivity"
+			android:label="Add Party"/>
+
+		<activity
+			android:name=".Partyviewactivity"
+			android:label="Party"/>
+
+		<activity
+			android:name=".Partieseditactivity"
+			android:label="Edit Party"/>
+
+		<activity
+			android:name=".Itemsactivity"
+			android:label="Items"/>
+
+		<activity
+			android:name=".Additemactivity"
+			android:label="Add Item"/>
+
+		<activity
+			android:name=".Itemviewactivity"
+			android:label="Item"/>
+
+		<activity
+			android:name=".Itemseditactivity"
+			android:label="Edit Item"/>
+
+		<activity
+			android:name=".Expensesactivity"
+			android:exported="false"/>
+
+		<activity
+			android:name=".Expenseeditactivity"
+			android:exported="false"/>
+
+		<activity
+			android:name=".Expenseviewactivity"
+			android:exported="false"/>
+
+		<activity
+			android:name=".Importexcelactivity"
+			android:label="Importexcel"/>
+
+		<activity
+			android:name=".ImportSkippedRowsActivity"
+			android:label="Rows Not Imported"/>
+
+		<activity
+			android:name=".ImportVyaparActivity"
+			android:label="Import Vyapar Backup"/>
+
+		<activity
+			android:name=".ImportVyaparSkippedRowsActivity"
+			android:label="Rows Not Imported"/>
+
+		<activity
+			android:name=".Reportsactivity"
+			android:label="Reports"/>
+
+		<activity
+			android:name=".Salesreportactivity"
+			android:label="Total Sales"/>
+
+		<activity
+			android:name=".Partysalesreportactivity"
+			android:label="Sales by Party"/>
+
+		<activity
+			android:name=".Itemrankingreportactivity"
+			android:label="Item Ranking"/>
+
+		<activity
+			android:name=".Partyrankingreportactivity"
+			android:label="Party Ranking"/>
+
+		<activity
+			android:name=".MainActivity"
+			android:label="@string/app_name"/>
+
+	</application>
+
+</manifest>
+

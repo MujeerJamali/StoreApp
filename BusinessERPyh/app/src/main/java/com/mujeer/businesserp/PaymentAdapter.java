@@ -1,0 +1,165 @@
+package com.mujeer.businesserp;
+
+import android.app.Activity;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
+import android.widget.TextView;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+
+public class PaymentAdapter extends BaseAdapter {
+
+	private Activity activity;
+
+	private ArrayList<HashMap<String, Object>> originalList;
+	private ArrayList<HashMap<String, Object>> filteredList;
+
+	private TextView tv_code;
+	private TextView tv_type;
+	private TextView tv_party;
+	private TextView tv_date;
+	private TextView tv_amount;
+
+	public PaymentAdapter(
+		Activity activity,
+		ArrayList<HashMap<String, Object>> list) {
+
+		this.activity = activity;
+
+		this.originalList = list;
+		this.filteredList =
+			new ArrayList<HashMap<String, Object>>(list);
+	}
+
+	@Override
+	public int getCount() {
+		return filteredList.size();
+	}
+
+	@Override
+	public Object getItem(int position) {
+		return filteredList.get(position);
+	}
+
+	@Override
+	public long getItemId(int position) {
+		return (Integer) filteredList.get(position).get("id");
+	}
+
+	@Override
+	public View getView(
+		int position,
+		View convertView,
+		ViewGroup parent) {
+
+		if (convertView == null) {
+
+			convertView = LayoutInflater.from(activity).inflate(
+				R.layout.payment_adapter,
+				parent,
+				false
+			);
+		}
+
+		tv_code = convertView.findViewById(R.id.tv_code);
+		tv_type = convertView.findViewById(R.id.tv_type);
+		tv_party = convertView.findViewById(R.id.tv_party);
+		tv_date = convertView.findViewById(R.id.tv_date);
+		tv_amount = convertView.findViewById(R.id.tv_amount);
+
+		HashMap<String, Object> payment =
+			filteredList.get(position);
+
+		tv_code.setText(
+			payment.get("code").toString()
+		);
+
+		int type = Integer.parseInt(
+			payment.get("type").toString()
+		);
+
+		if (type == DatabaseHelper.PAYMENT_IN) {
+
+			tv_type.setText("Payment In");
+
+		} else {
+
+			tv_type.setText("Payment Out");
+		}
+
+		tv_party.setText(
+			payment.get("party_name").toString()
+		);
+
+		tv_date.setText(
+			payment.get("date").toString()
+		);
+
+		tv_amount.setText(
+			"Rs. " +
+			payment.get("amount").toString()
+		);
+
+		return convertView;
+	}
+
+	public void filter(String keyword) {
+
+		filteredList.clear();
+
+		if (keyword == null) {
+
+			keyword = "";
+		}
+
+		keyword = keyword
+			.toLowerCase()
+			.trim();
+
+		if (keyword.length() == 0) {
+
+			filteredList.addAll(
+				originalList
+			);
+
+		} else {
+
+			for (HashMap<String, Object> payment : originalList) {
+
+				String code =
+					payment.get("code")
+					.toString();
+
+				String party =
+					payment.get("party_name")
+					.toString();
+
+				String amount =
+					payment.get("amount")
+					.toString();
+
+				String notes = "";
+
+				if (payment.get("notes") != null) {
+
+					notes =
+						payment.get("notes")
+						.toString();
+				}
+
+				if (SearchUtils.matchesTokensAcrossFields(
+					keyword, code, party, amount, notes)) {
+
+					filteredList.add(
+						payment
+					);
+				}
+			}
+		}
+
+		notifyDataSetChanged();
+	}
+}

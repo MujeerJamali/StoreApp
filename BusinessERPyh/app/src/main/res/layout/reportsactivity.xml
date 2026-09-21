@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView style="@style/PageTitle" android:text="Reports" />
+
+    <!-- List of available reports, styled like the dashboard's Tools
+         card so it reads consistently with the rest of the app. New
+         reports get added here as another ToolRow + divider pair. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_card"
+        android:elevation="@dimen/elevation_card"
+        android:orientation="vertical">
+
+        <Button
+            android:id="@+id/btn_report_sales"
+            style="@style/ToolRow"
+            android:drawableStart="@drawable/badge_reports"
+            android:text="Total Sales by Period" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
+            android:id="@+id/btn_report_party_sales"
+            style="@style/ToolRow"
+            android:drawableStart="@drawable/badge_reports"
+            android:text="Sales by Party" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
+            android:id="@+id/btn_report_item_ranking"
+            style="@style/ToolRow"
+            android:drawableStart="@drawable/badge_reports"
+            android:text="Item Ranking (All Periods Combined)" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
+            android:id="@+id/btn_report_party_ranking"
+            style="@style/ToolRow"
+            android:drawableStart="@drawable/badge_reports"
+            android:text="Party Ranking (All Periods Combined)" />
+
+    </LinearLayout>
+
+</LinearLayout>
