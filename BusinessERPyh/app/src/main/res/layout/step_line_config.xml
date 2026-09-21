@@ -133,6 +133,7 @@
             android:id="@+id/btn_line_save"
             style="@style/AppButton"
             android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Save Line" />
 
