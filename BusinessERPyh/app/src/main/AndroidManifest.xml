@@ -12,10 +12,6 @@
         <activity
             android:name=".Developeractivity"
             android:label="Developer" />
-		
-		<activity
-			android:name=".Paymentviewactivity"
-			android:label="Payment" />
 
         <!-- Transactions -->
         <activity
@@ -95,35 +91,34 @@
         <activity
             android:name=".Itemseditactivity"
             android:label="Edit Item" />
-		
-		<activity
-			android:name=".Expensesactivity"
-			android:exported="false" />
 
-		<activity
-			android:name=".Expenseeditactivity"
-			android:exported="false" />
+        <activity
+            android:name=".Expensesactivity"
+            android:exported="false" />
 
-		<activity
-			android:name=".Expenseviewactivity"
-			android:exported="false" />
-		
-		
-		<activity
-			android:name=".Importexcelactivity"
-			android:label="Importexcel" />
+        <activity
+            android:name=".Expenseeditactivity"
+            android:exported="false" />
 
-		<activity
-			android:name=".ImportSkippedRowsActivity"
-			android:label="Rows Not Imported" />
+        <activity
+            android:name=".Expenseviewactivity"
+            android:exported="false" />
 
-		<activity
-			android:name=".ImportVyaparActivity"
-			android:label="Import Vyapar Backup" />
+        <activity
+            android:name=".Importexcelactivity"
+            android:label="Importexcel" />
 
-		<activity
-			android:name=".ImportVyaparSkippedRowsActivity"
-			android:label="Rows Not Imported" />
+        <activity
+            android:name=".ImportSkippedRowsActivity"
+            android:label="Rows Not Imported" />
+
+        <activity
+            android:name=".ImportVyaparActivity"
+            android:label="Import Vyapar Backup" />
+
+        <activity
+            android:name=".ImportVyaparSkippedRowsActivity"
+            android:label="Rows Not Imported" />
 
         <!-- Reports -->
         <activity
