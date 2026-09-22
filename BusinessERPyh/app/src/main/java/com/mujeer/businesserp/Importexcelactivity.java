@@ -32,6 +32,7 @@ public class Importexcelactivity extends Activity {
     private Button btn_import_transactions;
     private Button btn_view_skipped;
     private Button btn_import_vyapar;
+    private Button btn_export_vyapar;
     private Button btn_bulk_purchase_import;
     private TextView tv_result;
 
@@ -88,6 +89,7 @@ public class Importexcelactivity extends Activity {
         btn_import_transactions = (Button) findViewById(R.id.btn_import_transactions);
         btn_view_skipped = (Button) findViewById(R.id.btn_view_skipped);
         btn_import_vyapar = (Button) findViewById(R.id.btn_import_vyapar);
+        btn_export_vyapar = (Button) findViewById(R.id.btn_export_vyapar);
         btn_bulk_purchase_import = (Button) findViewById(R.id.btn_bulk_purchase_import);
         tv_result = (TextView) findViewById(R.id.tv_result);
 
@@ -125,6 +127,18 @@ public class Importexcelactivity extends Activity {
 					startActivity(new Intent(
 						Importexcelactivity.this,
 						ImportVyaparActivity.class
+					));
+				}
+			});
+
+        // Exports this app's own data into a .vyb file, in the same
+        // format the importer above reads.
+        btn_export_vyapar.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					startActivity(new Intent(
+						Importexcelactivity.this,
+						ExportVyaparActivity.class
 					));
 				}
 			});
