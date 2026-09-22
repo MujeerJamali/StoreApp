@@ -3,15 +3,18 @@ package com.mujeer.businesserp;
 import android.app.Activity;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 
@@ -22,6 +25,7 @@ public class Expenseeditactivity extends Activity {
 	private TextView tv_code;
 
 	private EditText et_item;
+	private AutoCompleteTextView actv_party;
 	private EditText et_date;
 	private EditText et_time;
 	private EditText et_amount;
@@ -32,6 +36,12 @@ public class Expenseeditactivity extends Activity {
 	private DatabaseHelper db;
 
 	private int expenseId = 0;
+
+	// name -> id, for resolving whatever the user typed/picked in
+	// actv_party back to a party row (the field is optional - blank is
+	// a valid "no party" choice, only a non-blank value has to resolve).
+	private Map<String, Integer> partyIdByName;
+	private Map<Integer, String> partyNameById;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +54,7 @@ public class Expenseeditactivity extends Activity {
 		tv_code = findViewById(R.id.tv_code);
 
 		et_item = findViewById(R.id.et_item);
+		actv_party = findViewById(R.id.actv_party);
 		et_date = findViewById(R.id.et_date);
 		et_time = findViewById(R.id.et_time);
 		et_date.setFocusable(false);
@@ -57,8 +68,9 @@ public class Expenseeditactivity extends Activity {
 		btn_save = findViewById(R.id.btn_save);
 
 		db = new DatabaseHelper(this);
-		
-		
+
+		loadPartyAutoComplete();
+
 		et_date.setOnClickListener(
 			new View.OnClickListener() {
 
@@ -139,6 +151,16 @@ public class Expenseeditactivity extends Activity {
 					expense.get("notes").toString()
 				);
 			}
+
+			if (expense.get("party_id") != null) {
+
+				int partyId = (Integer) expense.get("party_id");
+				String partyName = partyNameById.get(partyId);
+
+				if (partyName != null) {
+					actv_party.setText(partyName, false);
+				}
+			}
 		}
 
 		btn_save.setOnClickListener(
@@ -151,6 +173,38 @@ public class Expenseeditactivity extends Activity {
 				}
 			}
 		);
+	}
+
+	// Optional "who was this paid to" field - not every expense has one
+	// worth tracking (e.g. a cash purchase from an untracked vendor), so
+	// leaving it blank is valid; only a non-blank value has to resolve
+	// to a real party (see saveExpense()).
+	private void loadPartyAutoComplete() {
+
+		ArrayList<HashMap<String, Object>> parties = db.getParties();
+
+		ArrayList<String> partyNames = new ArrayList<String>();
+		HashMap<String, String> partySubtitles = new HashMap<String, String>();
+
+		partyIdByName = new HashMap<String, Integer>();
+		partyNameById = new HashMap<Integer, String>();
+
+		for (HashMap<String, Object> party : parties) {
+
+			String name = (String) party.get("name");
+			int id = (Integer) party.get("id");
+
+			partyNames.add(name);
+			partyIdByName.put(name, id);
+			partyNameById.put(id, name);
+			partySubtitles.put(name, "");
+		}
+
+		TwoLineAutoCompleteAdapter adapter =
+			new TwoLineAutoCompleteAdapter(this, partyNames, partySubtitles);
+
+		actv_party.setAdapter(adapter);
+		actv_party.setThreshold(1);
 	}
 
 	private void focusAndShowKeyboard(final View target) {
@@ -211,6 +265,25 @@ public class Expenseeditactivity extends Activity {
 			et_amount.getText().toString().trim()
 		);
 
+		String typedParty = actv_party.getText().toString().trim();
+		Integer partyId = null;
+
+		if (typedParty.length() > 0) {
+
+			partyId = partyIdByName.get(typedParty);
+
+			if (partyId == null) {
+
+				Toast.makeText(
+					this,
+					"Select a valid party, or leave it blank",
+					Toast.LENGTH_SHORT
+				).show();
+
+				return;
+			}
+		}
+
 		boolean success;
 
 		if (expenseId == 0) {
@@ -225,7 +298,9 @@ public class Expenseeditactivity extends Activity {
 
 				amount,
 
-				et_notes.getText().toString().trim()
+				et_notes.getText().toString().trim(),
+
+				partyId
 
 			) != -1;
 
@@ -243,7 +318,9 @@ public class Expenseeditactivity extends Activity {
 
 				amount,
 
-				et_notes.getText().toString().trim()
+				et_notes.getText().toString().trim(),
+
+				partyId
 			);
 		}
 

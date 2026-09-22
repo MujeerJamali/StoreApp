@@ -30,13 +30,15 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * Bulk "generate entries" screen: pick a transaction type (Purchase, Sale,
- * Payment or Expense), configure one or more lines (an item+price for
- * Purchase/Sale, a party+amount for Payment, a description+amount for
- * Expense), and for each line tap dates on a calendar - each tap registers
- * one more unit on that date, a long-press removes one. A review step lists
- * every configured line before a single "Generate" commits everything to
- * the database in one transaction.
+ * Bulk "generate entries" screen: a persistent toggle at the top switches
+ * between Purchase/Sale/Payment In/Payment Out/Expense from anywhere in the
+ * flow (instead of a separate picker screen you'd have to back out to in
+ * order to change your mind), then you configure one or more lines (an
+ * item+price for Purchase/Sale, a party+amount for Payment, a description
+ * +amount and optional party for Expense), and for each line tap dates on a
+ * calendar - each tap registers one more unit on that date, a long-press
+ * removes one. A review step lists every configured line before a single
+ * "Generate" commits everything to the database in one transaction.
  *
  * Same-date lines that share an effective party are merged into one
  * purchase/sale/payment record with the date's tapped quantity, matching
@@ -48,25 +50,28 @@ public class GenerateEntriesActivity extends Activity {
 
 	private static final int TYPE_PURCHASE = 0;
 	private static final int TYPE_SALE = 1;
-	private static final int TYPE_PAYMENT = 2;
-	private static final int TYPE_EXPENSE = 3;
+	private static final int TYPE_PAYMENT_IN = 2;
+	private static final int TYPE_PAYMENT_OUT = 3;
+	private static final int TYPE_EXPENSE = 4;
 
-	private static final int STEP_TYPE = 0;
-	private static final int STEP_SESSION_SETUP = 1;
-	private static final int STEP_ITEMS_MULTISELECT = 2;
-	private static final int STEP_LINES_LIST = 3;
-	private static final int STEP_LINE_CONFIG = 4;
-	private static final int STEP_REVIEW = 5;
+	private static final int[] TOGGLE_TYPES =
+		{TYPE_PURCHASE, TYPE_SALE, TYPE_PAYMENT_IN, TYPE_PAYMENT_OUT, TYPE_EXPENSE};
+
+	private static final int STEP_SESSION_SETUP = 0;
+	private static final int STEP_ITEMS_MULTISELECT = 1;
+	private static final int STEP_LINES_LIST = 2;
+	private static final int STEP_LINE_CONFIG = 3;
+	private static final int STEP_REVIEW = 4;
 
 	private DatabaseHelper db;
 	private FrameLayout frameStep;
+	private Button[] toggleButtons;
 	private int currentStep = -1;
 
 	private int entryType;
 	private boolean samePartyForAllItems = true;
 	private Integer sessionPartyId;
 	private String sessionPartyName;
-	private int paymentDirection = DatabaseHelper.PAYMENT_IN;
 
 	private ArrayList<HashMap<String, Object>> allParties;
 	private ArrayList<HashMap<String, Object>> allItems;
@@ -91,8 +96,68 @@ public class GenerateEntriesActivity extends Activity {
 		frameStep = findViewById(R.id.frame_step);
 
 		loadPartiesAndItems();
+		wireTypeToggle();
 
-		goToStep(STEP_TYPE);
+		startType(TYPE_PURCHASE);
+	}
+
+	// =====================
+	// PERSISTENT TYPE TOGGLE (outside frame_step, wired once)
+	// =====================
+
+	private void wireTypeToggle() {
+
+		toggleButtons = new Button[5];
+		toggleButtons[0] = findViewById(R.id.btn_toggle_purchase);
+		toggleButtons[1] = findViewById(R.id.btn_toggle_sale);
+		toggleButtons[2] = findViewById(R.id.btn_toggle_payment_in);
+		toggleButtons[3] = findViewById(R.id.btn_toggle_payment_out);
+		toggleButtons[4] = findViewById(R.id.btn_toggle_expense);
+
+		for (int i = 0; i < toggleButtons.length; i++) {
+
+			final int type = TOGGLE_TYPES[i];
+
+			toggleButtons[i].setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					onTypeToggleClicked(type);
+				}
+			});
+		}
+	}
+
+	private void onTypeToggleClicked(final int type) {
+
+		if (type == entryType) {
+			return;
+		}
+
+		if (lines.isEmpty()) {
+			startType(type);
+			return;
+		}
+
+		new AlertDialog.Builder(this)
+			.setTitle("Switch entry type?")
+			.setMessage(
+				"Switching to " + typeLabel(type) + " clears what you've started for " +
+				typeLabel(entryType) + ".")
+			.setPositiveButton("Switch", new DialogInterface.OnClickListener() {
+				@Override
+				public void onClick(DialogInterface dialog, int which) {
+					startType(type);
+				}
+			})
+			.setNegativeButton("Cancel", null)
+			.show();
+	}
+
+	private void updateToggleVisuals() {
+
+		for (int i = 0; i < toggleButtons.length; i++) {
+			applyToggleState(toggleButtons[i], TOGGLE_TYPES[i] == entryType);
+		}
 	}
 
 	private void loadPartiesAndItems() {
@@ -130,12 +195,8 @@ public class GenerateEntriesActivity extends Activity {
 
 		switch (currentStep) {
 
-			case STEP_TYPE:
-				super.onBackPressed();
-				break;
-
 			case STEP_SESSION_SETUP:
-				goToStep(STEP_TYPE);
+				super.onBackPressed();
 				break;
 
 			case STEP_ITEMS_MULTISELECT:
@@ -143,11 +204,7 @@ public class GenerateEntriesActivity extends Activity {
 				break;
 
 			case STEP_LINES_LIST:
-				if (entryType == TYPE_EXPENSE) {
-					goToStep(STEP_TYPE);
-				} else {
-					goToStep(STEP_SESSION_SETUP);
-				}
+				super.onBackPressed();
 				break;
 
 			case STEP_LINE_CONFIG:
@@ -155,10 +212,10 @@ public class GenerateEntriesActivity extends Activity {
 				break;
 
 			case STEP_REVIEW:
-				if (entryType == TYPE_PAYMENT || entryType == TYPE_EXPENSE) {
-					goToStep(STEP_LINES_LIST);
-				} else {
+				if (entryType == TYPE_PURCHASE || entryType == TYPE_SALE) {
 					goToStep(STEP_ITEMS_MULTISELECT);
+				} else {
+					goToStep(STEP_LINES_LIST);
 				}
 				break;
 
@@ -175,7 +232,6 @@ public class GenerateEntriesActivity extends Activity {
 		int layoutRes;
 
 		switch (step) {
-			case STEP_TYPE: layoutRes = R.layout.step_type_picker; break;
 			case STEP_SESSION_SETUP: layoutRes = R.layout.step_session_setup; break;
 			case STEP_ITEMS_MULTISELECT: layoutRes = R.layout.step_items_multiselect; break;
 			case STEP_LINES_LIST: layoutRes = R.layout.step_lines_list; break;
@@ -188,7 +244,6 @@ public class GenerateEntriesActivity extends Activity {
 		frameStep.addView(view);
 
 		switch (step) {
-			case STEP_TYPE: wireTypePicker(view); break;
 			case STEP_SESSION_SETUP: wireSessionSetup(view); break;
 			case STEP_ITEMS_MULTISELECT: wireItemsMultiselect(view); break;
 			case STEP_LINES_LIST: wireLinesList(view); break;
@@ -198,33 +253,10 @@ public class GenerateEntriesActivity extends Activity {
 	}
 
 	// =====================
-	// STEP 0: TYPE PICKER
+	// Resets session state for the newly-selected type and jumps to its
+	// first step - Purchase/Sale need the party-mode setup step first,
+	// Payment In/Out/Expense go straight to their lines list.
 	// =====================
-
-	private void wireTypePicker(View root) {
-
-		Button btnPurchase = root.findViewById(R.id.btn_type_purchase);
-		Button btnSale = root.findViewById(R.id.btn_type_sale);
-		Button btnPayment = root.findViewById(R.id.btn_type_payment);
-		Button btnExpense = root.findViewById(R.id.btn_type_expense);
-
-		btnPurchase.setOnClickListener(new View.OnClickListener() {
-			@Override public void onClick(View v) { startType(TYPE_PURCHASE); }
-		});
-
-		btnSale.setOnClickListener(new View.OnClickListener() {
-			@Override public void onClick(View v) { startType(TYPE_SALE); }
-		});
-
-		btnPayment.setOnClickListener(new View.OnClickListener() {
-			@Override public void onClick(View v) { startType(TYPE_PAYMENT); }
-		});
-
-		btnExpense.setOnClickListener(new View.OnClickListener() {
-			@Override public void onClick(View v) { startType(TYPE_EXPENSE); }
-		});
-	}
-
 	private void startType(int type) {
 
 		entryType = type;
@@ -232,99 +264,67 @@ public class GenerateEntriesActivity extends Activity {
 		samePartyForAllItems = true;
 		sessionPartyId = null;
 		sessionPartyName = null;
-		paymentDirection = DatabaseHelper.PAYMENT_IN;
 
-		if (type == TYPE_EXPENSE) {
-			goToStep(STEP_LINES_LIST);
-		} else {
+		updateToggleVisuals();
+
+		if (type == TYPE_PURCHASE || type == TYPE_SALE) {
 			goToStep(STEP_SESSION_SETUP);
+		} else {
+			goToStep(STEP_LINES_LIST);
 		}
 	}
 
 	// =====================
-	// STEP 1: SESSION SETUP (party mode / payment direction)
+	// STEP: SESSION SETUP (Purchase/Sale party mode only)
 	// =====================
 
 	private void wireSessionSetup(final View root) {
 
 		TextView title = root.findViewById(R.id.tv_setup_title);
-		LinearLayout groupPartyMode = root.findViewById(R.id.group_party_mode);
-		LinearLayout groupDirection = root.findViewById(R.id.group_payment_direction);
-		final LinearLayout fieldSessionParty = root.findViewById(R.id.field_session_party);
 		TextView sessionPartyLabel = root.findViewById(R.id.tv_session_party_label);
+		final LinearLayout fieldSessionParty = root.findViewById(R.id.field_session_party);
 		final AutoCompleteTextView actvSessionParty = root.findViewById(R.id.actv_session_party);
 
 		final Button btnSame = root.findViewById(R.id.btn_party_mode_same);
 		final Button btnDifferent = root.findViewById(R.id.btn_party_mode_different);
-		final Button btnIn = root.findViewById(R.id.btn_direction_in);
-		final Button btnOut = root.findViewById(R.id.btn_direction_out);
 		Button btnContinue = root.findViewById(R.id.btn_setup_continue);
 
 		setupPartyAutoComplete(actvSessionParty);
 
-		if (entryType == TYPE_PURCHASE || entryType == TYPE_SALE) {
+		title.setText(entryType == TYPE_PURCHASE ? "Purchase Setup" : "Sale Setup");
+		sessionPartyLabel.setText(entryType == TYPE_PURCHASE ? "Supplier" : "Customer");
 
-			title.setText(entryType == TYPE_PURCHASE ? "Purchase Setup" : "Sale Setup");
-			groupPartyMode.setVisibility(View.VISIBLE);
-			sessionPartyLabel.setText(entryType == TYPE_PURCHASE ? "Supplier" : "Customer");
+		applyToggleState(btnSame, samePartyForAllItems);
+		applyToggleState(btnDifferent, !samePartyForAllItems);
+		fieldSessionParty.setVisibility(samePartyForAllItems ? View.VISIBLE : View.GONE);
 
-			applyToggleState(btnSame, samePartyForAllItems);
-			applyToggleState(btnDifferent, !samePartyForAllItems);
-			fieldSessionParty.setVisibility(samePartyForAllItems ? View.VISIBLE : View.GONE);
-
-			if (sessionPartyName != null) {
-				actvSessionParty.setText(sessionPartyName, false);
-			}
-
-			btnSame.setOnClickListener(new View.OnClickListener() {
-				@Override public void onClick(View v) {
-					samePartyForAllItems = true;
-					applyToggleState(btnSame, true);
-					applyToggleState(btnDifferent, false);
-					fieldSessionParty.setVisibility(View.VISIBLE);
-				}
-			});
-
-			btnDifferent.setOnClickListener(new View.OnClickListener() {
-				@Override public void onClick(View v) {
-					samePartyForAllItems = false;
-					applyToggleState(btnSame, false);
-					applyToggleState(btnDifferent, true);
-					fieldSessionParty.setVisibility(View.GONE);
-				}
-			});
-
-		} else {
-
-			title.setText("Payment Setup");
-			groupDirection.setVisibility(View.VISIBLE);
-			fieldSessionParty.setVisibility(View.GONE);
-
-			applyToggleState(btnIn, paymentDirection == DatabaseHelper.PAYMENT_IN);
-			applyToggleState(btnOut, paymentDirection == DatabaseHelper.PAYMENT_OUT);
-
-			btnIn.setOnClickListener(new View.OnClickListener() {
-				@Override public void onClick(View v) {
-					paymentDirection = DatabaseHelper.PAYMENT_IN;
-					applyToggleState(btnIn, true);
-					applyToggleState(btnOut, false);
-				}
-			});
-
-			btnOut.setOnClickListener(new View.OnClickListener() {
-				@Override public void onClick(View v) {
-					paymentDirection = DatabaseHelper.PAYMENT_OUT;
-					applyToggleState(btnIn, false);
-					applyToggleState(btnOut, true);
-				}
-			});
+		if (sessionPartyName != null) {
+			actvSessionParty.setText(sessionPartyName, false);
 		}
+
+		btnSame.setOnClickListener(new View.OnClickListener() {
+			@Override public void onClick(View v) {
+				samePartyForAllItems = true;
+				applyToggleState(btnSame, true);
+				applyToggleState(btnDifferent, false);
+				fieldSessionParty.setVisibility(View.VISIBLE);
+			}
+		});
+
+		btnDifferent.setOnClickListener(new View.OnClickListener() {
+			@Override public void onClick(View v) {
+				samePartyForAllItems = false;
+				applyToggleState(btnSame, false);
+				applyToggleState(btnDifferent, true);
+				fieldSessionParty.setVisibility(View.GONE);
+			}
+		});
 
 		btnContinue.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
 
-				if ((entryType == TYPE_PURCHASE || entryType == TYPE_SALE) && samePartyForAllItems) {
+				if (samePartyForAllItems) {
 
 					String typed = actvSessionParty.getText().toString().trim();
 					Integer partyId = partyIdByName.get(typed);
@@ -338,11 +338,7 @@ public class GenerateEntriesActivity extends Activity {
 					sessionPartyName = typed;
 				}
 
-				if (entryType == TYPE_PURCHASE || entryType == TYPE_SALE) {
-					goToStep(STEP_ITEMS_MULTISELECT);
-				} else {
-					goToStep(STEP_LINES_LIST);
-				}
+				goToStep(STEP_ITEMS_MULTISELECT);
 			}
 		});
 	}
@@ -476,8 +472,10 @@ public class GenerateEntriesActivity extends Activity {
 		Button btnAdd = root.findViewById(R.id.btn_add_line);
 		Button btnContinue = root.findViewById(R.id.btn_lines_continue);
 
-		if (entryType == TYPE_PAYMENT) {
-			title.setText(paymentDirection == DatabaseHelper.PAYMENT_IN ? "Payment In - Lines" : "Payment Out - Lines");
+		if (entryType == TYPE_PAYMENT_IN) {
+			title.setText("Payment In - Lines");
+		} else if (entryType == TYPE_PAYMENT_OUT) {
+			title.setText("Payment Out - Lines");
 		} else {
 			title.setText("Expense Lines");
 		}
@@ -571,7 +569,9 @@ public class GenerateEntriesActivity extends Activity {
 		Button btnSave = root.findViewById(R.id.btn_line_save);
 
 		boolean isItemBased = entryType == TYPE_PURCHASE || entryType == TYPE_SALE;
-		final boolean needsPartyField = entryType == TYPE_PAYMENT || (isItemBased && !samePartyForAllItems);
+		boolean isPayment = entryType == TYPE_PAYMENT_IN || entryType == TYPE_PAYMENT_OUT;
+		final boolean needsPartyField =
+			isPayment || entryType == TYPE_EXPENSE || (isItemBased && !samePartyForAllItems);
 
 		if (isItemBased) {
 
@@ -585,7 +585,7 @@ public class GenerateEntriesActivity extends Activity {
 
 			tvUnitLabel.setText(entryType == TYPE_PURCHASE ? "Purchase Price" : "Sale Price");
 
-		} else if (entryType == TYPE_PAYMENT) {
+		} else if (isPayment) {
 
 			title.setText("Configure Party");
 			tvUnitLabel.setText("Amount");
@@ -605,8 +605,12 @@ public class GenerateEntriesActivity extends Activity {
 
 			groupParty.setVisibility(View.VISIBLE);
 
-			if (entryType == TYPE_PAYMENT) {
-				tvPartyLabel.setText(paymentDirection == DatabaseHelper.PAYMENT_IN ? "Received From" : "Paid To");
+			if (entryType == TYPE_PAYMENT_IN) {
+				tvPartyLabel.setText("Received From");
+			} else if (entryType == TYPE_PAYMENT_OUT) {
+				tvPartyLabel.setText("Paid To");
+			} else if (entryType == TYPE_EXPENSE) {
+				tvPartyLabel.setText("Party (optional)");
 			} else {
 				tvPartyLabel.setText(entryType == TYPE_PURCHASE ? "Supplier" : "Customer");
 			}
@@ -614,9 +618,10 @@ public class GenerateEntriesActivity extends Activity {
 			setupPartyAutoComplete(actvParty);
 
 			// Payment stores its party name in label (label doubles as
-			// the party's display name for that line); Purchase/Sale's
-			// per-item party mode uses linePartyName instead.
-			String prefillPartyName = entryType == TYPE_PAYMENT ? line.label : line.linePartyName;
+			// the party's display name for that line, since a payment
+			// has no separate description); everything else - including
+			// Expense's optional party - uses linePartyName instead.
+			String prefillPartyName = isPayment ? line.label : line.linePartyName;
 
 			if (prefillPartyName != null) {
 				actvParty.setText(prefillPartyName, false);
@@ -702,19 +707,35 @@ public class GenerateEntriesActivity extends Activity {
 		if (needsPartyField) {
 
 			String typed = actvParty.getText().toString().trim();
-			Integer partyId = partyIdByName.get(typed);
+			boolean isPayment = entryType == TYPE_PAYMENT_IN || entryType == TYPE_PAYMENT_OUT;
 
-			if (partyId == null) {
-				Toast.makeText(this, "Select a valid party", Toast.LENGTH_SHORT).show();
-				return;
-			}
+			if (typed.length() == 0 && entryType == TYPE_EXPENSE) {
 
-			if (entryType == TYPE_PAYMENT) {
-				line.refId = partyId;
-				line.label = typed;
+				// Optional for Expense - blank just means no party.
+				line.linePartyId = null;
+				line.linePartyName = null;
+
 			} else {
-				line.linePartyId = partyId;
-				line.linePartyName = typed;
+
+				Integer partyId = partyIdByName.get(typed);
+
+				if (partyId == null) {
+
+					String message = entryType == TYPE_EXPENSE
+						? "Select a valid party, or leave it blank"
+						: "Select a valid party";
+
+					Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+					return;
+				}
+
+				if (isPayment) {
+					line.refId = partyId;
+					line.label = typed;
+				} else {
+					line.linePartyId = partyId;
+					line.linePartyName = typed;
+				}
 			}
 		}
 
@@ -817,7 +838,7 @@ public class GenerateEntriesActivity extends Activity {
 
 			if (entryType == TYPE_PURCHASE || entryType == TYPE_SALE) {
 				recordCount = generatePurchasesOrSales(conn, time, notes);
-			} else if (entryType == TYPE_PAYMENT) {
+			} else if (entryType == TYPE_PAYMENT_IN || entryType == TYPE_PAYMENT_OUT) {
 				recordCount = generatePayments(conn, time, notes);
 			} else {
 				recordCount = generateExpenses(conn, time, notes);
@@ -958,6 +979,8 @@ public class GenerateEntriesActivity extends Activity {
 
 	private int generatePayments(SQLiteDatabase conn, String time, String notes) {
 
+		int direction = entryType == TYPE_PAYMENT_IN ? DatabaseHelper.PAYMENT_IN : DatabaseHelper.PAYMENT_OUT;
+
 		TreeMap<String, HashMap<Integer, Double>> groups = new TreeMap<String, HashMap<Integer, Double>>();
 
 		for (GenerateEntryLine line : lines) {
@@ -998,7 +1021,7 @@ public class GenerateEntriesActivity extends Activity {
 			for (Map.Entry<Integer, Double> partyEntry : dateEntry.getValue().entrySet()) {
 
 				db.insertPaymentBulk(
-					conn, paymentDirection, partyEntry.getKey(), date, time, partyEntry.getValue(), notes);
+					conn, direction, partyEntry.getKey(), date, time, partyEntry.getValue(), notes);
 
 				recordCount++;
 			}
@@ -1023,7 +1046,7 @@ public class GenerateEntriesActivity extends Activity {
 
 				double amount = qty * line.unitValue;
 
-				db.insertExpenseBulk(conn, line.label, e.getKey(), time, amount, notes);
+				db.insertExpenseBulk(conn, line.label, e.getKey(), time, amount, notes, line.linePartyId);
 
 				recordCount++;
 			}
@@ -1079,7 +1102,8 @@ public class GenerateEntriesActivity extends Activity {
 		switch (type) {
 			case TYPE_PURCHASE: return "Purchase";
 			case TYPE_SALE: return "Sale";
-			case TYPE_PAYMENT: return "Payment";
+			case TYPE_PAYMENT_IN: return "Payment In";
+			case TYPE_PAYMENT_OUT: return "Payment Out";
 			default: return "Expense";
 		}
 	}

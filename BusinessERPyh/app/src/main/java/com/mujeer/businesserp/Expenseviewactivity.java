@@ -14,6 +14,7 @@ public class Expenseviewactivity extends Activity {
 
 	private TextView tv_code;
 	private TextView tv_item;
+	private TextView tv_party;
 	private TextView tv_date;
 	private TextView tv_time;
 	private TextView tv_amount;
@@ -36,6 +37,7 @@ public class Expenseviewactivity extends Activity {
 
 		tv_code = findViewById(R.id.tv_code);
 		tv_item = findViewById(R.id.tv_item);
+		tv_party = findViewById(R.id.tv_party);
 		tv_date = findViewById(R.id.tv_date);
 		tv_time = findViewById(R.id.tv_time);
 		tv_amount = findViewById(R.id.tv_amount);
@@ -154,6 +156,19 @@ public class Expenseviewactivity extends Activity {
 			"Item: " +
 			expense.get("item").toString()
 		);
+
+		if (expense.get("party_id") != null) {
+
+			int partyId = (Integer) expense.get("party_id");
+			String partyName = db.getPartyById(partyId);
+
+			tv_party.setText("Party: " + partyName);
+			tv_party.setVisibility(View.VISIBLE);
+
+		} else {
+
+			tv_party.setVisibility(View.GONE);
+		}
 
 		tv_date.setText(
 			"Date: " +

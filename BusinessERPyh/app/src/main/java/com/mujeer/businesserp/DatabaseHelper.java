@@ -149,7 +149,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"date TEXT NOT NULL, " +
 			"time TEXT NOT NULL, " +
 			"amount REAL NOT NULL DEFAULT 0, " +
-			"notes TEXT" +
+			"notes TEXT, " +
+			"party_id INTEGER" +
 			")"
 		);
 
@@ -198,6 +199,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		// an explicit ALTER TABLE here.
 		addColumnIfMissing(db, TABLE_ITEMS, "balance", "REAL NOT NULL DEFAULT 0");
 		addColumnIfMissing(db, TABLE_PARTIES, "balance", "REAL NOT NULL DEFAULT 0");
+		addColumnIfMissing(db, TABLE_EXPENSES, "party_id", "INTEGER");
 
 		dropPurchaseCodeColumnIfPresent(db);
 	}
@@ -3159,7 +3161,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		String date,
 		String time,
 		double amount,
-		String notes
+		String notes,
+		Integer partyId
 	) {
 
 		ContentValues values = new ContentValues();
@@ -3170,6 +3173,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("time", time);
 		values.put("amount", amount);
 		values.put("notes", notes);
+		values.put("party_id", partyId);
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
@@ -3244,6 +3248,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 				)
 			);
 
+			int partyIdIndex = cursor.getColumnIndexOrThrow("party_id");
+
+			if (!cursor.isNull(partyIdIndex)) {
+				map.put("party_id", cursor.getInt(partyIdIndex));
+			}
+
 			list.add(map);
 		}
 
@@ -3299,6 +3309,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 			map.put("notes", cursor.getString(
 						cursor.getColumnIndexOrThrow("notes")));
+
+			int partyIdIndex = cursor.getColumnIndexOrThrow("party_id");
+
+			if (!cursor.isNull(partyIdIndex)) {
+				map.put("party_id", cursor.getInt(partyIdIndex));
+			}
 		}
 
 		cursor.close();
@@ -3318,7 +3334,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		String date,
 		String time,
 		double amount,
-		String notes
+		String notes,
+		Integer partyId
 	) {
 
 		ContentValues values = new ContentValues();
@@ -3328,6 +3345,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("time", time);
 		values.put("amount", amount);
 		values.put("notes", notes);
+		values.put("party_id", partyId);
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
@@ -3408,7 +3426,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 				i * 100,
 
-				"Dummy expense " + i
+				"Dummy expense " + i,
+
+				null
 			);
 		}
 	}
@@ -3927,7 +3947,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		String date,
 		String time,
 		double amount,
-		String notes) {
+		String notes,
+		Integer partyId) {
 
 		ContentValues values = new ContentValues();
 
@@ -3937,6 +3958,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("time", time);
 		values.put("amount", amount);
 		values.put("notes", notes);
+		values.put("party_id", partyId);
 
 		return db.insert(TABLE_EXPENSES, null, values);
 	}

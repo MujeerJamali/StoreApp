@@ -1228,7 +1228,8 @@ public class ImportVyaparActivity extends Activity {
                 formatDate(txnDate),
                 formatTime(txnTime),
                 amount,
-                description == null ? "" : description
+                description == null ? "" : description,
+                null
             );
 
             helper.markImportKeyUsedBulk(db, importKey);

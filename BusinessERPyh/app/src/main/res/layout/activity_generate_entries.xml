@@ -1,12 +1,91 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background">
+    android:background="@color/background"
+    android:orientation="vertical">
+
+    <!-- Persistent type toggle - stays visible across every step so
+         switching between Purchase/Sale/Payment In/Payment Out/Expense
+         is one tap from anywhere, instead of a separate picker screen
+         you have to back out to in order to change your mind. -->
+    <LinearLayout
+        android:id="@+id/row_type_toggle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/surface"
+        android:elevation="@dimen/elevation_card"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <Button
+            android:id="@+id/btn_toggle_purchase"
+            style="@style/AppButton.Outline.Small"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="3dp"
+            android:layout_weight="1"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:text="Purchase"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/btn_toggle_sale"
+            style="@style/AppButton.Outline.Small"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="3dp"
+            android:layout_weight="1"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:text="Sale"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/btn_toggle_payment_in"
+            style="@style/AppButton.Outline.Small"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="3dp"
+            android:layout_weight="1"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:text="Pay In"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/btn_toggle_payment_out"
+            style="@style/AppButton.Outline.Small"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="3dp"
+            android:layout_weight="1"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:text="Pay Out"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/btn_toggle_expense"
+            style="@style/AppButton.Outline.Small"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:text="Expense"
+            android:textSize="11sp" />
+
+    </LinearLayout>
 
     <FrameLayout
         android:id="@+id/frame_step"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
-</FrameLayout>
+</LinearLayout>

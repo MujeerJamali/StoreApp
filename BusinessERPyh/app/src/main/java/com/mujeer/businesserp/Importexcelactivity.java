@@ -749,7 +749,11 @@ public class Importexcelactivity extends Activity {
 					String expenseItem = category.length() > 0 ? category
 						: (description.length() > 0 ? description : "Imported Expense");
 
-					dbHelper.insertExpenseBulk(db, expenseItem, date, time, amount, description);
+					Integer expensePartyId = partyName != null && partyName.trim().length() > 0
+						? dbHelper.getOrCreatePartyIdBulk(db, partyName)
+						: null;
+
+					dbHelper.insertExpenseBulk(db, expenseItem, date, time, amount, description, expensePartyId);
 
 					imported++;
 
