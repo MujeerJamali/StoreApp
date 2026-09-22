@@ -14,7 +14,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:layout_marginBottom="12dp"
-        android:text="Saves everything in this app - parties, items, purchases, sales, payments, party transfers, and expenses - into a .vyb file in the same format &quot;Import Vyapar Backup&quot; reads. Use it to back up this device or move your data to another install; importing it back into this same app will duplicate your transactions."
+        android:text="Saves everything in this app - parties, items, purchases, sales, payments, party transfers, and expenses - into a .vyb file in the same format &quot;Restore Vyapar Backup&quot; reads. Use it to back up this device or move your data to another install; restoring it back into this same app will replace everything with this snapshot."
         android:textColor="@color/text_secondary"
         android:textSize="13sp" />
 

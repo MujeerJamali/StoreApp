@@ -7,14 +7,14 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <TextView style="@style/PageTitle" android:text="Import Vyapar Backup" />
+    <TextView style="@style/PageTitle" android:text="Restore Vyapar Backup" />
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:layout_marginBottom="12dp"
-        android:text="Separate from the Excel importer - imports directly from a Vyapar .vyb backup file."
+        android:text="Separate from the Excel importer - restores directly from a Vyapar .vyb backup file. This replaces everything currently in the app, it does not merge with it - you'll be asked to confirm before anything is deleted."
         android:textColor="@color/text_secondary"
         android:textSize="13sp" />
 
@@ -23,7 +23,7 @@
         style="@style/AppButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Select .vyb Backup File" />
+        android:text="Select .vyb Backup File to Restore" />
 
     <Button
         android:id="@+id/btn_view_skipped_vyb"

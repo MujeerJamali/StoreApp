@@ -37,19 +37,17 @@ import java.util.zip.ZipOutputStream;
 // more tables/columns this app has no way to know about, plus whatever
 // internal versioning/checksum bookkeeping the real app relies on. What
 // this DOES give you is a working round trip through this app's own
-// importer: export here, then "Import Vyapar Backup" on a fresh install
-// (or a different device) restores everything, using the exact same file
-// format and mechanism as restoring an actual Vyapar backup.
+// importer: export here, then "Restore Vyapar Backup" restores everything
+// from it, using the exact same file format and mechanism as restoring an
+// actual Vyapar backup.
 //
-// Importing your OWN export back into the SAME live database is not the
-// intended use: parties/items dedupe by name (via getOrCreatePartyIdBulk/
-// the vyb item-code lookup), but purchases/sales/payments/expenses/
-// transfers do not carry any content-based dedup, only per-run import-key
-// tracking - the first time a given export file is imported anywhere,
-// its transactions are new rows there, exactly like importing any other
-// backup you've never imported before. Use this to back up and restore to
-// a fresh install or a different device, not to "sync" back into the app
-// you exported from.
+// ImportVyaparActivity is a full restore, not a merge - it clears every
+// party/item/purchase/sale/payment/expense/transfer already in the app
+// before writing this file's data in fresh (with a confirmation first,
+// since that's destructive). So restoring your own export back into the
+// same live app resets it to exactly that export's snapshot, discarding
+// anything added since - it's meant for a fresh install or a different
+// device, not as a way to merge data back in.
 // =====================
 public class ExportVyaparActivity extends Activity {
 
@@ -272,9 +270,9 @@ public class ExportVyaparActivity extends Activity {
 
 			setStatus(
 				"Backup saved.\n\nRestore it later - on this device after a reinstall, or on " +
-				"another device with this app - using \"Import Vyapar Backup\". Importing it back " +
-				"into this same app without reinstalling will duplicate your purchases/sales/" +
-				"payments/expenses, so save this for a fresh install or another device.");
+				"another device with this app - using \"Restore Vyapar Backup\". Restoring it " +
+				"replaces everything currently there, so don't restore it back into this same " +
+				"app unless you want to reset it to this exact snapshot.");
 
 		} catch (Exception e) {
 

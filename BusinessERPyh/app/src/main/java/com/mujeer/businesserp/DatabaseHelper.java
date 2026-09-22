@@ -4050,6 +4050,42 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// Wipes every row from every table, for a full "restore from backup"
+	// that replaces the database rather than merging into it. Unlike
+	// deleteAllPurchases()/deleteAllSales()/deleteAllPayments(), this
+	// does not bother reversing each row's party-balance adjustment
+	// first - parties.balance is being deleted right along with the
+	// party rows themselves in this same pass, so there is nothing left
+	// for a stray adjustment to strand.
+	//
+	// Also clears import_log and vyb_import_map (which the per-table
+	// deleteAllX() methods don't all do consistently - see
+	// deleteAllItems()'s comment) - once the data they were tracking is
+	// gone, keeping their "already imported" keys around would make the
+	// very next import of the same backup wrongly skip everything as a
+	// duplicate.
+	//
+	// Runs on the shared beginTransaction()/getMigrationDatabase()
+	// connection so the caller can wrap "clear, then import" as one
+	// atomic transaction - a failure partway through the import leaves
+	// the original data intact instead of an empty database.
+	// =====================
+	public void clearAllDataBulk(SQLiteDatabase db) {
+
+		db.delete(TABLE_PURCHASE_ITEMS, null, null);
+		db.delete(TABLE_PURCHASES, null, null);
+		db.delete("sale_items", null, null);
+		db.delete("sales", null, null);
+		db.delete(TABLE_PAYMENTS, null, null);
+		db.delete(TABLE_EXPENSES, null, null);
+		db.delete(TABLE_PARTY_TRANSFERS, null, null);
+		db.delete(TABLE_ITEMS, null, null);
+		db.delete(TABLE_PARTIES, null, null);
+		db.delete(TABLE_IMPORT_LOG, null, null);
+		db.delete(TABLE_VYB_IMPORT_MAP, null, null);
+	}
+
+	// =====================
 	// BULK PURCHASE IMPORT (Excel -> new Purchase)
 	// The *Bulk() methods below use the shared SQLiteDatabase from
 	// beginTransaction()/getMigrationDatabase(), same convention as the

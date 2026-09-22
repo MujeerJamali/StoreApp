@@ -1,7 +1,9 @@
 package com.mujeer.businesserp;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ContentResolver;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -22,19 +24,27 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 // =====================
-// Imports directly from a Vyapar (.vyb) backup file - a zip that wraps a
-// real SQLite database. This is a completely separate import path from
-// Importexcelactivity/DatabaseHelper's Excel-import helpers: it never
-// touches Excel, and it never modifies an existing row, so the Excel
-// importer stays fully usable as a fallback while this is being tested.
+// Restores from a Vyapar (.vyb) backup file - a zip that wraps a real
+// SQLite database. This is a full restore, not a merge: confirmAndRunImport()
+// warns the user, and runImport() then clears every party, item, purchase,
+// sale, payment, expense, and transfer currently in the app (see
+// DatabaseHelper.clearAllDataBulk()) before writing the backup's data in
+// fresh, all inside one transaction so a failure partway through leaves
+// the original data intact instead of an empty database. This is a
+// completely separate import path from Importexcelactivity/
+// DatabaseHelper's Excel-import helpers - it never touches Excel.
 //
 // It reuses DatabaseHelper's existing bulk-insert helpers (the same ones
 // the Excel importer uses) for every table it writes to, plus a small
 // set of Vyapar-specific additions (insertItemBulk, insertPartyTransferBulk,
-// getVybLocalId/saveVybLocalId) added alongside them.
+// getVybLocalId/saveVybLocalId) added alongside them. The per-run
+// duplicate tracking those rely on stays useful within a single import
+// (e.g. two rows in the backup pointing at the same source id), even
+// though the database was just cleared, so nothing in this file's own
+// per-table import methods needed to change.
 //
 // Import order (matches the relationships in Vyapar's own schema):
-// Parties -> Items -> Purchases -> Purchase Line Items -> Sales ->
+// Clear -> Parties -> Items -> Purchases -> Purchase Line Items -> Sales ->
 // Sale Line Items -> Payment In -> Payment Out -> Party to Party transfers.
 // =====================
 public class ImportVyaparActivity extends Activity {
@@ -130,13 +140,39 @@ public class ImportVyaparActivity extends Activity {
 
             final Uri uri = data.getData();
 
-            new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        runImport(uri);
-                    }
-                }).start();
+            confirmAndRunImport(uri);
         }
+    }
+
+    // =====================
+    // This is a full restore, not a merge - runImport() clears every
+    // party/item/purchase/sale/payment/expense/transfer currently in the
+    // app before writing the backup's data in fresh. That's destructive
+    // and can't be undone, so it needs an explicit confirmation before
+    // anything is touched.
+    // =====================
+    private void confirmAndRunImport(final Uri uri) {
+
+        new AlertDialog.Builder(this)
+            .setTitle("Replace all data?")
+            .setMessage(
+                "This deletes every party, item, purchase, sale, payment, expense, and " +
+                "transfer currently in the app, then imports this backup. This cannot be undone."
+            )
+            .setPositiveButton("Delete and Import", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+
+                        new Thread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    runImport(uri);
+                                }
+                            }).start();
+                    }
+                })
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 
     private void setStatus(final String text) {
@@ -194,6 +230,14 @@ public class ImportVyaparActivity extends Activity {
             helper = new DatabaseHelper(this);
             helper.beginTransaction();
             SQLiteDatabase db = helper.getMigrationDatabase();
+
+            // This is a restore, not a merge: everything currently in the
+            // app is wiped before the backup goes in, inside this same
+            // transaction, so a failure partway through the import below
+            // rolls this back too and leaves the original data intact
+            // rather than an empty database.
+            setStatus("Clearing existing data...");
+            helper.clearAllDataBulk(db);
 
             HashMap<Long, Integer> partyIdMap = new HashMap<Long, Integer>();
             HashMap<Long, Integer> itemIdMap = new HashMap<Long, Integer>();
