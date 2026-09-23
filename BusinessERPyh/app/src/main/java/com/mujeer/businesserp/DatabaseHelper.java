@@ -4718,6 +4718,44 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return db.insert(TABLE_ITEMS, null, values);
 	}
 
+	// =====================
+	// Bulk-import counterparts of createVarietyGroup()/addVarietyValue():
+	// plain inserts with no grid-generation or balance-migration side
+	// effects, since a Vyapar/.vyb import is replaying a backup's own
+	// exact groups/values/combos verbatim rather than interactively
+	// building them up. insertVarietyComboBulk() always writes balance
+	// 0 - like insertItemBulk() above, the real balance is left to
+	// accumulate naturally as the backup's purchase/sale line items are
+	// replayed through insertPurchaseItemBulk()/insertSaleItemBulk()
+	// (each of which calls adjustComboBalance()), not written up front.
+	// =====================
+	public long insertVarietyGroupBulk(
+		SQLiteDatabase db, int itemId, String name, int sortOrder) {
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.put("name", name);
+		values.put("sort_order", sortOrder);
+
+		return db.insert(TABLE_VARIETY_GROUPS, null, values);
+	}
+
+	public long insertVarietyValueBulk(
+		SQLiteDatabase db, int groupId, String label, int sortOrder, boolean isDefault) {
+
+		return insertVarietyValueRow(db, groupId, label, sortOrder, isDefault);
+	}
+
+	public long insertVarietyComboBulk(SQLiteDatabase db, int itemId) {
+		return insertComboRow(db, itemId, 0.0);
+	}
+
+	public void linkComboValueBulk(
+		SQLiteDatabase db, long comboId, long groupId, long valueId) {
+
+		linkComboValue(db, comboId, groupId, valueId);
+	}
+
 	// Records a party-to-party transfer imported from Vyapar. The paying
 	// party's balance moves the same direction as a Payment In (money
 	// leaving them reduces what they owe us / increases what we owe
@@ -4817,6 +4855,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		db.delete(TABLE_PAYMENTS, null, null);
 		db.delete(TABLE_EXPENSES, null, null);
 		db.delete(TABLE_PARTY_TRANSFERS, null, null);
+		db.delete(TABLE_VARIETY_COMBO_VALUES, null, null);
+		db.delete(TABLE_VARIETY_COMBOS, null, null);
+		db.delete(TABLE_VARIETY_VALUES, null, null);
+		db.delete(TABLE_VARIETY_GROUPS, null, null);
 		db.delete(TABLE_ITEMS, null, null);
 		db.delete(TABLE_PARTIES, null, null);
 		db.delete(TABLE_IMPORT_LOG, null, null);

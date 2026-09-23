@@ -30,7 +30,10 @@ import java.util.zip.ZipOutputStream;
 // ImportVyaparActivity reads (kb_names, kb_items, kb_transactions,
 // kb_lineitems, party_to_party_transfer - see that class's comments for
 // the exact fields each one carries; every column written here is one the
-// importer actually reads, nothing more).
+// importer actually reads, nothing more), plus this app's own item
+// varieties (groups/values/combos, and each line item's chosen combo_id)
+// in four extra businesserp_variety_* tables that have no equivalent in
+// Vyapar's own schema - see createVyaparShapedTables() below.
 //
 // This is NOT a claim that a real Vyapar app can restore from this file -
 // Vyapar's actual schema is closed source and almost certainly has many
@@ -142,6 +145,10 @@ public class ExportVyaparActivity extends Activity {
 
 			exportParties(local, vyb);
 			exportItems(local, vyb);
+			exportVarietyGroups(local, vyb);
+			exportVarietyValues(local, vyb);
+			exportVarietyCombos(local, vyb);
+			exportVarietyComboValues(local, vyb);
 			exportExpenseCategories(local, vyb, expenseCategoryNameId);
 			exportPurchases(local, vyb);
 			exportPurchaseItems(local, vyb);
@@ -371,7 +378,8 @@ public class ExportVyaparActivity extends Activity {
 			"item_id INTEGER, " +
 			"quantity REAL, " +
 			"priceperunit REAL, " +
-			"total_amount REAL" +
+			"total_amount REAL, " +
+			"combo_id INTEGER" +
 			")"
 		);
 
@@ -383,6 +391,49 @@ public class ExportVyaparActivity extends Activity {
 			"p_paid_txn_id INTEGER, " +
 			"p_txn_date TEXT, " +
 			"p_txn_description TEXT" +
+			")"
+		);
+
+		// This app's own extension, not part of the Vyapar-shaped subset
+		// above - a real Vyapar backup will never have these tables (or
+		// kb_lineitems.combo_id), which is exactly how ImportVyaparActivity
+		// tells the two apart and skips variety import for a plain Vyapar
+		// backup instead of failing. Ids are copied straight from the
+		// local database (fresh tables of their own, so unlike the
+		// kb_transactions/kb_lineitems id space there's no risk of
+		// collision that would need an offset).
+		vyb.execSQL(
+			"CREATE TABLE businesserp_variety_groups (" +
+			"group_id INTEGER PRIMARY KEY, " +
+			"item_id INTEGER, " +
+			"name TEXT, " +
+			"sort_order INTEGER" +
+			")"
+		);
+
+		vyb.execSQL(
+			"CREATE TABLE businesserp_variety_values (" +
+			"value_id INTEGER PRIMARY KEY, " +
+			"group_id INTEGER, " +
+			"label TEXT, " +
+			"sort_order INTEGER, " +
+			"is_default INTEGER" +
+			")"
+		);
+
+		vyb.execSQL(
+			"CREATE TABLE businesserp_variety_combos (" +
+			"combo_id INTEGER PRIMARY KEY, " +
+			"item_id INTEGER" +
+			")"
+		);
+
+		vyb.execSQL(
+			"CREATE TABLE businesserp_variety_combo_values (" +
+			"combo_id INTEGER, " +
+			"group_id INTEGER, " +
+			"value_id INTEGER, " +
+			"PRIMARY KEY (combo_id, group_id)" +
 			")"
 		);
 	}
@@ -427,6 +478,96 @@ public class ExportVyaparActivity extends Activity {
 			values.put("item_type", 1);
 
 			vyb.insert("kb_items", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// VARIETY GROUPS -> businesserp_variety_groups (1:1 copy)
+	// =====================
+	private void exportVarietyGroups(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery(
+			"SELECT id, item_id, name, sort_order FROM variety_groups", null);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("group_id", c.getLong(0));
+			values.put("item_id", c.getLong(1));
+			values.put("name", c.getString(2));
+			values.put("sort_order", c.getInt(3));
+
+			vyb.insert("businesserp_variety_groups", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// VARIETY VALUES -> businesserp_variety_values (1:1 copy)
+	// =====================
+	private void exportVarietyValues(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery(
+			"SELECT id, group_id, label, sort_order, is_default FROM variety_values", null);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("value_id", c.getLong(0));
+			values.put("group_id", c.getLong(1));
+			values.put("label", c.getString(2));
+			values.put("sort_order", c.getInt(3));
+			values.put("is_default", c.getInt(4));
+
+			vyb.insert("businesserp_variety_values", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// VARIETY COMBOS -> businesserp_variety_combos. balance is
+	// intentionally not exported - like items.balance itself, the
+	// importer rebuilds it by replaying the backup's purchase/sale line
+	// items rather than trusting a point-in-time snapshot number, so
+	// there's nothing here for it to read.
+	// =====================
+	private void exportVarietyCombos(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery(
+			"SELECT id, item_id FROM variety_combos", null);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("combo_id", c.getLong(0));
+			values.put("item_id", c.getLong(1));
+
+			vyb.insert("businesserp_variety_combos", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// VARIETY COMBO VALUES -> businesserp_variety_combo_values (1:1 copy)
+	// =====================
+	private void exportVarietyComboValues(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery(
+			"SELECT combo_id, group_id, value_id FROM variety_combo_values", null);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("combo_id", c.getLong(0));
+			values.put("group_id", c.getLong(1));
+			values.put("value_id", c.getLong(2));
+
+			vyb.insert("businesserp_variety_combo_values", null, values);
 		}
 
 		c.close();
@@ -515,7 +656,8 @@ public class ExportVyaparActivity extends Activity {
 	private void exportPurchaseItems(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
-			"SELECT id, purchase_id, item_id, quantity, purchase_price, total FROM purchase_items", null);
+			"SELECT id, purchase_id, item_id, quantity, purchase_price, total, combo_id " +
+			"FROM purchase_items", null);
 
 		while (c.moveToNext()) {
 
@@ -525,6 +667,7 @@ public class ExportVyaparActivity extends Activity {
 			double quantity = c.getDouble(3);
 			double price = c.getDouble(4);
 			double total = c.getDouble(5);
+			Integer comboId = c.isNull(6) ? null : c.getInt(6);
 
 			ContentValues values = new ContentValues();
 			values.put("lineitem_id", id);
@@ -533,6 +676,7 @@ public class ExportVyaparActivity extends Activity {
 			values.put("quantity", quantity);
 			values.put("priceperunit", price);
 			values.put("total_amount", total);
+			values.put("combo_id", comboId);
 
 			vyb.insert("kb_lineitems", null, values);
 		}
@@ -596,7 +740,7 @@ public class ExportVyaparActivity extends Activity {
 	private void exportSaleItems(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
-			"SELECT id, sale_id, item_id, qty, rate, amount FROM sale_items", null);
+			"SELECT id, sale_id, item_id, qty, rate, amount, combo_id FROM sale_items", null);
 
 		while (c.moveToNext()) {
 
@@ -606,6 +750,7 @@ public class ExportVyaparActivity extends Activity {
 			double qty = c.getDouble(3);
 			double rate = c.getDouble(4);
 			double amount = c.getDouble(5);
+			Integer comboId = c.isNull(6) ? null : c.getInt(6);
 
 			ContentValues values = new ContentValues();
 			values.put("lineitem_id", OFFSET_SALE_LINEITEM + id);
@@ -614,6 +759,7 @@ public class ExportVyaparActivity extends Activity {
 			values.put("quantity", qty);
 			values.put("priceperunit", rate);
 			values.put("total_amount", amount);
+			values.put("combo_id", comboId);
 
 			vyb.insert("kb_lineitems", null, values);
 		}

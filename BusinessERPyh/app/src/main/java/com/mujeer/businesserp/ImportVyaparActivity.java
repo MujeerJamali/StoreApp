@@ -44,8 +44,17 @@ import java.util.zip.ZipInputStream;
 // per-table import methods needed to change.
 //
 // Import order (matches the relationships in Vyapar's own schema):
-// Clear -> Parties -> Items -> Purchases -> Purchase Line Items -> Sales ->
-// Sale Line Items -> Payment In -> Payment Out -> Party to Party transfers.
+// Clear -> Parties -> Items -> [Item Varieties] -> Purchases -> Purchase
+// Line Items -> Sales -> Sale Line Items -> Payment In -> Payment Out ->
+// Party to Party transfers -> Expenses.
+//
+// Item Varieties (groups/values/combos, and each line item's combo_id) is
+// this app's own extension - see ExportVyaparActivity's businesserp_
+// variety_* tables. It's entirely optional: a real Vyapar backup, or an
+// export made before this app had varieties, simply won't have those
+// tables/columns, which hasVarietyTables/lineItemsHaveComboId below detect
+// up front so that whole step (and combo_id resolution on line items) is
+// just skipped rather than failing the import.
 // =====================
 public class ImportVyaparActivity extends Activity {
 
@@ -80,6 +89,9 @@ public class ImportVyaparActivity extends Activity {
     private static class Counts {
         int partiesImported, partiesDuplicate;
         int itemsImported, itemsDuplicate;
+        int varietyGroupsImported, varietyGroupsDuplicate;
+        int varietyValuesImported, varietyValuesDuplicate;
+        int varietyCombosImported, varietyCombosDuplicate;
         int purchasesImported, purchasesDuplicate;
         int purchaseItemsImported, purchaseItemsDuplicate;
         int salesImported, salesDuplicate;
@@ -227,6 +239,13 @@ public class ImportVyaparActivity extends Activity {
                 throw new Exception("This file doesn't look like a Vyapar backup (expected tables not found).");
             }
 
+            // This app's own extension (see ExportVyaparActivity) - absent
+            // from a real Vyapar backup, or one exported before item
+            // varieties existed, in which case variety import is simply
+            // skipped below rather than failing the whole restore.
+            boolean hasVarietyTables = tableExists(vyaparDb, "businesserp_variety_groups");
+            boolean lineItemsHaveComboId = columnExists(vyaparDb, "kb_lineitems", "combo_id");
+
             helper = new DatabaseHelper(this);
             helper.beginTransaction();
             SQLiteDatabase db = helper.getMigrationDatabase();
@@ -241,6 +260,9 @@ public class ImportVyaparActivity extends Activity {
 
             HashMap<Long, Integer> partyIdMap = new HashMap<Long, Integer>();
             HashMap<Long, Integer> itemIdMap = new HashMap<Long, Integer>();
+            HashMap<Long, Integer> varietyGroupIdMap = new HashMap<Long, Integer>();
+            HashMap<Long, Integer> varietyValueIdMap = new HashMap<Long, Integer>();
+            HashMap<Long, Integer> varietyComboIdMap = new HashMap<Long, Integer>();
             HashMap<Long, Long> purchaseIdMap = new HashMap<Long, Long>();
             HashMap<Long, Long> saleIdMap = new HashMap<Long, Long>();
 
@@ -250,17 +272,31 @@ public class ImportVyaparActivity extends Activity {
             setStatus("Importing items...");
             importItems(vyaparDb, helper, db, itemIdMap, skipped, counts);
 
+            if (hasVarietyTables) {
+
+                setStatus("Importing item varieties...");
+                importVarietyGroups(vyaparDb, helper, db, itemIdMap, varietyGroupIdMap, skipped, counts);
+                importVarietyValues(vyaparDb, helper, db, varietyGroupIdMap, varietyValueIdMap, skipped, counts);
+                importVarietyCombos(vyaparDb, helper, db, itemIdMap, varietyComboIdMap, skipped, counts);
+                importVarietyComboValues(
+                    vyaparDb, helper, db, varietyComboIdMap, varietyGroupIdMap, varietyValueIdMap, skipped);
+            }
+
             setStatus("Importing purchases...");
             importPurchases(vyaparDb, helper, db, partyIdMap, purchaseIdMap, skipped, counts);
 
             setStatus("Importing purchase line items...");
-            importPurchaseLineItems(vyaparDb, helper, db, purchaseIdMap, itemIdMap, skipped, counts);
+            importPurchaseLineItems(
+                vyaparDb, helper, db, purchaseIdMap, itemIdMap, varietyComboIdMap,
+                lineItemsHaveComboId, skipped, counts);
 
             setStatus("Importing sales...");
             importSales(vyaparDb, helper, db, partyIdMap, saleIdMap, skipped, counts);
 
             setStatus("Importing sale line items...");
-            importSaleLineItems(vyaparDb, helper, db, saleIdMap, itemIdMap, skipped, counts);
+            importSaleLineItems(
+                vyaparDb, helper, db, saleIdMap, itemIdMap, varietyComboIdMap,
+                lineItemsHaveComboId, skipped, counts);
 
             setStatus("Importing payments in...");
             importPayments(vyaparDb, helper, db, partyIdMap, skipped, counts, 3, true);
@@ -328,6 +364,12 @@ public class ImportVyaparActivity extends Activity {
 								   + " imported, " + finalCounts.partiesDuplicate + " already imported\n");
                     summary.append("Items: " + finalCounts.itemsImported
 								   + " imported, " + finalCounts.itemsDuplicate + " already imported\n");
+                    if (finalCounts.varietyGroupsImported > 0 || finalCounts.varietyGroupsDuplicate > 0) {
+                        summary.append("Variety groups: " + finalCounts.varietyGroupsImported
+									   + " imported, " + finalCounts.varietyGroupsDuplicate + " already imported\n");
+                        summary.append("Variety values: " + finalCounts.varietyValuesImported
+									   + " imported, " + finalCounts.varietyValuesDuplicate + " already imported\n");
+                    }
                     summary.append("Purchases: " + finalCounts.purchasesImported
 								   + " imported, " + finalCounts.purchasesDuplicate + " already imported\n");
                     summary.append("Purchase line items: " + finalCounts.purchaseItemsImported
@@ -459,6 +501,40 @@ public class ImportVyaparActivity extends Activity {
         }
 
         return vyaparDate.substring(0, 10);
+    }
+
+    private boolean tableExists(SQLiteDatabase db, String table) {
+
+        Cursor c = db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            new String[]{table}
+        );
+
+        boolean exists = c.getCount() > 0;
+
+        c.close();
+
+        return exists;
+    }
+
+    private boolean columnExists(SQLiteDatabase db, String table, String column) {
+
+        Cursor c = db.rawQuery("PRAGMA table_info(" + table + ")", null);
+
+        int nameIndex = c.getColumnIndex("name");
+        boolean exists = false;
+
+        while (c.moveToNext()) {
+
+            if (column.equalsIgnoreCase(c.getString(nameIndex))) {
+                exists = true;
+                break;
+            }
+        }
+
+        c.close();
+
+        return exists;
     }
 
     private void addSkipped(ArrayList<SkippedRow> skipped, String table, long vyaparId, String reason) {
@@ -646,6 +722,269 @@ public class ImportVyaparActivity extends Activity {
         return null;
     }
 
+    private Integer resolveVarietyGroup(
+        DatabaseHelper helper, SQLiteDatabase db, HashMap<Long, Integer> groupIdMap, long groupId) {
+
+        Integer id = groupIdMap.get(groupId);
+
+        if (id != null) {
+            return id;
+        }
+
+        Long fromMap = helper.getVybLocalId(db, "variety_group", groupId);
+
+        if (fromMap != null) {
+            groupIdMap.put(groupId, fromMap.intValue());
+            return fromMap.intValue();
+        }
+
+        return null;
+    }
+
+    private Integer resolveVarietyValue(
+        DatabaseHelper helper, SQLiteDatabase db, HashMap<Long, Integer> valueIdMap, long valueId) {
+
+        Integer id = valueIdMap.get(valueId);
+
+        if (id != null) {
+            return id;
+        }
+
+        Long fromMap = helper.getVybLocalId(db, "variety_value", valueId);
+
+        if (fromMap != null) {
+            valueIdMap.put(valueId, fromMap.intValue());
+            return fromMap.intValue();
+        }
+
+        return null;
+    }
+
+    private Integer resolveVarietyCombo(
+        DatabaseHelper helper, SQLiteDatabase db, HashMap<Long, Integer> comboIdMap, long comboId) {
+
+        Integer id = comboIdMap.get(comboId);
+
+        if (id != null) {
+            return id;
+        }
+
+        Long fromMap = helper.getVybLocalId(db, "variety_combo", comboId);
+
+        if (fromMap != null) {
+            comboIdMap.put(comboId, fromMap.intValue());
+            return fromMap.intValue();
+        }
+
+        return null;
+    }
+
+    // =====================
+    // STEP 2b - ITEM VARIETIES (businesserp_variety_groups/values/combos/
+    // combo_values - this app's own extension, only present when
+    // hasVarietyTables was true). Order matters: groups before values
+    // before combos before combo_values, since each references the one
+    // before it.
+    // =====================
+    private void importVarietyGroups(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> itemIdMap,
+        HashMap<Long, Integer> groupIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT group_id, item_id, name, sort_order FROM businesserp_variety_groups", null);
+
+        while (c.moveToNext()) {
+
+            long groupId = c.getLong(0);
+            long itemId = c.getLong(1);
+            String name = c.getString(2);
+            int sortOrder = c.getInt(3);
+
+            String importKey = "vyb_variety_group_" + groupId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+
+                Long localId = helper.getVybLocalId(db, "variety_group", groupId);
+
+                if (localId != null) {
+                    groupIdMap.put(groupId, localId.intValue());
+                }
+
+                counts.varietyGroupsDuplicate++;
+                continue;
+            }
+
+            Integer localItemId = resolveItem(helper, db, itemIdMap, itemId);
+
+            if (localItemId == null) {
+                addSkipped(skipped, "variety_group", groupId, "Item for this variety group was not found/imported");
+                continue;
+            }
+
+            long localId = helper.insertVarietyGroupBulk(
+                db, localItemId, name == null ? "" : name, sortOrder);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            helper.saveVybLocalId(db, "variety_group", groupId, localId);
+
+            groupIdMap.put(groupId, (int) localId);
+            counts.varietyGroupsImported++;
+        }
+
+        c.close();
+    }
+
+    private void importVarietyValues(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> groupIdMap,
+        HashMap<Long, Integer> valueIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT value_id, group_id, label, sort_order, is_default FROM businesserp_variety_values", null);
+
+        while (c.moveToNext()) {
+
+            long valueId = c.getLong(0);
+            long groupId = c.getLong(1);
+            String label = c.getString(2);
+            int sortOrder = c.getInt(3);
+            boolean isDefault = c.getInt(4) != 0;
+
+            String importKey = "vyb_variety_value_" + valueId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+
+                Long localId = helper.getVybLocalId(db, "variety_value", valueId);
+
+                if (localId != null) {
+                    valueIdMap.put(valueId, localId.intValue());
+                }
+
+                counts.varietyValuesDuplicate++;
+                continue;
+            }
+
+            Integer localGroupId = resolveVarietyGroup(helper, db, groupIdMap, groupId);
+
+            if (localGroupId == null) {
+                addSkipped(skipped, "variety_value", valueId, "Variety group for this value was not found/imported");
+                continue;
+            }
+
+            long localId = helper.insertVarietyValueBulk(
+                db, localGroupId, label == null ? "" : label, sortOrder, isDefault);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            helper.saveVybLocalId(db, "variety_value", valueId, localId);
+
+            valueIdMap.put(valueId, (int) localId);
+            counts.varietyValuesImported++;
+        }
+
+        c.close();
+    }
+
+    // Combos are always created at 0 balance regardless of anything the
+    // backup might carry - see insertVarietyComboBulk()'s comment. The
+    // real balance builds back up naturally as this same import replays
+    // the backup's purchase/sale line items below.
+    private void importVarietyCombos(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> itemIdMap,
+        HashMap<Long, Integer> comboIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT combo_id, item_id FROM businesserp_variety_combos", null);
+
+        while (c.moveToNext()) {
+
+            long comboId = c.getLong(0);
+            long itemId = c.getLong(1);
+
+            String importKey = "vyb_variety_combo_" + comboId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+
+                Long localId = helper.getVybLocalId(db, "variety_combo", comboId);
+
+                if (localId != null) {
+                    comboIdMap.put(comboId, localId.intValue());
+                }
+
+                counts.varietyCombosDuplicate++;
+                continue;
+            }
+
+            Integer localItemId = resolveItem(helper, db, itemIdMap, itemId);
+
+            if (localItemId == null) {
+                addSkipped(skipped, "variety_combo", comboId, "Item for this variety combo was not found/imported");
+                continue;
+            }
+
+            long localId = helper.insertVarietyComboBulk(db, localItemId);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            helper.saveVybLocalId(db, "variety_combo", comboId, localId);
+
+            comboIdMap.put(comboId, (int) localId);
+            counts.varietyCombosImported++;
+        }
+
+        c.close();
+    }
+
+    // No per-row dedup tracking needed - linkComboValueBulk() upserts
+    // (combo_id, group_id) is its own primary key, so replaying the same
+    // link twice is naturally idempotent.
+    private void importVarietyComboValues(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> comboIdMap,
+        HashMap<Long, Integer> groupIdMap,
+        HashMap<Long, Integer> valueIdMap,
+        ArrayList<SkippedRow> skipped) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT combo_id, group_id, value_id FROM businesserp_variety_combo_values", null);
+
+        while (c.moveToNext()) {
+
+            long comboId = c.getLong(0);
+            long groupId = c.getLong(1);
+            long valueId = c.getLong(2);
+
+            Integer localComboId = resolveVarietyCombo(helper, db, comboIdMap, comboId);
+            Integer localGroupId = resolveVarietyGroup(helper, db, groupIdMap, groupId);
+            Integer localValueId = resolveVarietyValue(helper, db, valueIdMap, valueId);
+
+            if (localComboId == null || localGroupId == null || localValueId == null) {
+                addSkipped(
+                    skipped, "variety_combo_value", comboId,
+                    "Combo, group, or value for this link was not found/imported");
+                continue;
+            }
+
+            helper.linkComboValueBulk(db, localComboId, localGroupId, localValueId);
+        }
+
+        c.close();
+    }
+
     // =====================
     // STEP 3 - PURCHASES (kb_transactions, txn_type=2)
     // grand_total = txn_cash_amount + txn_balance_amount and
@@ -748,11 +1087,17 @@ public class ImportVyaparActivity extends Activity {
         SQLiteDatabase db,
         HashMap<Long, Long> purchaseIdMap,
         HashMap<Long, Integer> itemIdMap,
+        HashMap<Long, Integer> comboIdMap,
+        boolean lineItemsHaveComboId,
         ArrayList<SkippedRow> skipped,
         Counts counts) {
 
+        // combo_id is this app's own extension (see hasVarietyTables in
+        // runImport()) - only selected when the backup's kb_lineitems
+        // actually has that column, since a real Vyapar backup won't.
         Cursor c = vyaparDb.rawQuery(
-            "SELECT li.lineitem_id, li.lineitem_txn_id, li.item_id, li.quantity, li.priceperunit, li.total_amount " +
+            "SELECT li.lineitem_id, li.lineitem_txn_id, li.item_id, li.quantity, li.priceperunit, li.total_amount" +
+            (lineItemsHaveComboId ? ", li.combo_id" : "") + " " +
             "FROM kb_lineitems li JOIN kb_transactions t ON li.lineitem_txn_id = t.txn_id " +
             "WHERE t.txn_type=2", null);
 
@@ -764,6 +1109,12 @@ public class ImportVyaparActivity extends Activity {
             double quantity = c.getDouble(3);
             double pricePerUnit = c.getDouble(4);
             double totalAmount = c.getDouble(5);
+
+            Integer localComboId = null;
+
+            if (lineItemsHaveComboId && !c.isNull(6)) {
+                localComboId = resolveVarietyCombo(helper, db, comboIdMap, c.getLong(6));
+            }
 
             String importKey = "vyb_purchase_item_" + lineItemId;
 
@@ -791,7 +1142,7 @@ public class ImportVyaparActivity extends Activity {
             }
 
             helper.insertPurchaseItemBulk(
-                db, localPurchaseId, localItemId, quantity, pricePerUnit, totalAmount);
+                db, localPurchaseId, localItemId, quantity, pricePerUnit, totalAmount, localComboId);
 
             helper.markImportKeyUsedBulk(db, importKey);
             counts.purchaseItemsImported++;
@@ -902,11 +1253,14 @@ public class ImportVyaparActivity extends Activity {
         SQLiteDatabase db,
         HashMap<Long, Long> saleIdMap,
         HashMap<Long, Integer> itemIdMap,
+        HashMap<Long, Integer> comboIdMap,
+        boolean lineItemsHaveComboId,
         ArrayList<SkippedRow> skipped,
         Counts counts) {
 
         Cursor c = vyaparDb.rawQuery(
-            "SELECT li.lineitem_id, li.lineitem_txn_id, li.item_id, li.quantity, li.priceperunit, li.total_amount " +
+            "SELECT li.lineitem_id, li.lineitem_txn_id, li.item_id, li.quantity, li.priceperunit, li.total_amount" +
+            (lineItemsHaveComboId ? ", li.combo_id" : "") + " " +
             "FROM kb_lineitems li JOIN kb_transactions t ON li.lineitem_txn_id = t.txn_id " +
             "WHERE t.txn_type=1", null);
 
@@ -918,6 +1272,12 @@ public class ImportVyaparActivity extends Activity {
             double quantity = c.getDouble(3);
             double pricePerUnit = c.getDouble(4);
             double totalAmount = c.getDouble(5);
+
+            Integer localComboId = null;
+
+            if (lineItemsHaveComboId && !c.isNull(6)) {
+                localComboId = resolveVarietyCombo(helper, db, comboIdMap, c.getLong(6));
+            }
 
             String importKey = "vyb_sale_item_" + lineItemId;
 
@@ -950,6 +1310,7 @@ public class ImportVyaparActivity extends Activity {
             itemData.put("qty", quantity);
             itemData.put("rate", pricePerUnit);
             itemData.put("amount", totalAmount);
+            itemData.put("combo_id", localComboId);
 
             helper.insertSaleItemBulk(db, itemData);
 
