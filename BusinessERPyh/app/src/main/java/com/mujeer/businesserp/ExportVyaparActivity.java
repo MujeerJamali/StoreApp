@@ -813,7 +813,7 @@ public class ExportVyaparActivity extends Activity {
 		SQLiteDatabase local, SQLiteDatabase vyb, HashMap<String, Long> categoryNameId) {
 
 		Cursor c = local.rawQuery(
-			"SELECT id, item, date, time, amount, notes FROM expenses", null);
+			"SELECT id, item, date, time, amount, notes, party_id FROM expenses", null);
 
 		while (c.moveToNext()) {
 
@@ -823,6 +823,7 @@ public class ExportVyaparActivity extends Activity {
 			String time = c.getString(3);
 			double amount = c.getDouble(4);
 			String notes = c.getString(5);
+			Integer partyId = c.isNull(6) ? null : c.getInt(6);
 
 			Long categoryId = item == null ? null : categoryNameId.get(item);
 
@@ -837,6 +838,13 @@ public class ExportVyaparActivity extends Activity {
 
 			if (categoryId != null) {
 				values.put("txn_category_id", categoryId);
+			}
+
+			// Expenses' party is optional (unlike purchases/sales/payments,
+			// which always have one) - only write txn_name_id when there
+			// actually is one, same as exportSales() does.
+			if (partyId != null) {
+				values.put("txn_name_id", partyId);
 			}
 
 			vyb.insert("kb_transactions", null, values);

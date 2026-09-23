@@ -308,7 +308,7 @@ public class ImportVyaparActivity extends Activity {
             importPartyTransfers(vyaparDb, helper, db, partyIdMap, skipped, counts);
 
             setStatus("Importing expenses...");
-            importExpenses(vyaparDb, helper, db, skipped, counts);
+            importExpenses(vyaparDb, helper, db, partyIdMap, skipped, counts);
 
             setStatus("Logging unsupported transaction types...");
             logUnsupportedTypes(vyaparDb, skipped);
@@ -1539,6 +1539,7 @@ public class ImportVyaparActivity extends Activity {
         SQLiteDatabase vyaparDb,
         DatabaseHelper helper,
         SQLiteDatabase db,
+        HashMap<Long, Integer> partyIdMap,
         ArrayList<SkippedRow> skipped,
         Counts counts) {
 
@@ -1549,7 +1550,8 @@ public class ImportVyaparActivity extends Activity {
             "      FROM kb_lineitems li JOIN kb_items ki ON li.item_id = ki.item_id " +
             "      WHERE li.lineitem_txn_id = t.txn_id " +
             "      ORDER BY li.lineitem_id" +
-            "  )) AS line_item_names " +
+            "  )) AS line_item_names, " +
+            "  t.txn_name_id " +
             "FROM kb_transactions t LEFT JOIN kb_names n ON t.txn_category_id = n.name_id " +
             "WHERE t.txn_type=7", null);
 
@@ -1562,6 +1564,16 @@ public class ImportVyaparActivity extends Activity {
             String description = c.getString(4);
             String categoryName = c.getString(5);
             String lineItemNames = c.getString(6);
+
+            // Optional - most expenses have no party. When present, it's
+            // resolved the same way a purchase/sale/payment's party is;
+            // unlike those, though, an unresolvable party here just means
+            // the expense imports without one rather than being skipped,
+            // since a party was never required for an expense in the
+            // first place (see Expenseeditactivity.saveExpense()).
+            Integer partyId = c.isNull(7)
+                ? null
+                : resolveParty(helper, db, partyIdMap, c.getLong(7));
 
             String importKey = "vyb_expense_" + txnId;
 
@@ -1590,7 +1602,7 @@ public class ImportVyaparActivity extends Activity {
                 formatTime(txnTime),
                 amount,
                 description == null ? "" : description,
-                null
+                partyId
             );
 
             helper.markImportKeyUsedBulk(db, importKey);
