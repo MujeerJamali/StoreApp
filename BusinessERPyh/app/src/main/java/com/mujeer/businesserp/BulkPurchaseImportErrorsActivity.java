@@ -14,7 +14,7 @@ import java.util.ArrayList;
 // user can see exactly what to fix in the Excel file before trying
 // again. Reads BulkPurchaseImportActivity.lastErrors, which is only
 // kept in memory for the run that just finished (same convention as
-// ImportSkippedRowsActivity / Importexcelactivity.lastSkippedRows).
+// ImportVyaparSkippedRowsActivity / ImportVyaparActivity.lastSkippedRows).
 // =====================
 public class BulkPurchaseImportErrorsActivity extends Activity {
 

@@ -17,7 +17,6 @@ import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Random;
 
 	public class Partiesactivity extends Activity {
 
@@ -25,7 +24,6 @@ import java.util.Random;
     TextView tv_no_parties;
 
     Button btn_add_party;
-    Button btn_generate_parties;
     Button btn_delete_all_parties;
 
     ListView lv_parties;
@@ -45,7 +43,6 @@ import java.util.Random;
         tv_no_parties = findViewById(R.id.tv_no_parties);
 
         btn_add_party = findViewById(R.id.btn_add_party);
-        btn_generate_parties = findViewById(R.id.btn_generate_parties);
         btn_delete_all_parties = findViewById(R.id.btn_delete_all_parties);
 
         lv_parties = findViewById(R.id.lv_parties);
@@ -83,29 +80,6 @@ import java.util.Random;
 		Partiesactivity.this,
 		Addpartyactivity.class
                 ));
-				}
-					});
-
-					btn_generate_parties.setOnClickListener(new View.OnClickListener() {
-					@Override
-						public void onClick(View v) {
-
-						Random random = new Random();
-
-					for (int i = 1; i <= 100; i++) {
-
-                    String name = "Party " + (1000 + random.nextInt(9000));
-
-                    db.insertParty(name);
-						}
-
-						loadParties();
-
-                Toast.makeText(
-			Partiesactivity.this,
-		"100 parties generated",
-		Toast.LENGTH_SHORT
-                ).show();
 				}
 					});
 

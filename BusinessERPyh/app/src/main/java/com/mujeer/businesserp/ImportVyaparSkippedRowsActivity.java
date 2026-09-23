@@ -13,8 +13,7 @@ import java.util.ArrayList;
 // unsupported transaction types, unresolved parties/items, and
 // duplicates - each with a reason. Reads
 // ImportVyaparActivity.lastSkippedRows, kept in memory only for the run
-// that just finished. Reuses the same generic list layouts as
-// ImportSkippedRowsActivity (the Excel importer's equivalent screen).
+// that just finished.
 // =====================
 public class ImportVyaparSkippedRowsActivity extends Activity {
 

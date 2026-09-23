@@ -23,7 +23,6 @@ public class MainActivity extends Activity {
 
 	Button btn_reports;
 
-	Button btn_developer;
 	Button btn_import;
 	Button btn_generate_entries;
 
@@ -47,7 +46,6 @@ public class MainActivity extends Activity {
 
 		btn_reports = findViewById(R.id.btn_reports);
 
-		btn_developer = findViewById(R.id.btn_developer);
 		btn_import = findViewById(R.id.btn_import);
 		btn_generate_entries = findViewById(R.id.btn_generate_entries);
 
@@ -154,19 +152,6 @@ public class MainActivity extends Activity {
 				}
 			});
 
-		btn_developer.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-
-					Intent intent = new Intent(
-						MainActivity.this,
-						Developeractivity.class
-					);
-
-					startActivity(intent);
-				}
-			});
-			
 		btn_import.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {

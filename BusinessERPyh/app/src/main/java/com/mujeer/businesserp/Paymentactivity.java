@@ -22,7 +22,6 @@ public class Paymentactivity extends Activity {
 	private TextView tv_empty;
 
 	private Button btn_add;
-	private Button btn_generate;
 	private Button btn_delete_all;
 	private Button btn_filter;
 
@@ -46,7 +45,6 @@ public class Paymentactivity extends Activity {
 		tv_empty = findViewById(R.id.tv_empty);
 
 		btn_add = findViewById(R.id.btn_add);
-		btn_generate = findViewById(R.id.btn_generate);
 		btn_delete_all = findViewById(R.id.btn_delete_all);
 		btn_filter = findViewById(R.id.btn_filter);
 
@@ -73,56 +71,6 @@ public class Paymentactivity extends Activity {
 					);
 
 					startActivity(intent);
-				}
-			}
-		);
-
-		btn_generate.setOnClickListener(
-			new View.OnClickListener() {
-
-				@Override
-				public void onClick(View v) {
-
-					new android.app.AlertDialog.Builder(
-						Paymentactivity.this
-					)
-
-						.setTitle(
-						"Generate Payments"
-					)
-
-						.setMessage(
-						"Generate 100 random payments?\n\nThis is intended for testing."
-					)
-
-						.setPositiveButton(
-						"Generate",
-						new android.content.DialogInterface.OnClickListener() {
-
-							@Override
-							public void onClick(
-								android.content.DialogInterface dialog,
-								int which) {
-
-								generatePayments();
-
-								loadPayments();
-
-								Toast.makeText(
-									Paymentactivity.this,
-									"100 payments generated.",
-									Toast.LENGTH_SHORT
-								).show();
-							}
-						}
-					)
-
-						.setNegativeButton(
-						"Cancel",
-						null
-					)
-
-						.show();
 				}
 			}
 		);
@@ -376,91 +324,4 @@ public class Paymentactivity extends Activity {
 			et_search.getText().toString()
 		);
 	}
-	
-	private void generatePayments() {
-
-		java.util.Random random =
-			new java.util.Random();
-
-		for (int i = 0; i < 100; i++) {
-
-			HashMap<String, Object> party =
-				db.getRandomParty();
-
-			if (party == null) {
-
-				Toast.makeText(
-			this,
-			"Please add at least one party first.",
-			Toast.LENGTH_SHORT
-				).show();
-
-				return;
-			}
-
-				int partyId = Integer.parseInt(
-				party.get("id").toString()
-			);
-
-			int type;
-
-				if (random.nextBoolean()) {
-
-		type = DatabaseHelper.PAYMENT_IN;
-
-	} else {
-
-type = DatabaseHelper.PAYMENT_OUT;
-		}
-
-		int month =
-			random.nextInt(12) + 1;
-
-		int day =
-			random.nextInt(28) + 1;
-
-		String date = String.format(
-			java.util.Locale.getDefault(),
-			"2026-%02d-%02d",
-			month,
-			day
-		);
-
-		int hour =
-			random.nextInt(24);
-
-		int minute =
-			random.nextInt(60);
-
-		String time = String.format(
-			java.util.Locale.getDefault(),
-			"%02d:%02d",
-			hour,
-			minute
-		);
-
-		double amount =
-			100 + random.nextInt(9901);
-
-		String notes =
-			"Generated Payment " + (i + 1);
-
-		db.insertPayment(
-
-			type,
-
-			partyId,
-
-			date,
-
-			time,
-
-			amount,
-
-			notes
-		);
-	}
-}
-	
-	
 }

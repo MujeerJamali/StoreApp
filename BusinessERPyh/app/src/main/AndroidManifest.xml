@@ -9,10 +9,6 @@
         android:resizeableActivity="true"
         android:theme="@style/AppTheme">
 
-        <activity
-            android:name=".Developeractivity"
-            android:label="Developer" />
-
         <!-- Transactions -->
         <activity
             android:name=".Transactionactivity"
@@ -107,10 +103,6 @@
         <activity
             android:name=".Importexcelactivity"
             android:label="Importexcel" />
-
-        <activity
-            android:name=".ImportSkippedRowsActivity"
-            android:label="Rows Not Imported" />
 
         <activity
             android:name=".ImportVyaparActivity"

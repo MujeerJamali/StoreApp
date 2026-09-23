@@ -22,7 +22,6 @@ public class Expensesactivity extends Activity {
 	private TextView tv_empty;
 
 	private Button btn_add;
-	private Button btn_generate;
 	private Button btn_delete_all;
 	private Button btn_filter;
 
@@ -46,7 +45,6 @@ public class Expensesactivity extends Activity {
 		tv_empty = findViewById(R.id.tv_empty);
 
 		btn_add = findViewById(R.id.btn_add);
-		btn_generate = findViewById(R.id.btn_generate);
 		btn_delete_all = findViewById(R.id.btn_delete_all);
 		btn_filter = findViewById(R.id.btn_filter);
 
@@ -75,25 +73,6 @@ public class Expensesactivity extends Activity {
 					);
 
 					startActivity(intent);
-				}
-			}
-		);
-
-		btn_generate.setOnClickListener(
-			new View.OnClickListener() {
-
-				@Override
-				public void onClick(View v) {
-
-					db.generateDummyExpenses();
-
-					loadExpenses();
-
-					Toast.makeText(
-						Expensesactivity.this,
-						"Dummy expenses generated.",
-						Toast.LENGTH_SHORT
-					).show();
 				}
 			}
 		);
