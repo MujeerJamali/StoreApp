@@ -17,7 +17,6 @@ import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Random;
 
 public class Itemsactivity extends Activity {
 
@@ -25,7 +24,6 @@ public class Itemsactivity extends Activity {
     TextView tv_no_items;
 
     Button btn_add_item;
-    Button btn_generate_items;
     Button btn_delete_all_items;
 
     ListView lv_items;
@@ -45,7 +43,6 @@ public class Itemsactivity extends Activity {
         tv_no_items = findViewById(R.id.tv_no_items);
 
         btn_add_item = findViewById(R.id.btn_add_item);
-        btn_generate_items = findViewById(R.id.btn_generate_items);
         btn_delete_all_items = findViewById(R.id.btn_delete_all_items);
 
         lv_items = findViewById(R.id.lv_items);
@@ -83,36 +80,6 @@ public class Itemsactivity extends Activity {
 									  Itemsactivity.this,
 									  Additemactivity.class
 								  ));
-				}
-			});
-
-        btn_generate_items.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-
-					Random random = new Random();
-
-					for (int i = 1; i <= 100; i++) {
-
-						String name = "Item " + (1000 + random.nextInt(9000));
-
-						double purchasePrice = 50 + random.nextInt(451);
-						double salePrice = purchasePrice + 20 + random.nextInt(181);
-
-						db.insertItem(
-                            name,
-                            purchasePrice,
-                            salePrice
-						);
-					}
-
-					loadItems();
-
-					Toast.makeText(
-                        Itemsactivity.this,
-                        "100 items generated",
-                        Toast.LENGTH_SHORT
-					).show();
 				}
 			});
 

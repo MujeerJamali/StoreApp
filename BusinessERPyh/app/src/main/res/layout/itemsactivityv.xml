@@ -36,21 +36,10 @@
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/btn_generate_items"
-                style="@style/AppButton.Outline.Small"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="6dp"
-                android:text="Generate 100" />
-
-            <Button
                 android:id="@+id/btn_delete_all_items"
                 style="@style/AppButton.Danger.Small"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="6dp"
                 android:text="Delete All" />
 
         </LinearLayout>
