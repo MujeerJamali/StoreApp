@@ -26,6 +26,13 @@ public class GenerateEntryLine {
 
 	public double unitValue;
 
+	// Purchase/Sale only, and only when the item has variety groups: the
+	// value picked from each group's dropdown (group id -> value id), and
+	// the variety_combos row they resolve to. Null/empty when the item
+	// has no variety groups.
+	public Map<Integer, Integer> varietySelections = new LinkedHashMap<Integer, Integer>();
+	public Integer comboId;
+
 	public Map<String, Integer> dateCounts = new LinkedHashMap<String, Integer>();
 
 	public int totalCount() {

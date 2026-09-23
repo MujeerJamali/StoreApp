@@ -45,6 +45,16 @@
 
         </LinearLayout>
 
+        <!-- Purchase/Sale only, and only when the item has variety groups:
+             one label+Spinner pair per group, built dynamically in code
+             (GenerateEntriesActivity#wireLineConfig). -->
+        <LinearLayout
+            android:id="@+id/container_line_varieties"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone" />
+
         <!-- Payment (always), or Purchase/Sale in "different party per
              item" mode: party picker for this line. -->
         <LinearLayout

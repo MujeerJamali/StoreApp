@@ -29,6 +29,16 @@
         android:inputType="text|textNoSuggestions"
         />
 
+    <!-- One label+Spinner pair per variety group of the selected item,
+         built dynamically in code (Transactioneditactivity#populateVarietySpinners).
+         Empty and gone for an item with no variety groups. -->
+    <LinearLayout
+        android:id="@+id/container_dialog_varieties"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone" />
+
     <TextView style="@style/FieldLabel" android:text="Quantity" />
     <EditText
         android:id="@+id/et_quantity"

@@ -13,11 +13,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 
     public static final String DATABASE_NAME = "business_erp.db";
-    // Bumped 11 -> 12 to add TABLE_VYB_IMPORT_MAP and TABLE_PARTY_TRANSFERS
-    // for the Vyapar backup importer. onUpgrade() below just re-runs
-    // onCreate(), and every CREATE TABLE there uses IF NOT EXISTS, so this
-    // only adds the two new tables and never touches existing data.
-    public static final int DATABASE_VERSION = 13;
+    // Bumped 13 -> 14 to add the item varieties tables (variety_groups,
+    // variety_values, variety_combos, variety_combo_values) and the
+    // nullable combo_id column on purchase_items/sale_items. onUpgrade()
+    // below just re-runs onCreate(), and every CREATE TABLE there uses
+    // IF NOT EXISTS, so this only adds the new tables and never touches
+    // existing data.
+    public static final int DATABASE_VERSION = 14;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -40,6 +42,27 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// its local id to link child records (e.g. a purchase's line items)
 	// even if the parent itself was skipped this run as a duplicate.
 	public static final String TABLE_VYB_IMPORT_MAP = "vyb_import_map";
+
+	// Item varieties (e.g. "Size", "Color"). An item can have zero, one, or
+	// several groups; each group belongs to exactly one item.
+	public static final String TABLE_VARIETY_GROUPS = "variety_groups";
+
+	// A single labeled value within a group (e.g. "S", "M", "L" under a
+	// "Size" group). Every group gets a "?" value auto-created alongside it,
+	// used as the fallback when a group exists but the user doesn't pick a
+	// specific value.
+	public static final String TABLE_VARIETY_VALUES = "variety_values";
+
+	// One row per real stock-keeping combination for an item - one value
+	// chosen from each of the item's groups. This is what purchase_items /
+	// sale_items link to (combo_id) and what actually carries the stock
+	// quantity; items.balance stays the authoritative total and is kept in
+	// lockstep as the sum of its combos.
+	public static final String TABLE_VARIETY_COMBOS = "variety_combos";
+
+	// Junction table: which variety_value (one per group) makes up a given
+	// variety_combo.
+	public static final String TABLE_VARIETY_COMBO_VALUES = "variety_combo_values";
 
 
 
@@ -182,6 +205,42 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			")"
 		);
 
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_VARIETY_GROUPS + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"item_id INTEGER NOT NULL, " +
+			"name TEXT NOT NULL, " +
+			"sort_order INTEGER NOT NULL DEFAULT 0" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_VARIETY_VALUES + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"group_id INTEGER NOT NULL, " +
+			"label TEXT NOT NULL, " +
+			"sort_order INTEGER NOT NULL DEFAULT 0, " +
+			"is_default INTEGER NOT NULL DEFAULT 0" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_VARIETY_COMBOS + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"item_id INTEGER NOT NULL, " +
+			"balance REAL NOT NULL DEFAULT 0" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_VARIETY_COMBO_VALUES + " (" +
+			"combo_id INTEGER NOT NULL, " +
+			"group_id INTEGER NOT NULL, " +
+			"value_id INTEGER NOT NULL, " +
+			"PRIMARY KEY (combo_id, group_id)" +
+			")"
+		);
+
 
     }
 	@Override
@@ -200,6 +259,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		addColumnIfMissing(db, TABLE_ITEMS, "balance", "REAL NOT NULL DEFAULT 0");
 		addColumnIfMissing(db, TABLE_PARTIES, "balance", "REAL NOT NULL DEFAULT 0");
 		addColumnIfMissing(db, TABLE_EXPENSES, "party_id", "INTEGER");
+		addColumnIfMissing(db, TABLE_PURCHASE_ITEMS, "combo_id", "INTEGER");
+		addColumnIfMissing(db, "sale_items", "combo_id", "INTEGER");
 
 		dropPurchaseCodeColumnIfPresent(db);
 	}
@@ -942,6 +1003,489 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		);
 	}
 
+	// =====================
+	// ITEM VARIETIES
+	// =====================
+	// An item can have zero or more variety groups (e.g. "Size", "Color").
+	// Every group gets a "?" value created alongside it as the fallback
+	// for "no specific variety picked" in Purchase/Sale. Stock is tracked
+	// per combination (one value from each of the item's groups) in
+	// variety_combos; items.balance stays the authoritative total stock
+	// and is kept in lockstep as the sum of its combos via
+	// adjustComboBalance(), called everywhere adjustItemBalance() is.
+	// =====================
+
+	private static final String DEFAULT_VARIETY_VALUE_LABEL = "?";
+
+	public long createVarietyGroup(int itemId, String name) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.beginTransaction();
+
+		try {
+
+			ArrayList<HashMap<String, Object>> existingGroups =
+				getVarietyGroups(db, itemId);
+
+			ContentValues groupValues = new ContentValues();
+			groupValues.put("item_id", itemId);
+			groupValues.put("name", name);
+			groupValues.put("sort_order", existingGroups.size());
+
+			long groupId = db.insert(TABLE_VARIETY_GROUPS, null, groupValues);
+
+			long defaultValueId = insertVarietyValueRow(
+				db, groupId, DEFAULT_VARIETY_VALUE_LABEL, 0, true
+			);
+
+			if (existingGroups.isEmpty()) {
+
+				// First group for this item - migrate its current plain
+				// balance into a single new "?" combo so no stock is lost.
+				double currentBalance = getItemBalance(db, itemId);
+
+				long comboId = insertComboRow(db, itemId, currentBalance);
+
+				linkComboValue(db, comboId, groupId, defaultValueId);
+
+			} else {
+
+				// Item already has combos from earlier groups - extend
+				// every existing combo with this new group's "?" value
+				// instead of creating new combos. The combo count is
+				// unchanged by adding a GROUP; it only grows when a VALUE
+				// is added to an existing group (see addVarietyValue()).
+				ArrayList<Integer> comboIds = getComboIdsForItem(db, itemId);
+
+				for (int comboId : comboIds) {
+					linkComboValue(db, comboId, groupId, defaultValueId);
+				}
+			}
+
+			db.setTransactionSuccessful();
+
+			return groupId;
+
+		} finally {
+
+			db.endTransaction();
+		}
+	}
+
+	public long addVarietyValue(int groupId, String label) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.beginTransaction();
+
+		try {
+
+			int itemId = getItemIdForGroup(db, groupId);
+
+			ArrayList<HashMap<String, Object>> existingValues =
+				getVarietyValues(db, groupId);
+
+			long valueId = insertVarietyValueRow(
+				db, groupId, label, existingValues.size(), false
+			);
+
+			// Auto-grid: create one new combo, at 0 stock, for every
+			// existing combination of the item's OTHER groups' values,
+			// paired with this new value - so a combination is never
+			// missing when it's time to sell it.
+			ArrayList<HashMap<Integer, Integer>> otherGroupTuples =
+				getDistinctOtherGroupTuples(db, itemId, groupId);
+
+			if (otherGroupTuples.isEmpty()) {
+
+				// This is the item's only group - no other-group
+				// dimensions to combine with.
+				long comboId = insertComboRow(db, itemId, 0);
+				linkComboValue(db, comboId, groupId, valueId);
+
+			} else {
+
+				for (HashMap<Integer, Integer> tuple : otherGroupTuples) {
+
+					long comboId = insertComboRow(db, itemId, 0);
+					linkComboValue(db, comboId, groupId, valueId);
+
+					for (Map.Entry<Integer, Integer> entry : tuple.entrySet()) {
+						linkComboValue(
+							db, comboId, entry.getKey(), entry.getValue()
+						);
+					}
+				}
+			}
+
+			db.setTransactionSuccessful();
+
+			return valueId;
+
+		} finally {
+
+			db.endTransaction();
+		}
+	}
+
+	public ArrayList<HashMap<String, Object>> getVarietyGroups(int itemId) {
+		return getVarietyGroups(this.getReadableDatabase(), itemId);
+	}
+
+	private ArrayList<HashMap<String, Object>> getVarietyGroups(
+		SQLiteDatabase db, int itemId) {
+
+		ArrayList<HashMap<String, Object>> list =
+			new ArrayList<HashMap<String, Object>>();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, name, sort_order FROM " + TABLE_VARIETY_GROUPS +
+			" WHERE item_id=? ORDER BY sort_order, id",
+			new String[]{String.valueOf(itemId)}
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> map = new HashMap<String, Object>();
+			map.put("id", cursor.getInt(0));
+			map.put("name", cursor.getString(1));
+			map.put("sort_order", cursor.getInt(2));
+
+			list.add(map);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	public ArrayList<HashMap<String, Object>> getVarietyValues(int groupId) {
+		return getVarietyValues(this.getReadableDatabase(), groupId);
+	}
+
+	private ArrayList<HashMap<String, Object>> getVarietyValues(
+		SQLiteDatabase db, int groupId) {
+
+		ArrayList<HashMap<String, Object>> list =
+			new ArrayList<HashMap<String, Object>>();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, label, sort_order, is_default FROM " +
+			TABLE_VARIETY_VALUES +
+			" WHERE group_id=? ORDER BY is_default DESC, sort_order, id",
+			new String[]{String.valueOf(groupId)}
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> map = new HashMap<String, Object>();
+			map.put("id", cursor.getInt(0));
+			map.put("label", cursor.getString(1));
+			map.put("sort_order", cursor.getInt(2));
+			map.put("is_default", cursor.getInt(3) != 0);
+
+			list.add(map);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// One row per real stock-keeping combination for this item, with a
+	// human-readable "label" (e.g. "Red / M") built by joining its values
+	// in group sort order.
+	public ArrayList<HashMap<String, Object>> getVarietyCombos(int itemId) {
+
+		ArrayList<HashMap<String, Object>> combos =
+			new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor comboCursor = db.rawQuery(
+			"SELECT id, balance FROM " + TABLE_VARIETY_COMBOS +
+			" WHERE item_id=? ORDER BY id",
+			new String[]{String.valueOf(itemId)}
+		);
+
+		while (comboCursor.moveToNext()) {
+
+			int comboId = comboCursor.getInt(0);
+			double balance = comboCursor.getDouble(1);
+
+			HashMap<String, Object> map = new HashMap<String, Object>();
+			map.put("id", comboId);
+			map.put("balance", balance);
+			map.put("label", getComboLabel(db, comboId));
+
+			combos.add(map);
+		}
+
+		comboCursor.close();
+
+		return combos;
+	}
+
+	private String getComboLabel(SQLiteDatabase db, int comboId) {
+
+		StringBuilder label = new StringBuilder();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT v.label FROM " + TABLE_VARIETY_COMBO_VALUES + " cv " +
+			"INNER JOIN " + TABLE_VARIETY_VALUES + " v ON v.id = cv.value_id " +
+			"INNER JOIN " + TABLE_VARIETY_GROUPS + " g ON g.id = cv.group_id " +
+			"WHERE cv.combo_id=? ORDER BY g.sort_order, g.id",
+			new String[]{String.valueOf(comboId)}
+		);
+
+		while (cursor.moveToNext()) {
+
+			if (label.length() > 0) {
+				label.append(" / ");
+			}
+
+			label.append(cursor.getString(0));
+		}
+
+		cursor.close();
+
+		return label.toString();
+	}
+
+	// Given the value selected for every group of an item, finds the
+	// combo row that matches all of them. Returns null if there are no
+	// selections (the item has no variety groups - nothing to resolve).
+	public Integer resolveComboId(Map<Integer, Integer> groupIdToValueId) {
+
+		if (groupIdToValueId == null || groupIdToValueId.isEmpty()) {
+			return null;
+		}
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		StringBuilder where = new StringBuilder();
+		ArrayList<String> args = new ArrayList<String>();
+
+		for (Map.Entry<Integer, Integer> entry : groupIdToValueId.entrySet()) {
+
+			if (where.length() > 0) {
+				where.append(" OR ");
+			}
+
+			where.append("(group_id=? AND value_id=?)");
+			args.add(String.valueOf(entry.getKey()));
+			args.add(String.valueOf(entry.getValue()));
+		}
+
+		args.add(String.valueOf(groupIdToValueId.size()));
+
+		Cursor cursor = db.rawQuery(
+			"SELECT combo_id FROM " + TABLE_VARIETY_COMBO_VALUES +
+			" WHERE " + where.toString() +
+			" GROUP BY combo_id HAVING COUNT(*)=?",
+			args.toArray(new String[0])
+		);
+
+		Integer comboId = null;
+
+		if (cursor.moveToFirst()) {
+			comboId = cursor.getInt(0);
+		}
+
+		cursor.close();
+
+		return comboId;
+	}
+
+	// The inverse of resolveComboId(): given a combo id, returns its
+	// group_id -> value_id selections, so a dropdown can be restored to
+	// its previous selection when re-editing an existing line.
+	public Map<Integer, Integer> getComboSelections(int comboId) {
+
+		Map<Integer, Integer> selections = new HashMap<Integer, Integer>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT group_id, value_id FROM " + TABLE_VARIETY_COMBO_VALUES +
+			" WHERE combo_id=?",
+			new String[]{String.valueOf(comboId)}
+		);
+
+		while (cursor.moveToNext()) {
+			selections.put(cursor.getInt(0), cursor.getInt(1));
+		}
+
+		cursor.close();
+
+		return selections;
+	}
+
+	// Mirrors adjustItemBalance() but for a variety combo's own stock
+	// count. comboId is null whenever the item a purchase/sale line
+	// belongs to has no variety groups - in that case there's nothing to
+	// adjust here, items.balance (updated separately) is the only figure
+	// that exists for that item.
+	private void adjustComboBalance(SQLiteDatabase db, Integer comboId, double delta) {
+
+		if (comboId == null || delta == 0) {
+			return;
+		}
+
+		db.execSQL(
+			"UPDATE " + TABLE_VARIETY_COMBOS +
+			" SET balance = balance + ? WHERE id = ?",
+			new Object[]{delta, comboId}
+		);
+	}
+
+	private long insertVarietyValueRow(
+		SQLiteDatabase db, long groupId, String label,
+		int sortOrder, boolean isDefault) {
+
+		ContentValues values = new ContentValues();
+		values.put("group_id", groupId);
+		values.put("label", label);
+		values.put("sort_order", sortOrder);
+		values.put("is_default", isDefault ? 1 : 0);
+
+		return db.insert(TABLE_VARIETY_VALUES, null, values);
+	}
+
+	private long insertComboRow(SQLiteDatabase db, int itemId, double balance) {
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.put("balance", balance);
+
+		return db.insert(TABLE_VARIETY_COMBOS, null, values);
+	}
+
+	private void linkComboValue(
+		SQLiteDatabase db, long comboId, long groupId, long valueId) {
+
+		ContentValues values = new ContentValues();
+		values.put("combo_id", comboId);
+		values.put("group_id", groupId);
+		values.put("value_id", valueId);
+
+		db.insertWithOnConflict(
+			TABLE_VARIETY_COMBO_VALUES,
+			null,
+			values,
+			SQLiteDatabase.CONFLICT_REPLACE
+		);
+	}
+
+	private double getItemBalance(SQLiteDatabase db, int itemId) {
+
+		double balance = 0;
+
+		Cursor cursor = db.rawQuery(
+			"SELECT balance FROM " + TABLE_ITEMS + " WHERE id=?",
+			new String[]{String.valueOf(itemId)}
+		);
+
+		if (cursor.moveToFirst()) {
+			balance = cursor.getDouble(0);
+		}
+
+		cursor.close();
+
+		return balance;
+	}
+
+	private int getItemIdForGroup(SQLiteDatabase db, int groupId) {
+
+		int itemId = 0;
+
+		Cursor cursor = db.rawQuery(
+			"SELECT item_id FROM " + TABLE_VARIETY_GROUPS + " WHERE id=?",
+			new String[]{String.valueOf(groupId)}
+		);
+
+		if (cursor.moveToFirst()) {
+			itemId = cursor.getInt(0);
+		}
+
+		cursor.close();
+
+		return itemId;
+	}
+
+	private ArrayList<Integer> getComboIdsForItem(SQLiteDatabase db, int itemId) {
+
+		ArrayList<Integer> ids = new ArrayList<Integer>();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id FROM " + TABLE_VARIETY_COMBOS + " WHERE item_id=?",
+			new String[]{String.valueOf(itemId)}
+		);
+
+		while (cursor.moveToNext()) {
+			ids.add(cursor.getInt(0));
+		}
+
+		cursor.close();
+
+		return ids;
+	}
+
+	// Returns, for every existing combo of this item, the map of
+	// (group_id -> value_id) for every group OTHER than groupId - i.e.
+	// the "other dimensions" a new value in groupId needs to be combined
+	// with. Combos are kept as a full grid at all times, so every
+	// existing combo already has exactly one value per other group.
+	private ArrayList<HashMap<Integer, Integer>> getDistinctOtherGroupTuples(
+		SQLiteDatabase db, int itemId, int groupId) {
+
+		ArrayList<HashMap<Integer, Integer>> tuples =
+			new ArrayList<HashMap<Integer, Integer>>();
+
+		ArrayList<Integer> comboIds = getComboIdsForItem(db, itemId);
+
+		for (int comboId : comboIds) {
+
+			HashMap<Integer, Integer> tuple = new HashMap<Integer, Integer>();
+
+			Cursor cursor = db.rawQuery(
+				"SELECT group_id, value_id FROM " +
+				TABLE_VARIETY_COMBO_VALUES +
+				" WHERE combo_id=? AND group_id<>?",
+				new String[]{String.valueOf(comboId), String.valueOf(groupId)}
+			);
+
+			while (cursor.moveToNext()) {
+				tuple.put(cursor.getInt(0), cursor.getInt(1));
+			}
+
+			cursor.close();
+
+			if (tuple.isEmpty()) {
+				// groupId was this item's only group - nothing to
+				// combine with.
+				continue;
+			}
+
+			boolean alreadyPresent = false;
+
+			for (HashMap<Integer, Integer> existing : tuples) {
+
+				if (existing.equals(tuple)) {
+					alreadyPresent = true;
+					break;
+				}
+			}
+
+			if (!alreadyPresent) {
+				tuples.add(tuple);
+			}
+		}
+
+		return tuples;
+	}
+
 	public long insertPurchase(
         int partyId,
         String date,
@@ -1237,6 +1781,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         double purchasePrice,
         double total) {
 
+		return insertPurchaseItem(
+			purchaseId, itemId, quantity, purchasePrice, total, null
+		);
+	}
+
+	// comboId is null for an item with no variety groups; when non-null it
+	// is the specific variety combination this purchase line is stocking.
+	public long insertPurchaseItem(
+        long purchaseId,
+        int itemId,
+        double quantity,
+        double purchasePrice,
+        double total,
+        Integer comboId) {
+
 		SQLiteDatabase db = this.getWritableDatabase();
 
 		ContentValues values = new ContentValues();
@@ -1246,6 +1805,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("quantity", quantity);
 		values.put("purchase_price", purchasePrice);
 		values.put("total", total);
+		values.put("combo_id", comboId);
 
 		long id = db.insert(
             TABLE_PURCHASE_ITEMS,
@@ -1255,6 +1815,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		// A purchase brings stock in.
 		adjustItemBalance(db, itemId, quantity);
+		adjustComboBalance(db, comboId, quantity);
 
 
 		return id;
@@ -1333,6 +1894,27 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			}
 
 			qtyCursor.close();
+
+			// Same reversal, but per variety combo (skipping lines with no
+			// combo_id - an item with no variety groups never got one).
+			Cursor comboQtyCursor = db.rawQuery(
+				"SELECT combo_id, SUM(quantity) FROM " +
+				TABLE_PURCHASE_ITEMS +
+				" WHERE purchase_id=? AND combo_id IS NOT NULL" +
+				" GROUP BY combo_id",
+				new String[]{String.valueOf(purchaseId)}
+			);
+
+			while (comboQtyCursor.moveToNext()) {
+
+				adjustComboBalance(
+					db,
+					comboQtyCursor.getInt(0),
+					-comboQtyCursor.getDouble(1)
+				);
+			}
+
+			comboQtyCursor.close();
 
 			db.delete(
                 TABLE_PURCHASE_ITEMS,
@@ -1471,6 +2053,25 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 			stockCursor.close();
 
+			// Same idea, but per variety combo.
+			Cursor comboStockCursor = db.rawQuery(
+				"SELECT combo_id, SUM(quantity) FROM " +
+				TABLE_PURCHASE_ITEMS +
+				" WHERE combo_id IS NOT NULL GROUP BY combo_id",
+				null
+			);
+
+			while (comboStockCursor.moveToNext()) {
+
+				adjustComboBalance(
+					db,
+					comboStockCursor.getInt(0),
+					-comboStockCursor.getDouble(1)
+				);
+			}
+
+			comboStockCursor.close();
+
 			db.delete(TABLE_PURCHASE_ITEMS, null, null);
 
 			db.delete(TABLE_PURCHASES, null, null);
@@ -1554,6 +2155,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		}
 
 		qtyCursor.close();
+
+		// Same reversal, but per variety combo.
+		Cursor comboQtyCursor = db.rawQuery(
+			"SELECT combo_id, SUM(quantity) FROM " +
+			TABLE_PURCHASE_ITEMS +
+			" WHERE purchase_id=? AND combo_id IS NOT NULL" +
+			" GROUP BY combo_id",
+			new String[]{String.valueOf(purchaseId)}
+		);
+
+		while (comboQtyCursor.moveToNext()) {
+
+			adjustComboBalance(
+				db,
+				comboQtyCursor.getInt(0),
+				-comboQtyCursor.getDouble(1)
+			);
+		}
+
+		comboQtyCursor.close();
 
 		db.delete(
 			TABLE_PURCHASE_ITEMS,
@@ -1737,6 +2358,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("rate", itemData.get("rate").toString());
 		values.put("amount", itemData.get("amount").toString());
 
+		// Optional - null for an item with no variety groups, otherwise
+		// the specific variety combination this sale line is taking stock
+		// from.
+		Integer comboId = itemData.get("combo_id") == null
+			? null
+			: Integer.valueOf(itemData.get("combo_id").toString());
+
+		values.put("combo_id", comboId);
+
 		long id = db.insert("sale_items", null, values);
 
 		// A sale takes stock out.
@@ -1744,6 +2374,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		double qty = Double.parseDouble(itemData.get("qty").toString());
 
 		adjustItemBalance(db, itemId, -qty);
+		adjustComboBalance(db, comboId, -qty);
 
 		return id;
 	}
@@ -2305,6 +2936,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		qtyCursor.close();
 
+		// Same reversal, but per variety combo.
+		Cursor comboQtyCursor = db.rawQuery(
+			"SELECT combo_id, SUM(qty) FROM sale_items WHERE sale_id=? " +
+			"AND combo_id IS NOT NULL GROUP BY combo_id",
+			new String[]{saleId}
+		);
+
+		while (comboQtyCursor.moveToNext()) {
+
+			adjustComboBalance(
+				db,
+				comboQtyCursor.getInt(0),
+				comboQtyCursor.getDouble(1)
+			);
+		}
+
+		comboQtyCursor.close();
+
 		db.delete(
 			"sale_items",
 			"sale_id=?",
@@ -2479,6 +3128,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		stockCursor.close();
 
+		// Same idea, but per variety combo.
+		Cursor comboStockCursor = db.rawQuery(
+			"SELECT combo_id, SUM(qty) FROM sale_items " +
+			"WHERE combo_id IS NOT NULL GROUP BY combo_id",
+			null
+		);
+
+		while (comboStockCursor.moveToNext()) {
+
+			adjustComboBalance(
+				db,
+				comboStockCursor.getInt(0),
+				comboStockCursor.getDouble(1)
+			);
+		}
+
+		comboStockCursor.close();
+
 		db.delete("sale_items", null, null);
 
 		db.delete("sales", null, null);
@@ -2514,6 +3181,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		}
 
 		qtyCursor.close();
+
+		// Same reversal, but per variety combo.
+		Cursor comboQtyCursor = db.rawQuery(
+			"SELECT combo_id, SUM(qty) FROM sale_items WHERE sale_id=? " +
+			"AND combo_id IS NOT NULL GROUP BY combo_id",
+			new String[]{String.valueOf(saleId)}
+		);
+
+		while (comboQtyCursor.moveToNext()) {
+
+			adjustComboBalance(
+				db,
+				comboQtyCursor.getInt(0),
+				comboQtyCursor.getDouble(1)
+			);
+		}
+
+		comboQtyCursor.close();
 
 		db.delete(
 			"sale_items",
@@ -3525,6 +4210,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		double purchasePrice,
 		double total) {
 
+		return insertPurchaseItemBulk(
+			db, purchaseId, itemId, quantity, purchasePrice, total, null
+		);
+	}
+
+	// comboId is null for an item with no variety groups.
+	public long insertPurchaseItemBulk(
+		SQLiteDatabase db,
+		long purchaseId,
+		int itemId,
+		double quantity,
+		double purchasePrice,
+		double total,
+		Integer comboId) {
+
 		ContentValues values =
 			new ContentValues();
 
@@ -3553,6 +4253,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			total
 		);
 
+		values.put(
+			"combo_id",
+			comboId
+		);
+
 		long id = db.insert(
 			TABLE_PURCHASE_ITEMS,
 			null,
@@ -3561,6 +4266,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		// A purchase brings stock in.
 		adjustItemBalance(db, itemId, quantity);
+		adjustComboBalance(db, comboId, quantity);
 
 		return id;
 	}
@@ -3597,6 +4303,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			itemData.get("amount").toString()
 		);
 
+		// Optional - null for an item with no variety groups, otherwise
+		// the specific variety combination this sale line is taking stock
+		// from.
+		Integer comboId = itemData.get("combo_id") == null
+			? null
+			: Integer.valueOf(itemData.get("combo_id").toString());
+
+		values.put("combo_id", comboId);
+
 		long id = db.insert(
 			"sale_items",
 			null,
@@ -3608,6 +4323,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		double qty = Double.parseDouble(itemData.get("qty").toString());
 
 		adjustItemBalance(db, itemId, -qty);
+		adjustComboBalance(db, comboId, -qty);
 
 		return id;
 	}

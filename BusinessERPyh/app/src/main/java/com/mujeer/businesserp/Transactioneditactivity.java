@@ -3,10 +3,13 @@ package com.mujeer.businesserp;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ScrollView;
+import android.widget.Spinner;
 
 import android.widget.TextView;
 import android.widget.AdapterView;
@@ -18,7 +21,9 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 
 
 public class Transactioneditactivity extends Activity {
@@ -562,6 +567,15 @@ public class Transactioneditactivity extends Activity {
 		final EditText etPurchasePrice =
 			view.findViewById(R.id.et_purchase_price);
 
+		final LinearLayout containerVarieties =
+			view.findViewById(R.id.container_dialog_varieties);
+
+		final Map<Integer, Spinner> varietySpinners =
+			new LinkedHashMap<Integer, Spinner>();
+
+		final Map<Integer, ArrayList<HashMap<String, Object>>> varietyValuesByGroup =
+			new LinkedHashMap<Integer, ArrayList<HashMap<String, Object>>>();
+
 		final TextView tvDialogTitle =
 			view.findViewById(R.id.tv_dialog_title);
 
@@ -663,6 +677,14 @@ public class Transactioneditactivity extends Activity {
 						.get(priceField)
 						.toString()
 					);
+
+					populateVarietySpinners(
+						containerVarieties,
+						(Integer) items.get(actualIndex).get("id"),
+						null,
+						varietySpinners,
+						varietyValuesByGroup
+					);
 				}
 			});
 
@@ -684,6 +706,14 @@ public class Transactioneditactivity extends Activity {
 
 						etPurchasePrice.setText(presetPrice.toString());
 					}
+
+					populateVarietySpinners(
+						containerVarieties,
+						presetItemId,
+						null,
+						varietySpinners,
+						varietyValuesByGroup
+					);
 
 					break;
 				}
@@ -730,7 +760,9 @@ public class Transactioneditactivity extends Activity {
 						items,
 						selectedPosition[0],
 						etQuantity,
-						etPurchasePrice)) {
+						etPurchasePrice,
+						varietySpinners,
+						varietyValuesByGroup)) {
 
 						dialog.dismiss();
 					}
@@ -762,7 +794,9 @@ public class Transactioneditactivity extends Activity {
 						items,
 						selectedPosition[0],
 						etQuantity,
-						etPurchasePrice)) {
+						etPurchasePrice,
+						varietySpinners,
+						varietyValuesByGroup)) {
 
 						// Clear all fields and refocus the item name so
 						// the next item can be entered right away.
@@ -771,6 +805,11 @@ public class Transactioneditactivity extends Activity {
 						actvItem.setText("", false);
 						etQuantity.setText("");
 						etPurchasePrice.setText("");
+
+						containerVarieties.removeAllViews();
+						containerVarieties.setVisibility(View.GONE);
+						varietySpinners.clear();
+						varietyValuesByGroup.clear();
 
 						showKeyboardOn(actvItem);
 					}
@@ -832,7 +871,9 @@ public class Transactioneditactivity extends Activity {
 		ArrayList<HashMap<String, Object>> items,
 		int selectedIndex,
 		EditText etQuantity,
-		EditText etPurchasePrice) {
+		EditText etPurchasePrice,
+		Map<Integer, Spinner> varietySpinners,
+		Map<Integer, ArrayList<HashMap<String, Object>>> varietyValuesByGroup) {
 
 		HashMap<String, Object> map = new HashMap<String, Object>();
 
@@ -893,6 +934,7 @@ public class Transactioneditactivity extends Activity {
 
 		map.put(priceKey, purchasePrice);
 		map.put("total", quantity * purchasePrice);
+		map.put("combo_id", resolveComboIdFromSpinners(varietySpinners, varietyValuesByGroup));
 
 		transactionItemList.add(map);
 
@@ -905,6 +947,102 @@ public class Transactioneditactivity extends Activity {
 		updateGrandTotal();
 
 		return true;
+	}
+
+	// =====================
+	// ITEM VARIETIES (Add/Edit item dialog)
+	// =====================
+	// Rebuilds container with one label+Spinner pair per variety group of
+	// itemId, restoring preselectedValues (group_id -> value_id) where
+	// given. Leaves outSpinners/outValuesByGroup empty and the container
+	// hidden for an item with no variety groups.
+	// =====================
+	private void populateVarietySpinners(
+		LinearLayout container,
+		int itemId,
+		Map<Integer, Integer> preselectedValues,
+		Map<Integer, Spinner> outSpinners,
+		Map<Integer, ArrayList<HashMap<String, Object>>> outValuesByGroup) {
+
+		container.removeAllViews();
+		outSpinners.clear();
+		outValuesByGroup.clear();
+
+		ArrayList<HashMap<String, Object>> groups = db.getVarietyGroups(itemId);
+
+		if (groups.isEmpty()) {
+			container.setVisibility(View.GONE);
+			return;
+		}
+
+		container.setVisibility(View.VISIBLE);
+
+		for (HashMap<String, Object> group : groups) {
+
+			final int groupId = (Integer) group.get("id");
+			String groupName = (String) group.get("name");
+
+			ArrayList<HashMap<String, Object>> values = db.getVarietyValues(groupId);
+			outValuesByGroup.put(groupId, values);
+
+			TextView groupLabel = new TextView(this);
+			groupLabel.setText(groupName);
+			groupLabel.setTextColor(getResources().getColor(R.color.text_secondary));
+			groupLabel.setTextSize(13);
+			groupLabel.setPadding(0, 12, 0, 4);
+			container.addView(groupLabel);
+
+			ArrayList<String> valueLabels = new ArrayList<String>();
+			int selectedIndex = 0;
+
+			Integer preselectedValueId =
+				preselectedValues != null ? preselectedValues.get(groupId) : null;
+
+			for (int i = 0; i < values.size(); i++) {
+
+				valueLabels.add((String) values.get(i).get("label"));
+
+				if (preselectedValueId != null &&
+					preselectedValueId.equals(values.get(i).get("id"))) {
+					selectedIndex = i;
+				}
+			}
+
+			Spinner spinner = new Spinner(this);
+
+			ArrayAdapter<String> adapter = new ArrayAdapter<String>(
+				this, android.R.layout.simple_spinner_item, valueLabels);
+			adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+			spinner.setAdapter(adapter);
+			spinner.setSelection(selectedIndex);
+
+			container.addView(spinner);
+			outSpinners.put(groupId, spinner);
+		}
+	}
+
+	private Integer resolveComboIdFromSpinners(
+		Map<Integer, Spinner> varietySpinners,
+		Map<Integer, ArrayList<HashMap<String, Object>>> varietyValuesByGroup) {
+
+		if (varietySpinners.isEmpty()) {
+			return null;
+		}
+
+		Map<Integer, Integer> selections = new LinkedHashMap<Integer, Integer>();
+
+		for (Map.Entry<Integer, Spinner> entry : varietySpinners.entrySet()) {
+
+			int groupId = entry.getKey();
+			int position = entry.getValue().getSelectedItemPosition();
+
+			HashMap<String, Object> selectedValue =
+				varietyValuesByGroup.get(groupId).get(position);
+
+			selections.put(groupId, (Integer) selectedValue.get("id"));
+		}
+
+		return db.resolveComboId(selections);
 	}
 
 	// =====================
@@ -1052,6 +1190,15 @@ public class Transactioneditactivity extends Activity {
 
 		final EditText etPurchasePrice =
 			view.findViewById(R.id.et_purchase_price);
+
+		final LinearLayout containerVarieties =
+			view.findViewById(R.id.container_dialog_varieties);
+
+		final Map<Integer, Spinner> varietySpinners =
+			new LinkedHashMap<Integer, Spinner>();
+
+		final Map<Integer, ArrayList<HashMap<String, Object>>> varietyValuesByGroup =
+			new LinkedHashMap<Integer, ArrayList<HashMap<String, Object>>>();
 
 		final TextView tvDialogTitle =
 			view.findViewById(R.id.tv_dialog_title);
@@ -1230,6 +1377,21 @@ public class Transactioneditactivity extends Activity {
 		actvItem.setThreshold(1);
 		actvItem.setText(itemNames.get(selectedPosition), false);
 
+		Map<Integer, Integer> preselectedVarietyValues = null;
+
+		if (oldItem.get("combo_id") != null) {
+			preselectedVarietyValues =
+				db.getComboSelections((Integer) oldItem.get("combo_id"));
+		}
+
+		populateVarietySpinners(
+			containerVarieties,
+			(Integer) items.get(selectedPosition).get("id"),
+			preselectedVarietyValues,
+			varietySpinners,
+			varietyValuesByGroup
+		);
+
 		final int[] selectedItemPosition = {selectedPosition};
 
 		actvItem.setOnItemClickListener(
@@ -1260,6 +1422,17 @@ public class Transactioneditactivity extends Activity {
 						items.get(actualIndex)
 						.get(priceField)
 						.toString()
+					);
+
+					// The item changed, so any previously selected variety
+					// no longer applies - repopulate fresh for the newly
+					// picked item, defaulting each group to its "?" value.
+					populateVarietySpinners(
+						containerVarieties,
+						(Integer) items.get(actualIndex).get("id"),
+						null,
+						varietySpinners,
+						varietyValuesByGroup
 					);
 				}
 			});
@@ -1366,6 +1539,11 @@ public class Transactioneditactivity extends Activity {
 					oldItem.put(
 						"total",
 						quantity * purchasePrice
+					);
+
+					oldItem.put(
+						"combo_id",
+						resolveComboIdFromSpinners(varietySpinners, varietyValuesByGroup)
 					);
 
 					transactionItemAdapter.notifyDataSetChanged();
@@ -1624,7 +1802,9 @@ public class Transactioneditactivity extends Activity {
 
 		((Double) item.get("purchase_price")).doubleValue(),
 
-			((Double) item.get("total")).doubleValue()
+			((Double) item.get("total")).doubleValue(),
+
+			(Integer) item.get("combo_id")
 			);
 			}
 
@@ -2248,6 +2428,7 @@ public class Transactioneditactivity extends Activity {
 			itemData.put("qty", item.get("quantity"));
 			itemData.put("rate", item.get("sale_price"));
 			itemData.put("amount", item.get("total"));
+			itemData.put("combo_id", item.get("combo_id"));
 
 			db.insertSaleItem(itemData);
 		}
@@ -2379,6 +2560,7 @@ public class Transactioneditactivity extends Activity {
 			itemData.put("qty", item.get("quantity"));
 			itemData.put("rate", item.get("sale_price"));
 			itemData.put("amount", item.get("total"));
+			itemData.put("combo_id", item.get("combo_id"));
 
 			db.insertSaleItem(itemData);
 		}

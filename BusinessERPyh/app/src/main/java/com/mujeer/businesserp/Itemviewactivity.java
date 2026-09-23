@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -23,6 +24,9 @@ public class Itemviewactivity extends Activity {
     TextView tv_sale_price;
     TextView tv_item_stock;
     TextView tv_transactions_empty;
+
+    LinearLayout cardVarietiesView;
+    LinearLayout containerVarietiesView;
 
     Button btn_edit_item;
     Button btn_delete_item;
@@ -48,6 +52,9 @@ public class Itemviewactivity extends Activity {
         tv_sale_price = findViewById(R.id.tv_sale_price);
         tv_item_stock = findViewById(R.id.tv_item_stock);
         tv_transactions_empty = findViewById(R.id.tv_transactions_empty);
+
+        cardVarietiesView = findViewById(R.id.card_varieties_view);
+        containerVarietiesView = findViewById(R.id.container_varieties_view);
 
         btn_edit_item = findViewById(R.id.btn_edit_item);
         btn_delete_item = findViewById(R.id.btn_delete_item);
@@ -258,6 +265,56 @@ public class Itemviewactivity extends Activity {
             } else {
                 tv_item_stock.setTextColor(getResources().getColor(R.color.mod_items));
             }
+
+            loadVarieties();
+        }
+    }
+
+    // Read-only breakdown of stock by variety combination - hidden
+    // entirely for an item with no variety groups.
+    private void loadVarieties() {
+
+        ArrayList<HashMap<String, Object>> combos = db.getVarietyCombos(itemId);
+
+        if (combos.isEmpty()) {
+            cardVarietiesView.setVisibility(View.GONE);
+            return;
+        }
+
+        cardVarietiesView.setVisibility(View.VISIBLE);
+        containerVarietiesView.removeAllViews();
+
+        for (HashMap<String, Object> combo : combos) {
+
+            String label = (String) combo.get("label");
+            double balance = (Double) combo.get("balance");
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setPadding(0, 6, 0, 6);
+
+            TextView labelView = new TextView(this);
+            labelView.setText(label);
+            labelView.setTextColor(getResources().getColor(R.color.text_primary));
+            labelView.setTextSize(14);
+
+            LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+            labelView.setLayoutParams(labelParams);
+
+            TextView stockView = new TextView(this);
+            stockView.setText(String.valueOf(balance));
+            stockView.setTextColor(
+                balance <= 0
+                    ? getResources().getColor(R.color.danger)
+                    : getResources().getColor(R.color.mod_items));
+            stockView.setTextSize(14);
+            stockView.setTypeface(stockView.getTypeface(), android.graphics.Typeface.BOLD);
+
+            row.addView(labelView);
+            row.addView(stockView);
+
+            containerVarietiesView.addView(row);
         }
     }
 }

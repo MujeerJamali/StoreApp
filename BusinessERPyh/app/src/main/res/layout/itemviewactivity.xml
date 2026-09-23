@@ -85,6 +85,38 @@
 
         </LinearLayout>
 
+        <!-- Read-only breakdown of this item's stock by variety
+             combination (e.g. "Red / M" -> 4). Hidden entirely when the
+             item has no variety groups - rows are built dynamically in
+             code, see Itemviewactivity#loadVarieties(). -->
+        <LinearLayout
+            android:id="@+id/card_varieties_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Varieties"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/container_varieties_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical" />
+
+        </LinearLayout>
+
         <TextView
             style="@style/SectionTitle"
             android:layout_marginTop="24dp"

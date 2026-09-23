@@ -14,7 +14,9 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -23,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -628,6 +631,72 @@ public class GenerateEntriesActivity extends Activity {
 			}
 		}
 
+		// Purchase/Sale only: one dropdown per variety group the item has,
+		// defaulting to (or restoring) the previously chosen value. A
+		// group-less item leaves the container empty and hidden, and the
+		// line's comboId stays null (no variety tracking for that item).
+		LinearLayout containerVarieties = root.findViewById(R.id.container_line_varieties);
+		containerVarieties.removeAllViews();
+
+		final Map<Integer, Spinner> varietySpinners = new LinkedHashMap<Integer, Spinner>();
+		final Map<Integer, ArrayList<HashMap<String, Object>>> varietyValuesByGroup =
+			new LinkedHashMap<Integer, ArrayList<HashMap<String, Object>>>();
+
+		if (isItemBased) {
+
+			ArrayList<HashMap<String, Object>> groups = db.getVarietyGroups(line.refId);
+
+			if (!groups.isEmpty()) {
+
+				containerVarieties.setVisibility(View.VISIBLE);
+
+				for (HashMap<String, Object> group : groups) {
+
+					int groupId = (Integer) group.get("id");
+					String groupName = (String) group.get("name");
+
+					ArrayList<HashMap<String, Object>> values = db.getVarietyValues(groupId);
+					varietyValuesByGroup.put(groupId, values);
+
+					TextView groupLabel = new TextView(this);
+					groupLabel.setText(groupName);
+					groupLabel.setTextColor(getResources().getColor(R.color.text_secondary));
+					groupLabel.setTextSize(13);
+					groupLabel.setPadding(0, 12, 0, 4);
+					containerVarieties.addView(groupLabel);
+
+					ArrayList<String> valueLabels = new ArrayList<String>();
+					int selectedIndex = 0;
+					Integer previouslySelectedValueId = line.varietySelections.get(groupId);
+
+					for (int i = 0; i < values.size(); i++) {
+
+						valueLabels.add((String) values.get(i).get("label"));
+
+						if (previouslySelectedValueId != null &&
+							previouslySelectedValueId.equals(values.get(i).get("id"))) {
+							selectedIndex = i;
+						}
+					}
+
+					Spinner spinner = new Spinner(this);
+
+					ArrayAdapter<String> adapter = new ArrayAdapter<String>(
+						this, android.R.layout.simple_spinner_item, valueLabels);
+					adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+					spinner.setAdapter(adapter);
+					spinner.setSelection(selectedIndex);
+
+					containerVarieties.addView(spinner);
+					varietySpinners.put(groupId, spinner);
+				}
+
+			} else {
+
+				containerVarieties.setVisibility(View.GONE);
+			}
+		}
+
 		if (line.unitValue > 0) {
 			etUnitValue.setText(formatQty(line.unitValue));
 		}
@@ -664,7 +733,9 @@ public class GenerateEntriesActivity extends Activity {
 		btnSave.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				onLineSaveClicked(line, needsPartyField, actvParty, etDescription, etUnitValue);
+				onLineSaveClicked(
+					line, needsPartyField, actvParty, etDescription, etUnitValue,
+					varietySpinners, varietyValuesByGroup);
 			}
 		});
 	}
@@ -690,7 +761,9 @@ public class GenerateEntriesActivity extends Activity {
 		boolean needsPartyField,
 		AutoCompleteTextView actvParty,
 		EditText etDescription,
-		EditText etUnitValue) {
+		EditText etUnitValue,
+		Map<Integer, Spinner> varietySpinners,
+		Map<Integer, ArrayList<HashMap<String, Object>>> varietyValuesByGroup) {
 
 		double unitValue = parseDoubleOrZero(etUnitValue.getText().toString());
 
@@ -752,6 +825,25 @@ public class GenerateEntriesActivity extends Activity {
 		}
 
 		line.unitValue = unitValue;
+
+		if (!varietySpinners.isEmpty()) {
+
+			Map<Integer, Integer> selections = new LinkedHashMap<Integer, Integer>();
+
+			for (Map.Entry<Integer, Spinner> entry : varietySpinners.entrySet()) {
+
+				int groupId = entry.getKey();
+				int position = entry.getValue().getSelectedItemPosition();
+
+				HashMap<String, Object> selectedValue =
+					varietyValuesByGroup.get(groupId).get(position);
+
+				selections.put(groupId, (Integer) selectedValue.get("id"));
+			}
+
+			line.varietySelections = selections;
+			line.comboId = db.resolveComboId(selections);
+		}
 
 		boolean isItemBased = entryType == TYPE_PURCHASE || entryType == TYPE_SALE;
 
@@ -934,7 +1026,8 @@ public class GenerateEntriesActivity extends Activity {
 						int qty = (Integer) pair[1];
 
 						db.insertPurchaseItemBulk(
-							conn, purchaseId, line.refId, qty, line.unitValue, qty * line.unitValue);
+							conn, purchaseId, line.refId, qty, line.unitValue,
+							qty * line.unitValue, line.comboId);
 					}
 
 				} else {
@@ -965,6 +1058,7 @@ public class GenerateEntriesActivity extends Activity {
 						itemData.put("qty", (double) qty);
 						itemData.put("rate", line.unitValue);
 						itemData.put("amount", qty * line.unitValue);
+						itemData.put("combo_id", line.comboId);
 
 						db.insertSaleItemBulk(conn, itemData);
 					}

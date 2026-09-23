@@ -54,6 +54,53 @@
 
         </LinearLayout>
 
+        <!-- Optional stock-keeping groups (e.g. Size, Color). Hidden until
+             the item exists (a new item has no id to attach groups to
+             until it's saved once). Group/value rows are built dynamically
+             in code - see Itemseditactivity#loadVarieties(). -->
+        <LinearLayout
+            android:id="@+id/card_varieties"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Varieties"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Optional stock-keeping groups, e.g. Size or Color."
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:id="@+id/container_varieties"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <Button
+                android:id="@+id/btn_add_variety_group"
+                style="@style/AppButton.Outline.Small"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="+ Add Group" />
+
+        </LinearLayout>
+
         <Button
             android:id="@+id/btn_update_item"
             style="@style/AppButton"
