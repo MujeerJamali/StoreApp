@@ -1142,6 +1142,20 @@ public class ImportVyaparActivity extends Activity {
                 continue;
             }
 
+            // The item has a Size (or other) variety group, but this row
+            // came in with no combo to attach it to - writing it in with
+            // combo_id=null would silently pile stock up in a phantom
+            // "no size" bucket instead of a real one, and the same
+            // bucket can then go negative on a later sale that hits this
+            // same gap. Skip it and surface it in the Rows Not Imported
+            // report instead, so it gets added back in manually with the
+            // correct size chosen.
+            if (localComboId == null && helper.itemHasVarietyGroupsBulk(db, localItemId)) {
+                addSkipped(skipped, "purchase_line_item", lineItemId,
+                    "Item requires a size and the backup didn't specify one - add this line manually with the correct size");
+                continue;
+            }
+
             helper.insertPurchaseItemBulk(
                 db, localPurchaseId, localItemId, quantity, pricePerUnit, totalAmount, localComboId);
 
@@ -1302,6 +1316,17 @@ public class ImportVyaparActivity extends Activity {
 
             if (localItemId == null) {
                 addSkipped(skipped, "sale_line_item", lineItemId, "Item was not found/imported");
+                continue;
+            }
+
+            // See the matching guard in importPurchaseLineItems() - a
+            // sizeless line for a sized item must not be written in with
+            // combo_id=null, since that phantom "no size" bucket has no
+            // stock of its own and would go negative even though the
+            // item's real sizes have stock on hand.
+            if (localComboId == null && helper.itemHasVarietyGroupsBulk(db, localItemId)) {
+                addSkipped(skipped, "sale_line_item", lineItemId,
+                    "Item requires a size and the backup didn't specify one - add this line manually with the correct size");
                 continue;
             }
 

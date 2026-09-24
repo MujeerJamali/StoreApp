@@ -5161,6 +5161,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return insertComboRow(db, itemId, 0.0);
 	}
 
+	// True if itemId has at least one variety group (e.g. "Size") - used
+	// by the Vyapar importer to tell a genuinely combo-less item from one
+	// that needs a combo_id the source row didn't provide (see the
+	// sizeless-line guard in ImportVyaparActivity).
+	public boolean itemHasVarietyGroupsBulk(SQLiteDatabase db, int itemId) {
+
+		Cursor cursor = db.rawQuery(
+			"SELECT 1 FROM " + TABLE_VARIETY_GROUPS + " WHERE item_id=? LIMIT 1",
+			new String[]{String.valueOf(itemId)}
+		);
+
+		boolean has = cursor.moveToFirst();
+
+		cursor.close();
+
+		return has;
+	}
+
 	public void linkComboValueBulk(
 		SQLiteDatabase db, long comboId, long groupId, long valueId) {
 
