@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -44,6 +45,7 @@ public class Transactioneditactivity extends Activity {
 	
 	AutoCompleteTextView actv_party;
     EditText et_date, et_time, et_invoice_number, et_amount_paid, et_notes;
+    CheckBox cb_full_paid;
     View tv_add_note;
     TextView tv_grand_total;
     TextView tv_page_title;
@@ -61,9 +63,9 @@ public class Transactioneditactivity extends Activity {
 
     ArrayList<String> partyNames;
 
-    // Tracks whether the user has typed their own value into
-    // et_amount_paid, so the auto-filled default (grand total for
-    // sales, 0 for purchases) stops overwriting it once they have.
+    // Tracks whether the user has typed directly into et_amount_paid
+    // (distinct from the "Full Paid" checkbox driving it - see
+    // cb_full_paid/updateDefaultAmountPaid()).
     boolean amountPaidEditedByUser = false;
     boolean updatingAmountPaidProgrammatically = false;
 
@@ -161,6 +163,8 @@ public class Transactioneditactivity extends Activity {
 					}
 				}
 			});
+        cb_full_paid = findViewById(R.id.cb_full_paid);
+		cb_full_paid.setOnCheckedChangeListener(fullPaidCheckedChangeListener);
         et_notes = findViewById(R.id.et_notes);
         tv_add_note = findViewById(R.id.tv_add_note);
 		tv_add_note.setOnClickListener(new View.OnClickListener() {
@@ -1722,29 +1726,70 @@ public class Transactioneditactivity extends Activity {
 	}
 
 	// =====================
-	// Keeps et_amount_paid defaulted to the grand total for sales (paid
-	// in full by default) and to 0 for purchases, for as long as the
-	// user hasn't typed their own value in. Only applies when adding a
-	// new transaction - an existing one being edited keeps its saved
-	// amount paid untouched.
+	// Keeps et_amount_paid synced to the grand total for as long as the
+	// "Full Paid" checkbox is checked, whether adding a new transaction
+	// or editing an existing one - unchecking it hands the field back to
+	// the user (see cb_full_paid's listener, which also sets it to 0 the
+	// moment it's unchecked).
 	// =====================
 	private void updateDefaultAmountPaid(double grandTotal) {
 
-		if (isEditMode || amountPaidEditedByUser) {
+		if (cb_full_paid == null || !cb_full_paid.isChecked()) {
 			return;
 		}
 
 		updatingAmountPaidProgrammatically = true;
 
 		et_amount_paid.setText(
-			String.format(
-				Locale.getDefault(),
-				"%.2f",
-				transactionType == TYPE_SALE ? grandTotal : 0
-			)
+			String.format(Locale.getDefault(), "%.2f", grandTotal)
 		);
 
 		updatingAmountPaidProgrammatically = false;
+	}
+
+	// Shared by both the checkbox's own listener and
+	// setFullPaidCheckboxSilently()'s temporary re-wiring below.
+	private final android.widget.CompoundButton.OnCheckedChangeListener fullPaidCheckedChangeListener =
+		new android.widget.CompoundButton.OnCheckedChangeListener() {
+
+			@Override
+			public void onCheckedChanged(
+				android.widget.CompoundButton buttonView, boolean isChecked) {
+
+				updatingAmountPaidProgrammatically = true;
+
+				if (isChecked) {
+
+					double total = 0;
+
+					for (HashMap<String, Object> map : transactionItemList) {
+						total += (Double) map.get("total");
+					}
+
+					et_amount_paid.setText(
+						String.format(Locale.getDefault(), "%.2f", total)
+					);
+
+				} else {
+
+					et_amount_paid.setText("0");
+				}
+
+				updatingAmountPaidProgrammatically = false;
+			}
+		};
+
+	// Sets the checkbox to reflect an already-saved paid/total pair
+	// (opening an existing transaction for editing) without triggering
+	// its own listener - the listener is for the user's own taps, not
+	// for reflecting data that's already what it is.
+	private void setFullPaidCheckboxSilently(double paidAmount, double grandTotal) {
+
+		boolean isFull = paidAmount >= grandTotal - 0.01;
+
+		cb_full_paid.setOnCheckedChangeListener(null);
+		cb_full_paid.setChecked(isFull);
+		cb_full_paid.setOnCheckedChangeListener(fullPaidCheckedChangeListener);
 	}
 	private void savePurchase(final boolean andNew) {
 
@@ -2295,6 +2340,11 @@ public class Transactioneditactivity extends Activity {
 			purchase.get("amount_paid").toString()
 		);
 
+		setFullPaidCheckboxSilently(
+			(Double) purchase.get("amount_paid"),
+			(Double) purchase.get("grand_total")
+		);
+
 		et_notes.setText(
 			purchase.get("notes").toString()
 		);
@@ -2383,6 +2433,11 @@ public class Transactioneditactivity extends Activity {
 
 		et_amount_paid.setText(
 			sale.get("paid_amount").toString()
+		);
+
+		setFullPaidCheckboxSilently(
+			Double.parseDouble(sale.get("paid_amount").toString()),
+			Double.parseDouble(sale.get("grand_total").toString())
 		);
 
 		int partyId =

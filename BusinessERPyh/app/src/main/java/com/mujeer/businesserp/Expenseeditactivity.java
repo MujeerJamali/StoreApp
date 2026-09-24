@@ -5,6 +5,8 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -29,6 +31,8 @@ public class Expenseeditactivity extends Activity {
 	private EditText et_date;
 	private EditText et_time;
 	private EditText et_amount;
+	private EditText et_amount_paid;
+	private CheckBox cb_full_paid;
 	private EditText et_notes;
 
 	private Button btn_save;
@@ -36,6 +40,11 @@ public class Expenseeditactivity extends Activity {
 	private DatabaseHelper db;
 
 	private int expenseId = 0;
+
+	// Guards against the "Full Paid" checkbox's own listener reacting to
+	// a programmatic setText() the same way it would a real user tap -
+	// same convention as Transactioneditactivity's cb_full_paid.
+	private boolean updatingAmountPaidProgrammatically = false;
 
 	// name -> id, for resolving whatever the user typed/picked in
 	// actv_party back to a party row (the field is optional - blank is
@@ -63,6 +72,8 @@ public class Expenseeditactivity extends Activity {
 		et_time.setFocusable(false);
 		et_time.setClickable(true);
 		et_amount = findViewById(R.id.et_amount);
+		et_amount_paid = findViewById(R.id.et_amount_paid);
+		cb_full_paid = findViewById(R.id.cb_full_paid);
 		et_notes = findViewById(R.id.et_notes);
 
 		btn_save = findViewById(R.id.btn_save);
@@ -70,6 +81,27 @@ public class Expenseeditactivity extends Activity {
 		db = new DatabaseHelper(this);
 
 		loadPartyAutoComplete();
+
+		cb_full_paid.setOnCheckedChangeListener(fullPaidCheckedChangeListener);
+
+		et_amount.addTextChangedListener(
+			new android.text.TextWatcher() {
+
+				@Override
+				public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+				@Override
+				public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+				@Override
+				public void afterTextChanged(android.text.Editable s) {
+
+					if (cb_full_paid.isChecked()) {
+						syncAmountPaidToAmount();
+					}
+				}
+			}
+		);
 
 		et_date.setOnClickListener(
 			new View.OnClickListener() {
@@ -118,6 +150,8 @@ public class Expenseeditactivity extends Activity {
 				).format(new Date())
 			);
 
+			et_amount_paid.setText("0");
+
 			focusAndShowKeyboard(et_item);
 
 		} else {
@@ -144,6 +178,17 @@ public class Expenseeditactivity extends Activity {
 			et_amount.setText(
 				expense.get("amount").toString()
 			);
+
+			double loadedAmount = (Double) expense.get("amount");
+			double loadedPaidAmount = (Double) expense.get("paid_amount");
+
+			et_amount_paid.setText(
+				String.valueOf(loadedPaidAmount)
+			);
+
+			cb_full_paid.setOnCheckedChangeListener(null);
+			cb_full_paid.setChecked(loadedPaidAmount >= loadedAmount - 0.01);
+			cb_full_paid.setOnCheckedChangeListener(fullPaidCheckedChangeListener);
 
 			if (expense.get("notes") != null) {
 
@@ -207,6 +252,33 @@ public class Expenseeditactivity extends Activity {
 		actv_party.setThreshold(1);
 	}
 
+	private final CompoundButton.OnCheckedChangeListener fullPaidCheckedChangeListener =
+		new CompoundButton.OnCheckedChangeListener() {
+
+			@Override
+			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+
+				if (isChecked) {
+					syncAmountPaidToAmount();
+				} else {
+					updatingAmountPaidProgrammatically = true;
+					et_amount_paid.setText("0");
+					updatingAmountPaidProgrammatically = false;
+				}
+			}
+		};
+
+	private void syncAmountPaidToAmount() {
+
+		updatingAmountPaidProgrammatically = true;
+
+		et_amount_paid.setText(
+			et_amount.getText().toString().trim()
+		);
+
+		updatingAmountPaidProgrammatically = false;
+	}
+
 	private void focusAndShowKeyboard(final View target) {
 
 		target.requestFocus();
@@ -265,6 +337,17 @@ public class Expenseeditactivity extends Activity {
 			et_amount.getText().toString().trim()
 		);
 
+		double paidAmount = 0;
+
+		try {
+
+			paidAmount = Double.parseDouble(
+				et_amount_paid.getText().toString().trim()
+			);
+
+		} catch (Exception e) {
+		}
+
 		String typedParty = actv_party.getText().toString().trim();
 		Integer partyId = null;
 
@@ -298,6 +381,8 @@ public class Expenseeditactivity extends Activity {
 
 				amount,
 
+				paidAmount,
+
 				et_notes.getText().toString().trim(),
 
 				partyId
@@ -317,6 +402,8 @@ public class Expenseeditactivity extends Activity {
 				et_time.getText().toString().trim(),
 
 				amount,
+
+				paidAmount,
 
 				et_notes.getText().toString().trim(),
 
