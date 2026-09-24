@@ -7,6 +7,11 @@ import android.view.View;
 import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.PopupMenu;
+import android.widget.TextView;
+
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Locale;
 
 public class MainActivity extends Activity {
 
@@ -25,8 +30,17 @@ public class MainActivity extends Activity {
 
 	Button btn_import;
 	Button btn_generate_entries;
+	Button btn_cash;
+	Button btn_wanted_items;
 
 	Button btn_quick_add;
+
+	TextView tv_cash_balance;
+	TextView tv_expense_today;
+	TextView tv_expense_week;
+	TextView tv_expense_month;
+
+	DatabaseHelper db;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -48,10 +62,18 @@ public class MainActivity extends Activity {
 
 		btn_import = findViewById(R.id.btn_import);
 		btn_generate_entries = findViewById(R.id.btn_generate_entries);
+		btn_cash = findViewById(R.id.btn_cash);
+		btn_wanted_items = findViewById(R.id.btn_wanted_items);
 
 		btn_quick_add = findViewById(R.id.btn_quick_add);
-		
-		
+
+		tv_cash_balance = findViewById(R.id.tv_cash_balance);
+		tv_expense_today = findViewById(R.id.tv_expense_today);
+		tv_expense_week = findViewById(R.id.tv_expense_week);
+		tv_expense_month = findViewById(R.id.tv_expense_month);
+
+		db = new DatabaseHelper(this);
+
 
 		btn_expenses.setOnClickListener(
 			new View.OnClickListener() {
@@ -178,6 +200,32 @@ public class MainActivity extends Activity {
 				}
 			});
 
+		btn_cash.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						CashActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_wanted_items.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						WantedItemsActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
 		btn_quick_add.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
@@ -236,8 +284,70 @@ public class MainActivity extends Activity {
 					popup.show();
 				}
 			});
-			
+
 	}
-	
-	
+
+	@Override
+	protected void onResume() {
+		super.onResume();
+		loadCashSummary();
+	}
+
+	// Computed off the main thread - a handful of SUM queries, but still
+	// no reason to risk a hitch on the dashboard's own launch/resume path.
+	private void loadCashSummary() {
+
+		new Thread(new Runnable() {
+				@Override
+				public void run() {
+
+					final double cashBalance = db.getCashBalance();
+
+					SimpleDateFormat sdf =
+						new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+
+					String today = sdf.format(new java.util.Date());
+
+					Calendar weekStart = Calendar.getInstance();
+					weekStart.set(Calendar.DAY_OF_WEEK, weekStart.getFirstDayOfWeek());
+					String weekFrom = sdf.format(weekStart.getTime());
+
+					Calendar monthStart = Calendar.getInstance();
+					monthStart.set(Calendar.DAY_OF_MONTH, 1);
+					String monthFrom = sdf.format(monthStart.getTime());
+
+					final double expenseToday = db.getExpenseTotalForRange(today, today);
+					final double expenseWeek = db.getExpenseTotalForRange(weekFrom, today);
+					final double expenseMonth = db.getExpenseTotalForRange(monthFrom, today);
+
+					runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
+
+								tv_cash_balance.setText(
+									String.format(Locale.getDefault(), "%.2f", cashBalance)
+								);
+
+								tv_cash_balance.setTextColor(
+									getResources().getColor(
+										cashBalance < 0 ? R.color.danger : R.color.text_primary
+									)
+								);
+
+								tv_expense_today.setText(
+									String.format(Locale.getDefault(), "%.2f", expenseToday)
+								);
+
+								tv_expense_week.setText(
+									String.format(Locale.getDefault(), "%.2f", expenseWeek)
+								);
+
+								tv_expense_month.setText(
+									String.format(Locale.getDefault(), "%.2f", expenseMonth)
+								);
+							}
+						});
+				}
+			}).start();
+	}
 }

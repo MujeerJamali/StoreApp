@@ -5220,5 +5220,257 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		}
 	}
 
+	// =====================
+	// CASH IN HAND
+	// =====================
+	// "Cash" here means money that has actually changed hands right now -
+	// the paid portion of a sale/purchase/expense (not its full total),
+	// a payment (always fully cash, no partial concept), and manual
+	// adjustments. Computed live from the ledger each time, not stored/
+	// maintained as a running balance - this app's data volume makes a
+	// handful of SUM queries cheap, and it avoids having to hook a
+	// balance-adjustment call into dozens of existing insert/delete/
+	// update call sites the way items.balance/parties.balance already
+	// are. Party-to-party transfers are deliberately excluded - they
+	// move balances between two parties' accounts, not necessarily this
+	// business's own cash in hand.
+	// =====================
+
+	private double sumColumn(SQLiteDatabase db, String sql, String[] args) {
+
+		Cursor cursor = db.rawQuery(sql, args);
+
+		double result = 0;
+
+		if (cursor.moveToFirst() && !cursor.isNull(0)) {
+			result = cursor.getDouble(0);
+		}
+
+		cursor.close();
+
+		return result;
+	}
+
+	public double getCashBalance() {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		double balance = 0;
+
+		balance += sumColumn(db, "SELECT SUM(paid_amount) FROM sales", null);
+		balance += sumColumn(db,
+			"SELECT SUM(amount) FROM " + TABLE_PAYMENTS + " WHERE type=?",
+			new String[]{String.valueOf(PAYMENT_IN)});
+		balance += sumColumn(db, "SELECT SUM(amount) FROM " + TABLE_CASH_ADJUSTMENTS, null);
+
+		balance -= sumColumn(db, "SELECT SUM(amount_paid) FROM " + TABLE_PURCHASES, null);
+		balance -= sumColumn(db,
+			"SELECT SUM(amount) FROM " + TABLE_PAYMENTS + " WHERE type=?",
+			new String[]{String.valueOf(PAYMENT_OUT)});
+		balance -= sumColumn(db, "SELECT SUM(paid_amount) FROM " + TABLE_EXPENSES, null);
+
+		return balance;
+	}
+
+	// One row per cash-affecting transaction - amount is the signed cash
+	// effect (positive = cash in, negative = cash out), so the Cash
+	// screen can show a plain running list without exposing full
+	// transaction detail. Rows with a zero cash effect (e.g. a fully
+	// credit purchase) are left out - there's nothing to show for them
+	// here.
+	public ArrayList<HashMap<String, Object>> getCashLedger() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT date, time, paid_amount AS amount, " +
+			"('Sale - ' || COALESCE(pa.name, 'Cash Sale')) AS label, source " +
+			"FROM sales s LEFT JOIN " + TABLE_PARTIES + " pa ON s.party_id = pa.id " +
+			"WHERE paid_amount != 0 " +
+
+			"UNION ALL " +
+
+			"SELECT date, time, -amount_paid, " +
+			"('Purchase - ' || pa.name), source " +
+			"FROM " + TABLE_PURCHASES + " p " +
+			"INNER JOIN " + TABLE_PARTIES + " pa ON p.party_id = pa.id " +
+			"WHERE amount_paid != 0 " +
+
+			"UNION ALL " +
+
+			"SELECT date, time, amount, ('Payment In - ' || pa.name), source " +
+			"FROM " + TABLE_PAYMENTS + " pm " +
+			"INNER JOIN " + TABLE_PARTIES + " pa ON pm.party_id = pa.id " +
+			"WHERE type=" + PAYMENT_IN + " " +
+
+			"UNION ALL " +
+
+			"SELECT date, time, -amount, ('Payment Out - ' || pa.name), source " +
+			"FROM " + TABLE_PAYMENTS + " pm " +
+			"INNER JOIN " + TABLE_PARTIES + " pa ON pm.party_id = pa.id " +
+			"WHERE type=" + PAYMENT_OUT + " " +
+
+			"UNION ALL " +
+
+			"SELECT date, time, -paid_amount, ('Expense - ' || item), source " +
+			"FROM " + TABLE_EXPENSES + " WHERE paid_amount != 0 " +
+
+			"UNION ALL " +
+
+			"SELECT date, time, amount, " +
+			"('Adjustment' || CASE WHEN notes IS NOT NULL AND notes != '' " +
+			"THEN ' - ' || notes ELSE '' END), source " +
+			"FROM " + TABLE_CASH_ADJUSTMENTS +
+
+			" ORDER BY date DESC, time DESC",
+
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> map = new HashMap<String, Object>();
+
+			map.put("date", cursor.getString(0));
+			map.put("time", cursor.getString(1));
+			map.put("amount", cursor.getDouble(2));
+			map.put("label", cursor.getString(3));
+			map.put("source", cursor.isNull(4) ? "Manual" : cursor.getString(4));
+
+			list.add(map);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	public long insertCashAdjustment(
+		String date, String time, double amount, String notes) {
+
+		ContentValues values = new ContentValues();
+		values.put("date", date);
+		values.put("time", time);
+		values.put("amount", amount);
+		values.put("notes", notes);
+		values.put("source", "Manual");
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		return db.insert(TABLE_CASH_ADJUSTMENTS, null, values);
+	}
+
+	// =====================
+	// TODAY / THIS WEEK / THIS MONTH EXPENSE TOTALS (dashboard)
+	// =====================
+	public double getExpenseTotalForRange(String fromDate, String toDate) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		return sumColumn(
+			db,
+			"SELECT SUM(amount) FROM " + TABLE_EXPENSES + " WHERE date BETWEEN ? AND ?",
+			new String[]{fromDate, toDate}
+		);
+	}
+
+	// =====================
+	// WANTED ITEMS - a customer asked for something not currently in
+	// stock (an existing catalog item that's out, or something not in
+	// the catalog at all).
+	// =====================
+	public long insertWantedItem(
+		Integer itemId, String itemName, String date, String time,
+		Integer partyId, String notes) {
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.put("item_name", itemName);
+		values.put("date", date);
+		values.put("time", time);
+		values.put("party_id", partyId);
+		values.put("notes", notes);
+		values.put("fulfilled", 0);
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		return db.insert(TABLE_WANTED_ITEMS, null, values);
+	}
+
+	public ArrayList<HashMap<String, Object>> getWantedItems(boolean includeFulfilled) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT w.id, w.item_id, w.item_name, w.date, w.time, " +
+			"w.party_id, pa.name, w.notes, w.fulfilled " +
+			"FROM " + TABLE_WANTED_ITEMS + " w " +
+			"LEFT JOIN " + TABLE_PARTIES + " pa ON w.party_id = pa.id " +
+			(includeFulfilled ? "" : "WHERE w.fulfilled = 0 ") +
+			"ORDER BY w.date DESC, w.time DESC",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> map = new HashMap<String, Object>();
+
+			map.put("id", cursor.getInt(0));
+
+			if (!cursor.isNull(1)) {
+				map.put("item_id", cursor.getInt(1));
+			}
+
+			map.put("item_name", cursor.getString(2));
+			map.put("date", cursor.getString(3));
+			map.put("time", cursor.getString(4));
+
+			if (!cursor.isNull(5)) {
+				map.put("party_id", cursor.getInt(5));
+				map.put("party_name", cursor.getString(6));
+			}
+
+			map.put("notes", cursor.getString(7));
+			map.put("fulfilled", cursor.getInt(8) != 0);
+
+			list.add(map);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	public boolean setWantedItemFulfilled(int wantedItemId, boolean fulfilled) {
+
+		ContentValues values = new ContentValues();
+		values.put("fulfilled", fulfilled ? 1 : 0);
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		int rows = db.update(
+			TABLE_WANTED_ITEMS, values, "id=?",
+			new String[]{String.valueOf(wantedItemId)}
+		);
+
+		return rows > 0;
+	}
+
+	public boolean deleteWantedItem(int wantedItemId) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		int rows = db.delete(
+			TABLE_WANTED_ITEMS, "id=?",
+			new String[]{String.valueOf(wantedItemId)}
+		);
+
+		return rows > 0;
+	}
+
 }
 

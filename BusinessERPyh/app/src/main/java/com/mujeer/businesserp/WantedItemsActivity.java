@@ -1,0 +1,220 @@
+package com.mujeer.businesserp;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.EditText;
+import android.widget.ListView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Locale;
+
+// =====================
+// Lets staff log something a customer asked for that the shop doesn't
+// currently have - either a catalog item that's out of stock, or
+// something not registered as an item at all. Not tied to a
+// transaction; just a running request log staff can check off once
+// fulfilled (e.g. restocked and the customer was told).
+// =====================
+public class WantedItemsActivity extends Activity {
+
+    private Button btnAdd;
+    private CheckBox cbShowFulfilled;
+    private TextView tvEmpty;
+    private ListView lvList;
+
+    private DatabaseHelper db;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.wanted_items_activity);
+
+        btnAdd = findViewById(R.id.btn_add_wanted_item);
+        cbShowFulfilled = findViewById(R.id.cb_show_fulfilled);
+        tvEmpty = findViewById(R.id.tv_wanted_items_empty);
+        lvList = findViewById(R.id.lv_wanted_items);
+
+        db = new DatabaseHelper(this);
+
+        btnAdd.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                promptAddWantedItem();
+            }
+        });
+
+        cbShowFulfilled.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                loadList();
+            }
+        });
+
+        loadList();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        loadList();
+    }
+
+    private void loadList() {
+
+        final boolean includeFulfilled = cbShowFulfilled.isChecked();
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                final ArrayList<HashMap<String, Object>> items =
+                    db.getWantedItems(includeFulfilled);
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+
+                        lvList.setAdapter(
+                            new WantedItemsAdapter(
+                                WantedItemsActivity.this,
+                                items,
+                                new WantedItemsAdapter.OnFulfilledToggleListener() {
+                                    @Override
+                                    public void onToggle(int wantedItemId, boolean fulfilled) {
+                                        toggleFulfilled(wantedItemId, fulfilled);
+                                    }
+                                }
+                            )
+                        );
+
+                        lvList.setEmptyView(tvEmpty);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private void toggleFulfilled(final int wantedItemId, final boolean fulfilled) {
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                db.setWantedItemFulfilled(wantedItemId, fulfilled);
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        loadList();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private void promptAddWantedItem() {
+
+        View view = getLayoutInflater().inflate(R.layout.dialog_wanted_item, null);
+
+        final AutoCompleteTextView actvItemName = view.findViewById(R.id.actv_wanted_item_name);
+        final AutoCompleteTextView actvParty = view.findViewById(R.id.actv_wanted_item_party);
+        final EditText etNotes = view.findViewById(R.id.et_wanted_item_notes);
+
+        final ArrayList<HashMap<String, Object>> items = db.getItemsForSpinner();
+        final ArrayList<String> itemNames = new ArrayList<>();
+
+        for (HashMap<String, Object> item : items) {
+            itemNames.add((String) item.get("name"));
+        }
+
+        actvItemName.setAdapter(
+            new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, itemNames)
+        );
+        actvItemName.setThreshold(1);
+
+        final ArrayList<HashMap<String, Object>> parties = db.getParties();
+        final ArrayList<String> partyNames = new ArrayList<>();
+
+        for (HashMap<String, Object> party : parties) {
+            partyNames.add((String) party.get("name"));
+        }
+
+        actvParty.setAdapter(
+            new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, partyNames)
+        );
+        actvParty.setThreshold(1);
+
+        new AlertDialog.Builder(this)
+            .setTitle("Add Wanted Item")
+            .setView(view)
+            .setPositiveButton("Save", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    saveWantedItem(items, parties, actvItemName, actvParty, etNotes);
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void saveWantedItem(
+        ArrayList<HashMap<String, Object>> items,
+        ArrayList<HashMap<String, Object>> parties,
+        AutoCompleteTextView actvItemName,
+        AutoCompleteTextView actvParty,
+        EditText etNotes) {
+
+        String itemName = actvItemName.getText().toString().trim();
+
+        if (itemName.length() == 0) {
+            Toast.makeText(this, "Enter an item name", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Integer itemId = null;
+
+        for (HashMap<String, Object> item : items) {
+            if (itemName.equalsIgnoreCase((String) item.get("name"))) {
+                itemId = (Integer) item.get("id");
+                break;
+            }
+        }
+
+        String partyName = actvParty.getText().toString().trim();
+        Integer partyId = null;
+
+        if (partyName.length() > 0) {
+
+            for (HashMap<String, Object> party : parties) {
+                if (partyName.equalsIgnoreCase((String) party.get("name"))) {
+                    partyId = (Integer) party.get("id");
+                    break;
+                }
+            }
+        }
+
+        String date = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        String time = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+
+        db.insertWantedItem(
+            itemId, itemName, date, time, partyId, etNotes.getText().toString().trim()
+        );
+
+        Toast.makeText(this, "Wanted item saved", Toast.LENGTH_SHORT).show();
+
+        loadList();
+    }
+}
