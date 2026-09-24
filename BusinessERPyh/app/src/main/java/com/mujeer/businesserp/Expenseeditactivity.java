@@ -35,11 +35,19 @@ public class Expenseeditactivity extends Activity {
 	private CheckBox cb_full_paid;
 	private EditText et_notes;
 
+	private TextView tv_cash_before;
+	private TextView tv_cash_after;
+
 	private Button btn_save;
 
 	private DatabaseHelper db;
 
 	private int expenseId = 0;
+
+	// See loadCashBaseline()/updateCashPreview() - the cash balance with
+	// this expense's own (original, on-disk) cash effect excluded.
+	private double cashBaseline = 0;
+	private boolean cashBaselineLoaded = false;
 
 	// Guards against the "Full Paid" checkbox's own listener reacting to
 	// a programmatic setText() the same way it would a real user tap -
@@ -75,6 +83,8 @@ public class Expenseeditactivity extends Activity {
 		et_amount_paid = findViewById(R.id.et_amount_paid);
 		cb_full_paid = findViewById(R.id.cb_full_paid);
 		et_notes = findViewById(R.id.et_notes);
+		tv_cash_before = findViewById(R.id.tv_cash_before);
+		tv_cash_after = findViewById(R.id.tv_cash_after);
 
 		btn_save = findViewById(R.id.btn_save);
 
@@ -99,6 +109,22 @@ public class Expenseeditactivity extends Activity {
 					if (cb_full_paid.isChecked()) {
 						syncAmountPaidToAmount();
 					}
+				}
+			}
+		);
+
+		et_amount_paid.addTextChangedListener(
+			new android.text.TextWatcher() {
+
+				@Override
+				public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+				@Override
+				public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+				@Override
+				public void afterTextChanged(android.text.Editable s) {
+					updateCashPreview();
 				}
 			}
 		);
@@ -154,6 +180,8 @@ public class Expenseeditactivity extends Activity {
 
 			focusAndShowKeyboard(et_item);
 
+			loadCashBaseline(0);
+
 		} else {
 
 			HashMap<String, Object> expense =
@@ -206,6 +234,8 @@ public class Expenseeditactivity extends Activity {
 					actv_party.setText(partyName, false);
 				}
 			}
+
+			loadCashBaseline(-loadedPaidAmount);
 		}
 
 		btn_save.setOnClickListener(
@@ -277,6 +307,62 @@ public class Expenseeditactivity extends Activity {
 		);
 
 		updatingAmountPaidProgrammatically = false;
+	}
+
+	// =====================
+	// Cash before/after preview - see the matching comment in
+	// Transactioneditactivity for the rationale. An expense's cash
+	// effect is always an outflow of its paid amount (the rest, if any,
+	// stays owed on credit).
+	// =====================
+	private void loadCashBaseline(final double originalCashImpact) {
+
+		new Thread(new Runnable() {
+
+				@Override
+				public void run() {
+
+					final double balance = db.getCashBalance();
+
+					runOnUiThread(new Runnable() {
+
+							@Override
+							public void run() {
+
+								cashBaseline = balance - originalCashImpact;
+								cashBaselineLoaded = true;
+
+								updateCashPreview();
+							}
+						});
+				}
+			}).start();
+	}
+
+	private void updateCashPreview() {
+
+		if (!cashBaselineLoaded || tv_cash_before == null || tv_cash_after == null) {
+			return;
+		}
+
+		double paid;
+
+		try {
+
+			paid = Double.parseDouble(et_amount_paid.getText().toString().trim());
+
+		} catch (Exception e) {
+
+			paid = 0;
+		}
+
+		tv_cash_before.setText(
+			String.format(Locale.getDefault(), "%.2f", cashBaseline)
+		);
+
+		tv_cash_after.setText(
+			String.format(Locale.getDefault(), "%.2f", cashBaseline - paid)
+		);
 	}
 
 	private void focusAndShowKeyboard(final View target) {

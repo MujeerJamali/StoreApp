@@ -49,6 +49,7 @@ public class Transactioneditactivity extends Activity {
     CheckBox cb_full_paid;
     View tv_add_note;
     TextView tv_grand_total;
+    TextView tv_cash_before, tv_cash_after;
     TextView tv_page_title;
     Button btn_add_item, btn_save_transaction, btn_go_dashboard;
     Button btn_cancel_transaction, btn_save_and_new_transaction;
@@ -69,6 +70,15 @@ public class Transactioneditactivity extends Activity {
     // cb_full_paid/updateDefaultAmountPaid()).
     boolean amountPaidEditedByUser = false;
     boolean updatingAmountPaidProgrammatically = false;
+
+    // The cash-in-hand balance as it stands with THIS transaction's own
+    // cash effect excluded (0 for a brand new transaction; the balance
+    // minus what this transaction currently contributes, when editing
+    // one that already exists) - see loadCashBaseline()/
+    // updateCashPreview() below. "Cash After" is this plus whatever the
+    // form's current Amount Paid would contribute.
+    double cashBaseline = 0;
+    boolean cashBaselineLoaded = false;
 
     // Keeps et_time ticking forward to "now" once a minute, for as long
     // as the user hasn't manually picked a time and isn't editing an
@@ -162,6 +172,8 @@ public class Transactioneditactivity extends Activity {
 					if (!updatingAmountPaidProgrammatically) {
 						amountPaidEditedByUser = true;
 					}
+
+					updateCashPreview();
 				}
 			});
         cb_full_paid = findViewById(R.id.cb_full_paid);
@@ -177,6 +189,8 @@ public class Transactioneditactivity extends Activity {
 				}
 			});
         tv_grand_total = findViewById(R.id.tv_grand_total);
+        tv_cash_before = findViewById(R.id.tv_cash_before);
+        tv_cash_after = findViewById(R.id.tv_cash_after);
         tv_page_title = findViewById(R.id.tv_page_title);
         btn_add_item = findViewById(R.id.btn_add_item);
         btn_save_transaction = findViewById(R.id.btn_update_purchase);
@@ -283,6 +297,7 @@ public class Transactioneditactivity extends Activity {
 
 			tv_grand_total.setText("0.00");
 			updateDefaultAmountPaid(0);
+			loadCashBaseline(0);
 
 			if (transactionType == TYPE_PURCHASE) {
 				loadPrefilledItemsFromIntent();
@@ -1753,6 +1768,66 @@ public class Transactioneditactivity extends Activity {
 	}
 
 	// =====================
+	// Cash before/after preview - shows what the shop's cash-in-hand
+	// balance is right now, and what it would become once this
+	// transaction is saved with its current Amount Paid. Queried once on
+	// a background thread (a handful of SUMs against the whole cash
+	// ledger), then updated purely with local arithmetic as the user
+	// edits Amount Paid, so no further DB hits are needed while typing.
+	// =====================
+	private void loadCashBaseline(final double originalCashImpact) {
+
+		new Thread(new Runnable() {
+
+				@Override
+				public void run() {
+
+					final double balance = db.getCashBalance();
+
+					runOnUiThread(new Runnable() {
+
+							@Override
+							public void run() {
+
+								cashBaseline = balance - originalCashImpact;
+								cashBaselineLoaded = true;
+
+								updateCashPreview();
+							}
+						});
+				}
+			}).start();
+	}
+
+	private void updateCashPreview() {
+
+		if (!cashBaselineLoaded || tv_cash_before == null || tv_cash_after == null) {
+			return;
+		}
+
+		double paid;
+
+		try {
+
+			paid = Double.parseDouble(et_amount_paid.getText().toString().trim());
+
+		} catch (Exception e) {
+
+			paid = 0;
+		}
+
+		double impact = transactionType == TYPE_PURCHASE ? -paid : paid;
+
+		tv_cash_before.setText(
+			String.format(Locale.getDefault(), "%.2f", cashBaseline)
+		);
+
+		tv_cash_after.setText(
+			String.format(Locale.getDefault(), "%.2f", cashBaseline + impact)
+		);
+	}
+
+	// =====================
 	// Keeps et_amount_paid synced to the grand total for as long as the
 	// "Full Paid" checkbox is checked, whether adding a new transaction
 	// or editing an existing one - unchecking it hands the field back to
@@ -2411,6 +2486,8 @@ public class Transactioneditactivity extends Activity {
 		);
 
 		updateGrandTotal();
+
+		loadCashBaseline(-((Double) purchase.get("amount_paid")));
 	}
 
 	private void loadSale() {
@@ -2498,9 +2575,11 @@ public class Transactioneditactivity extends Activity {
 		);
 
 		updateGrandTotal();
+
+		loadCashBaseline(Double.parseDouble(sale.get("paid_amount").toString()));
 	}
-	
-	
+
+
 	private void saveSale(boolean andNew) {
 
 		if (transactionItemList.size() == 0) {

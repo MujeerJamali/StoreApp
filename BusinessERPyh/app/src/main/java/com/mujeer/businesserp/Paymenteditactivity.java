@@ -33,11 +33,21 @@ public class Paymenteditactivity extends Activity {
 	private EditText et_amount;
 	private EditText et_notes;
 
+	private TextView tv_cash_before;
+	private TextView tv_cash_after;
+
 	private Button btn_save;
 
 	private DatabaseHelper db;
 
 	private int paymentId = 0;
+
+	// See loadCashBaseline()/updateCashPreview() - the cash balance with
+	// this payment's own (original, on-disk) cash effect excluded, so
+	// "Cash After" can be recomputed locally as the user edits the
+	// amount or flips Payment In/Out.
+	private double cashBaseline = 0;
+	private boolean cashBaselineLoaded = false;
 
 	private ArrayList<HashMap<String, Object>> partyList =
 	new ArrayList<HashMap<String, Object>>();
@@ -60,7 +70,25 @@ public class Paymenteditactivity extends Activity {
 		et_time = findViewById(R.id.et_time);
 		et_amount = findViewById(R.id.et_amount);
 		et_notes = findViewById(R.id.et_notes);
+		tv_cash_before = findViewById(R.id.tv_cash_before);
+		tv_cash_after = findViewById(R.id.tv_cash_after);
 		btn_save = findViewById(R.id.btn_save);
+
+		et_amount.addTextChangedListener(
+			new android.text.TextWatcher() {
+
+				@Override
+				public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+				@Override
+				public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+				@Override
+				public void afterTextChanged(android.text.Editable s) {
+					updateCashPreview();
+				}
+			}
+		);
 
 		db = new DatabaseHelper(this);
 
@@ -172,6 +200,8 @@ public class Paymenteditactivity extends Activity {
 
 			focusAndShowKeyboard(et_party);
 
+			loadCashBaseline(0);
+
 		} else {
 
 			HashMap<String, Object> payment =
@@ -209,6 +239,13 @@ public class Paymenteditactivity extends Activity {
 					payment.get("notes").toString()
 				);
 			}
+
+			int originalType = Integer.parseInt(payment.get("type").toString());
+			double originalAmount = Double.parseDouble(payment.get("amount").toString());
+
+			loadCashBaseline(
+				originalType == DatabaseHelper.PAYMENT_IN ? originalAmount : -originalAmount
+			);
 		}
 
 		btn_save.setOnClickListener(
@@ -243,6 +280,67 @@ public class Paymenteditactivity extends Activity {
 			btn_type_in.setBackgroundResource(R.drawable.bg_button_outline);
 			btn_type_in.setTextColor(getResources().getColor(R.color.primary));
 		}
+
+		updateCashPreview();
+	}
+
+	// =====================
+	// Cash before/after preview - see the matching comment in
+	// Transactioneditactivity for the rationale (one background query at
+	// load time, then pure local arithmetic as the form changes). A
+	// payment is always fully cash, so its impact is just the signed
+	// amount.
+	// =====================
+	private void loadCashBaseline(final double originalCashImpact) {
+
+		new Thread(new Runnable() {
+
+				@Override
+				public void run() {
+
+					final double balance = db.getCashBalance();
+
+					runOnUiThread(new Runnable() {
+
+							@Override
+							public void run() {
+
+								cashBaseline = balance - originalCashImpact;
+								cashBaselineLoaded = true;
+
+								updateCashPreview();
+							}
+						});
+				}
+			}).start();
+	}
+
+	private void updateCashPreview() {
+
+		if (!cashBaselineLoaded || tv_cash_before == null || tv_cash_after == null) {
+			return;
+		}
+
+		double amount;
+
+		try {
+
+			amount = Double.parseDouble(et_amount.getText().toString().trim());
+
+		} catch (Exception e) {
+
+			amount = 0;
+		}
+
+		double impact = selectedType == DatabaseHelper.PAYMENT_IN ? amount : -amount;
+
+		tv_cash_before.setText(
+			String.format(Locale.getDefault(), "%.2f", cashBaseline)
+		);
+
+		tv_cash_after.setText(
+			String.format(Locale.getDefault(), "%.2f", cashBaseline + impact)
+		);
 	}
 
 	private void focusAndShowKeyboard(final View target) {
