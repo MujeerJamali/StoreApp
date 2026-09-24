@@ -1356,7 +1356,50 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			return null;
 		}
 
-		SQLiteDatabase db = this.getReadableDatabase();
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		Integer comboId = findComboId(db, groupIdToValueId);
+
+		if (comboId != null) {
+			return comboId;
+		}
+
+		// No combo exists yet for this exact combination of values - can
+		// happen if a value's own combo row never got created (e.g. an
+		// older/partial import, or a value added outside the normal
+		// "add value" flow that grid-generates one). Rather than handing
+		// the caller a null and letting a real, user-picked size
+		// silently sell/purchase as untracked stock, create the missing
+		// combo on the spot (0 balance - it's genuinely new to the
+		// system, there's no history to carry over) the same way
+		// addVarietyValue()'s auto-grid does, so this can never happen
+		// twice for the same combination.
+		db.beginTransaction();
+
+		try {
+
+			int itemId = getItemIdForGroup(
+				db, groupIdToValueId.keySet().iterator().next());
+
+			long newComboId = insertComboRow(db, itemId, 0);
+
+			for (Map.Entry<Integer, Integer> entry : groupIdToValueId.entrySet()) {
+				linkComboValue(db, newComboId, entry.getKey(), entry.getValue());
+			}
+
+			db.setTransactionSuccessful();
+
+			comboId = (int) newComboId;
+
+		} finally {
+
+			db.endTransaction();
+		}
+
+		return comboId;
+	}
+
+	private Integer findComboId(SQLiteDatabase db, Map<Integer, Integer> groupIdToValueId) {
 
 		StringBuilder where = new StringBuilder();
 		ArrayList<String> args = new ArrayList<String>();

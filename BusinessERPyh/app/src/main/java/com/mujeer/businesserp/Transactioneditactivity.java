@@ -1091,19 +1091,10 @@ public class Transactioneditactivity extends Activity {
 		Map<Integer, ArrayList<HashMap<String, Object>>> varietyValuesByGroup) {
 
 		if (varietySpinners.isEmpty()) {
-
-			// TEMPORARY DEBUG - remove once the sizeless-sale bug is found.
-			android.widget.Toast.makeText(
-				this,
-				"DEBUG combo: no variety spinners for this item (treated as no variety groups)",
-				android.widget.Toast.LENGTH_LONG
-			).show();
-
 			return null;
 		}
 
 		Map<Integer, Integer> selections = new LinkedHashMap<Integer, Integer>();
-		StringBuilder debugSelections = new StringBuilder();
 
 		for (Map.Entry<Integer, Spinner> entry : varietySpinners.entrySet()) {
 
@@ -1113,28 +1104,10 @@ public class Transactioneditactivity extends Activity {
 			HashMap<String, Object> selectedValue =
 				varietyValuesByGroup.get(groupId).get(position);
 
-			Integer valueId = (Integer) selectedValue.get("id");
-
-			selections.put(groupId, valueId);
-
-			debugSelections
-				.append("group=").append(groupId)
-				.append(" pos=").append(position)
-				.append(" valueId=").append(valueId)
-				.append(" label=").append(selectedValue.get("label"))
-				.append("; ");
+			selections.put(groupId, (Integer) selectedValue.get("id"));
 		}
 
-		Integer resolved = db.resolveComboId(selections);
-
-		// TEMPORARY DEBUG - remove once the sizeless-sale bug is found.
-		android.widget.Toast.makeText(
-			this,
-			"DEBUG combo: " + debugSelections + "-> comboId=" + resolved,
-			android.widget.Toast.LENGTH_LONG
-		).show();
-
-		return resolved;
+		return db.resolveComboId(selections);
 	}
 
 	// =====================
