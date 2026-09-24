@@ -45,6 +45,7 @@ public class Transactioneditactivity extends Activity {
 	
 	AutoCompleteTextView actv_party;
     EditText et_date, et_time, et_invoice_number, et_amount_paid, et_notes;
+    EditText et_search_transaction_items;
     CheckBox cb_full_paid;
     View tv_add_note;
     TextView tv_grand_total;
@@ -207,12 +208,31 @@ public class Transactioneditactivity extends Activity {
         lv_transaction_items = findViewById(R.id.lv_purchase_items);
         scroll_transaction_edit = findViewById(R.id.scroll_transaction_edit);
         items_section_container = findViewById(R.id.items_section_container);
+        et_search_transaction_items = findViewById(R.id.et_search_transaction_items);
 
         db = new DatabaseHelper(this);
 
         transactionItemList = new ArrayList<HashMap<String,Object>>();
         transactionItemAdapter = new TransactionItemAdapter(this, transactionItemList);
         lv_transaction_items.setAdapter(transactionItemAdapter);
+
+		et_search_transaction_items.addTextChangedListener(
+			new android.text.TextWatcher() {
+
+				@Override
+				public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+				@Override
+				public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+				@Override
+				public void afterTextChanged(android.text.Editable s) {
+
+					transactionItemAdapter.filter(s.toString());
+
+					setListViewHeightBasedOnChildren(lv_transaction_items);
+				}
+			});
 		lv_transaction_items.setOnItemClickListener(
 			new AdapterView.OnItemClickListener() {
 
@@ -223,7 +243,9 @@ public class Transactioneditactivity extends Activity {
 					int position,
 					long id) {
 
-					showEditTransactionItem(position);
+					showEditTransactionItem(
+						transactionItemAdapter.getRealIndex(position)
+					);
 				}
 			});
 
@@ -288,7 +310,12 @@ public class Transactioneditactivity extends Activity {
 								android.content.DialogInterface dialog,
 								int which) {
 
-								transactionItemList.remove(position);
+								int realIndex =
+									transactionItemAdapter.getRealIndex(position);
+
+								if (realIndex != -1) {
+									transactionItemList.remove(realIndex);
+								}
 
 								transactionItemAdapter.notifyDataSetChanged();
 
