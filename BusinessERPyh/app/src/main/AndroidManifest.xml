@@ -137,6 +137,18 @@
             android:name=".Partyrankingreportactivity"
             android:label="Party Ranking" />
 
+        <activity
+            android:name=".NetProfitReportActivity"
+            android:label="Net Profit" />
+
+        <activity
+            android:name=".StockWorthReportActivity"
+            android:label="Stock Worth" />
+
+        <activity
+            android:name=".ItemMonthlyRankReportActivity"
+            android:label="Item Monthly Rank" />
+
         <!-- Bulk "generate entries" via calendar taps -->
         <activity
             android:name=".GenerateEntriesActivity"

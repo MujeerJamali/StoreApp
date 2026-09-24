@@ -10,21 +10,46 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <TextView style="@style/PageTitle" android:text="Item Ranking" />
+        <TextView style="@style/PageTitle" android:text="Item Monthly Rank" />
 
         <TextView
             style="@style/FieldLabel"
             android:layout_marginTop="0dp"
-            android:text="Each item's Today + Week + Month + Quarter + Year + All Time sales are added together into one combined score, and items are ranked by that score." />
+            android:text="Each item is ranked against the others within every month it sold in (1 = best), and those per-month ranks are summed - a lower sum means it ranked well more consistently." />
 
-        <TextView
-            style="@style/FieldLabel"
-            android:text="Sort By" />
+        <TextView style="@style/FieldLabel" android:text="Rank By" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_metric_sales"
+                style="@style/AppButton.Small"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Sales" />
+
+            <Button
+                android:id="@+id/btn_metric_profit"
+                style="@style/AppButton.Outline.Small"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Profit" />
+
+        </LinearLayout>
+
+        <TextView style="@style/FieldLabel" android:text="Period" />
 
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="12dp"
             android:scrollbars="none">
 
             <LinearLayout
@@ -33,7 +58,7 @@
                 android:orientation="horizontal">
 
                 <Button
-                    android:id="@+id/btn_sort_combined_desc"
+                    android:id="@+id/btn_range_month"
                     style="@style/AppButton.Small"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -41,10 +66,10 @@
                     android:minWidth="0dp"
                     android:paddingStart="18dp"
                     android:paddingEnd="18dp"
-                    android:text="Combined: High to Low" />
+                    android:text="This Month" />
 
                 <Button
-                    android:id="@+id/btn_sort_combined_asc"
+                    android:id="@+id/btn_range_quarter"
                     style="@style/AppButton.Outline.Small"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -52,25 +77,92 @@
                     android:minWidth="0dp"
                     android:paddingStart="18dp"
                     android:paddingEnd="18dp"
-                    android:text="Combined: Low to High" />
+                    android:text="Quarter" />
 
                 <Button
-                    android:id="@+id/btn_sort_name"
+                    android:id="@+id/btn_range_year"
+                    style="@style/AppButton.Outline.Small"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:minWidth="0dp"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:text="Year" />
+
+                <Button
+                    android:id="@+id/btn_range_all_time"
+                    style="@style/AppButton.Outline.Small"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:minWidth="0dp"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:text="All Time" />
+
+                <Button
+                    android:id="@+id/btn_range_custom"
                     style="@style/AppButton.Outline.Small"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:minWidth="0dp"
                     android:paddingStart="18dp"
                     android:paddingEnd="18dp"
-                    android:text="Item Name" />
+                    android:text="Custom Range" />
 
             </LinearLayout>
 
         </HorizontalScrollView>
 
-        <TextView
-            style="@style/FieldLabel"
-            android:text="Show" />
+        <LinearLayout
+            android:id="@+id/container_custom_range"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="From" />
+                <EditText
+                    android:id="@+id/et_custom_from"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clickable="true"
+                    android:focusable="false"
+                    android:hint="From date"
+                    android:inputType="text|textNoSuggestions" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:orientation="vertical">
+
+                <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="To" />
+                <EditText
+                    android:id="@+id/et_custom_to"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clickable="true"
+                    android:focusable="false"
+                    android:hint="To date"
+                    android:inputType="text|textNoSuggestions" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <TextView style="@style/FieldLabel" android:text="Show" />
 
         <HorizontalScrollView
             android:layout_width="match_parent"
@@ -125,7 +217,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:gravity="center"
-            android:text="No item sales found yet."
+            android:text="No item sales found in this period."
             android:textColor="@color/text_secondary"
             android:textSize="15sp"
             android:visibility="gone" />

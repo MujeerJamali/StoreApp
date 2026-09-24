@@ -2700,6 +2700,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// yearStart are all in "yyyy-MM-dd" format, are rolling windows
 	// ending today (e.g. monthStart = one month back from today), and
 	// are inclusive lower bounds.
+	// "An item starts with 'Shoe' is a shoe item" - the whole app's
+	// shoes/non-shoes split (item reports, Stock Worth) is this one
+	// name-prefix rule; SQLite's LIKE is case-insensitive for ASCII, so
+	// this also matches "shoe...", "SHOE...", etc.
+	public static final int SHOES_FILTER_ALL = 0;
+	public static final int SHOES_FILTER_SHOES_ONLY = 1;
+	public static final int SHOES_FILTER_NON_SHOES_ONLY = 2;
+
 	public ArrayList<HashMap<String, Object>> getItemSalesRanking(
 		String weekStart,
 		String monthStart,
@@ -2707,7 +2715,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		String sixMonthStart,
 		String nineMonthStart,
 		String yearStart,
-		int sortBy) {
+		int sortBy,
+		int shoesFilter) {
 
 		return getSalesRanking(
 			TABLE_ITEMS,
@@ -2721,7 +2730,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			sixMonthStart,
 			nineMonthStart,
 			yearStart,
-			sortBy
+			sortBy,
+			shoesFilter
 		);
 	}
 
@@ -2746,7 +2756,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			sixMonthStart,
 			nineMonthStart,
 			yearStart,
-			sortBy
+			sortBy,
+			SHOES_FILTER_ALL
 		);
 	}
 
@@ -2774,7 +2785,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		String sixMonthStart,
 		String nineMonthStart,
 		String yearStart,
-		int sortBy) {
+		int sortBy,
+		int shoesFilter) {
 
 		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
 
@@ -2788,6 +2800,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"sl.date" :
 			"st.date";
 
+		// Only meaningful for the items entity - parties have no shoes
+		// concept, and this whole clause is skipped for them.
+		String shoesWhere = "";
+
+		if (entityTable.equals(TABLE_ITEMS) && shoesFilter == SHOES_FILTER_SHOES_ONLY) {
+			shoesWhere = "WHERE e.name LIKE 'Shoe%' ";
+		} else if (entityTable.equals(TABLE_ITEMS) && shoesFilter == SHOES_FILTER_NON_SHOES_ONLY) {
+			shoesWhere = "WHERE e.name NOT LIKE 'Shoe%' ";
+		}
+
 		String sql =
 			"SELECT e.id AS entity_id, e.name AS entity_name, " +
 			"COALESCE(SUM(CASE WHEN " + dateColumn + " >= ? THEN st." + amountColumn + " ELSE 0 END), 0) AS week, " +
@@ -2800,6 +2822,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"FROM " + entityTable + " e " +
 			"INNER JOIN " + salesTable + " st ON st." + fkColumn + " = e.id " +
 			dateJoin +
+			shoesWhere +
 			"GROUP BY e.id, e.name";
 
 		SQLiteDatabase db = this.getReadableDatabase();
@@ -2954,6 +2977,230 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		}
 
 		return ranks;
+	}
+
+	// =====================
+	// REPORT: NET PROFIT (sale total - item cost - expenses) FOR A DATE
+	// RANGE. fromDate/toDate null means All Time (no date bound). Item
+	// cost is each sale line's quantity times its item's CURRENT
+	// purchase_price - this app doesn't keep a historical cost snapshot
+	// per sale, so a price change today also reshapes past periods'
+	// profit, same simplification the rest of the app already makes by
+	// treating items.purchase_price as a single current cost.
+	// =====================
+	public HashMap<String, Object> getNetProfitSummary(String fromDate, String toDate) {
+
+		HashMap<String, Object> map = new HashMap<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		boolean allTime = fromDate == null || toDate == null;
+
+		String[] args = allTime ? null : new String[]{fromDate, toDate};
+
+		double salesTotal = sumColumn(
+			db,
+			"SELECT COALESCE(SUM(grand_total), 0) FROM sales" +
+			(allTime ? "" : " WHERE date BETWEEN ? AND ?"),
+			args
+		);
+
+		double itemCost = sumColumn(
+			db,
+			"SELECT COALESCE(SUM(si.qty * i.purchase_price), 0) " +
+			"FROM sale_items si " +
+			"INNER JOIN sales s ON s.id = si.sale_id " +
+			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = si.item_id" +
+			(allTime ? "" : " WHERE s.date BETWEEN ? AND ?"),
+			args
+		);
+
+		double expensesTotal = sumColumn(
+			db,
+			"SELECT COALESCE(SUM(amount), 0) FROM " + TABLE_EXPENSES +
+			(allTime ? "" : " WHERE date BETWEEN ? AND ?"),
+			args
+		);
+
+		map.put("sales_total", salesTotal);
+		map.put("item_cost", itemCost);
+		map.put("expenses_total", expensesTotal);
+		map.put("net_profit", salesTotal - itemCost - expensesTotal);
+
+		return map;
+	}
+
+	// =====================
+	// REPORT: STOCK WORTH - current stock quantity times purchase_price,
+	// split into shoes/non-shoes by the same name-prefix rule as
+	// everywhere else. This is always a snapshot of right now: the app
+	// doesn't keep historical stock-level snapshots, so there's no way
+	// to reconstruct "stock worth as of a past date" without replaying
+	// every transaction back to that point - out of scope here.
+	// =====================
+	public HashMap<String, Object> getStockWorthSummary() {
+
+		HashMap<String, Object> map = new HashMap<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		double shoesWorth = sumColumn(
+			db,
+			"SELECT COALESCE(SUM(balance * purchase_price), 0) " +
+			"FROM " + TABLE_ITEMS + " WHERE name LIKE 'Shoe%'",
+			null
+		);
+
+		double nonShoesWorth = sumColumn(
+			db,
+			"SELECT COALESCE(SUM(balance * purchase_price), 0) " +
+			"FROM " + TABLE_ITEMS + " WHERE name NOT LIKE 'Shoe%'",
+			null
+		);
+
+		int shoesCount = (int) sumColumn(
+			db,
+			"SELECT COUNT(*) FROM " + TABLE_ITEMS + " WHERE name LIKE 'Shoe%'",
+			null
+		);
+
+		int nonShoesCount = (int) sumColumn(
+			db,
+			"SELECT COUNT(*) FROM " + TABLE_ITEMS + " WHERE name NOT LIKE 'Shoe%'",
+			null
+		);
+
+		map.put("shoes_worth", shoesWorth);
+		map.put("non_shoes_worth", nonShoesWorth);
+		map.put("total_worth", shoesWorth + nonShoesWorth);
+		map.put("shoes_count", shoesCount);
+		map.put("non_shoes_count", nonShoesCount);
+
+		return map;
+	}
+
+	// =====================
+	// REPORT: ITEM MONTHLY RANK-OF-RANKS
+	//
+	// For each calendar month touched by the date range, every item
+	// that sold that month is ranked against every other item that
+	// sold that month (rank 1 = highest sales, or highest profit when
+	// byProfit is true) using the same computeDescendingRanks() used by
+	// the Week/Month/.../All Time index ranking above. An item's
+	// per-month ranks are then summed across every month it appears in
+	// - a LOWER sum means it ranked well (near the top) more
+	// consistently, so the result is sorted with the lowest sum first.
+	// Months an item didn't sell in simply don't contribute a rank
+	// (neither a bonus nor a penalty) - this is what the feature was
+	// asked for as specified, not a claim that it's bias-free.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getItemMonthlyRankReport(
+		String fromDate, String toDate, boolean byProfit, int shoesFilter) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		String shoesWhere = "";
+
+		if (shoesFilter == SHOES_FILTER_SHOES_ONLY) {
+			shoesWhere = "AND i.name LIKE 'Shoe%' ";
+		} else if (shoesFilter == SHOES_FILTER_NON_SHOES_ONLY) {
+			shoesWhere = "AND i.name NOT LIKE 'Shoe%' ";
+		}
+
+		Cursor cursor = db.rawQuery(
+			"SELECT i.id, i.name, strftime('%Y-%m', s.date) AS ym, " +
+			"SUM(si.amount) AS sales_total, " +
+			"SUM(si.qty * i.purchase_price) AS cost_total " +
+			"FROM sale_items si " +
+			"INNER JOIN sales s ON s.id = si.sale_id " +
+			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = si.item_id " +
+			"WHERE s.date BETWEEN ? AND ? " +
+			shoesWhere +
+			"GROUP BY i.id, i.name, ym",
+			new String[]{fromDate, toDate}
+		);
+
+		// month -> list of {itemId, itemName, value}
+		java.util.LinkedHashMap<String, ArrayList<Object[]>> byMonth =
+			new java.util.LinkedHashMap<String, ArrayList<Object[]>>();
+
+		while (cursor.moveToNext()) {
+
+			int itemId = cursor.getInt(0);
+			String itemName = cursor.getString(1);
+			String month = cursor.getString(2);
+			double salesTotal = cursor.getDouble(3);
+			double costTotal = cursor.getDouble(4);
+
+			double value = byProfit ? (salesTotal - costTotal) : salesTotal;
+
+			ArrayList<Object[]> monthRows = byMonth.get(month);
+
+			if (monthRows == null) {
+				monthRows = new ArrayList<Object[]>();
+				byMonth.put(month, monthRows);
+			}
+
+			monthRows.add(new Object[]{itemId, itemName, value});
+		}
+
+		cursor.close();
+
+		HashMap<Integer, Integer> rankSumById = new HashMap<Integer, Integer>();
+		HashMap<Integer, String> nameById = new HashMap<Integer, String>();
+		HashMap<Integer, Integer> monthsCountedById = new HashMap<Integer, Integer>();
+
+		for (ArrayList<Object[]> monthRows : byMonth.values()) {
+
+			double[] values = new double[monthRows.size()];
+
+			for (int i = 0; i < monthRows.size(); i++) {
+				values[i] = (Double) monthRows.get(i)[2];
+			}
+
+			int[] ranks = computeDescendingRanks(values);
+
+			for (int i = 0; i < monthRows.size(); i++) {
+
+				int itemId = (Integer) monthRows.get(i)[0];
+				String itemName = (String) monthRows.get(i)[1];
+
+				nameById.put(itemId, itemName);
+
+				Integer existingSum = rankSumById.get(itemId);
+				rankSumById.put(itemId, (existingSum == null ? 0 : existingSum) + ranks[i]);
+
+				Integer existingCount = monthsCountedById.get(itemId);
+				monthsCountedById.put(itemId, (existingCount == null ? 0 : existingCount) + 1);
+			}
+		}
+
+		ArrayList<HashMap<String, Object>> result = new ArrayList<HashMap<String, Object>>();
+
+		for (Integer itemId : rankSumById.keySet()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+
+			row.put("item_id", itemId);
+			row.put("item_name", nameById.get(itemId));
+			row.put("rank_sum", rankSumById.get(itemId));
+			row.put("months_counted", monthsCountedById.get(itemId));
+
+			result.add(row);
+		}
+
+		java.util.Collections.sort(
+			result,
+			new java.util.Comparator<HashMap<String, Object>>() {
+
+				@Override
+				public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+					return ((Integer) a.get("rank_sum")).compareTo((Integer) b.get("rank_sum"));
+				}
+			}
+		);
+
+		return result;
 	}
 
 	public HashMap<String, Object> getSaleById(String saleId) {

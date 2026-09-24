@@ -26,12 +26,17 @@ public class Itemrankingreportactivity extends Activity {
 	private Button btn_sort_combined_asc;
 	private Button btn_sort_name;
 
+	private Button btn_shoes_all;
+	private Button btn_shoes_only;
+	private Button btn_shoes_non;
+
 	private TextView tv_empty;
 	private ListView lv_ranking;
 
 	private DatabaseHelper db;
 
 	private int selectedSort = DatabaseHelper.RANK_SORT_COMBINED_DESC;
+	private int selectedShoesFilter = DatabaseHelper.SHOES_FILTER_ALL;
 
 	// Bumped on every loadReport() call; a background result is only
 	// applied if it's still the most recent request by the time it
@@ -56,6 +61,10 @@ public class Itemrankingreportactivity extends Activity {
 		btn_sort_combined_desc = findViewById(R.id.btn_sort_combined_desc);
 		btn_sort_combined_asc = findViewById(R.id.btn_sort_combined_asc);
 		btn_sort_name = findViewById(R.id.btn_sort_name);
+
+		btn_shoes_all = findViewById(R.id.btn_shoes_all);
+		btn_shoes_only = findViewById(R.id.btn_shoes_only);
+		btn_shoes_non = findViewById(R.id.btn_shoes_non);
 
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_ranking = findViewById(R.id.lv_ranking);
@@ -86,7 +95,57 @@ public class Itemrankingreportactivity extends Activity {
 				}
 			});
 
+		btn_shoes_all.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					selectShoesFilter(DatabaseHelper.SHOES_FILTER_ALL);
+				}
+			});
+
+		btn_shoes_only.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					selectShoesFilter(DatabaseHelper.SHOES_FILTER_SHOES_ONLY);
+				}
+			});
+
+		btn_shoes_non.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					selectShoesFilter(DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY);
+				}
+			});
+
 		selectSort(DatabaseHelper.RANK_SORT_COMBINED_DESC);
+	}
+
+	private void selectShoesFilter(int filter) {
+
+		selectedShoesFilter = filter;
+
+		Button[] buttons = {btn_shoes_all, btn_shoes_only, btn_shoes_non};
+
+		int[] filters = {
+			DatabaseHelper.SHOES_FILTER_ALL,
+			DatabaseHelper.SHOES_FILTER_SHOES_ONLY,
+			DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY
+		};
+
+		for (int i = 0; i < buttons.length; i++) {
+
+			if (filters[i] == filter) {
+
+				buttons[i].setBackgroundResource(R.drawable.bg_button_primary);
+				buttons[i].setTextColor(getResources().getColor(R.color.text_on_primary));
+
+			} else {
+
+				buttons[i].setBackgroundResource(R.drawable.bg_button_outline);
+				buttons[i].setTextColor(getResources().getColor(R.color.primary));
+			}
+		}
+
+		loadReport();
 	}
 
 	@Override
@@ -172,6 +231,7 @@ public class Itemrankingreportactivity extends Activity {
 
 		final String[] starts = computeRangeStarts();
 		final int sort_forQuery = selectedSort;
+		final int shoesFilter_forQuery = selectedShoesFilter;
 		final long myGeneration = ++loadGeneration;
 
 		new Thread(new Runnable() {
@@ -186,7 +246,8 @@ public class Itemrankingreportactivity extends Activity {
 						starts[3],
 						starts[4],
 						starts[5],
-						sort_forQuery
+						sort_forQuery,
+						shoesFilter_forQuery
 					);
 
 					runOnUiThread(new Runnable() {

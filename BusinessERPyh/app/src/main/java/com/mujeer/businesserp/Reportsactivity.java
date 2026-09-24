@@ -12,6 +12,9 @@ public class Reportsactivity extends Activity {
 	Button btn_report_party_sales;
 	Button btn_report_item_ranking;
 	Button btn_report_party_ranking;
+	Button btn_report_net_profit;
+	Button btn_report_stock_worth;
+	Button btn_report_item_monthly_rank;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -24,6 +27,9 @@ public class Reportsactivity extends Activity {
 		btn_report_party_sales = findViewById(R.id.btn_report_party_sales);
 		btn_report_item_ranking = findViewById(R.id.btn_report_item_ranking);
 		btn_report_party_ranking = findViewById(R.id.btn_report_party_ranking);
+		btn_report_net_profit = findViewById(R.id.btn_report_net_profit);
+		btn_report_stock_worth = findViewById(R.id.btn_report_stock_worth);
+		btn_report_item_monthly_rank = findViewById(R.id.btn_report_item_monthly_rank);
 
 		btn_report_sales.setOnClickListener(new View.OnClickListener() {
 				@Override
@@ -71,6 +77,45 @@ public class Reportsactivity extends Activity {
 					Intent intent = new Intent(
 						Reportsactivity.this,
 						Partyrankingreportactivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_report_net_profit.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						Reportsactivity.this,
+						NetProfitReportActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_report_stock_worth.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						Reportsactivity.this,
+						StockWorthReportActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_report_item_monthly_rank.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						Reportsactivity.this,
+						ItemMonthlyRankReportActivity.class
 					);
 
 					startActivity(intent);
