@@ -1062,7 +1062,8 @@ public class ImportVyaparActivity extends Activity {
                 invoiceNumber,
                 grandTotal,
                 cash,
-                description == null ? "" : description
+                description == null ? "" : description,
+                "Vyapar Import"
             );
 
             helper.markImportKeyUsedBulk(db, importKey);
@@ -1232,7 +1233,7 @@ public class ImportVyaparActivity extends Activity {
             saleData.put("balance", balance);
             saleData.put("notes", description == null ? "" : description);
 
-            long localId = helper.insertSaleBulk(db, saleData);
+            long localId = helper.insertSaleBulk(db, saleData, "Vyapar Import");
 
             helper.markImportKeyUsedBulk(db, importKey);
             helper.saveVybLocalId(db, "sale", txnId, localId);
@@ -1378,7 +1379,8 @@ public class ImportVyaparActivity extends Activity {
                 formatDate(txnDate),
                 formatTime(txnTime),
                 amount,
-                description == null ? "" : description
+                description == null ? "" : description,
+                "Vyapar Import"
             );
 
             helper.markImportKeyUsedBulk(db, importKey);
@@ -1602,7 +1604,8 @@ public class ImportVyaparActivity extends Activity {
                 formatTime(txnTime),
                 amount,
                 description == null ? "" : description,
-                partyId
+                partyId,
+                "Vyapar Import"
             );
 
             helper.markImportKeyUsedBulk(db, importKey);

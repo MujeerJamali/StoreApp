@@ -1018,7 +1018,7 @@ public class GenerateEntriesActivity extends Activity {
 				if (entryType == TYPE_PURCHASE) {
 
 					long purchaseId = db.insertPurchaseBulk(
-						conn, partyId, date, time, "", grandTotal, 0, notes);
+						conn, partyId, date, time, "", grandTotal, 0, notes, "Generate Entries");
 
 					for (Object[] pair : entries) {
 
@@ -1045,7 +1045,7 @@ public class GenerateEntriesActivity extends Activity {
 					saleData.put("balance", grandTotal);
 					saleData.put("notes", notes);
 
-					long saleId = db.insertSaleBulk(conn, saleData);
+					long saleId = db.insertSaleBulk(conn, saleData, "Generate Entries");
 
 					for (Object[] pair : entries) {
 
@@ -1115,7 +1115,8 @@ public class GenerateEntriesActivity extends Activity {
 			for (Map.Entry<Integer, Double> partyEntry : dateEntry.getValue().entrySet()) {
 
 				db.insertPaymentBulk(
-					conn, direction, partyEntry.getKey(), date, time, partyEntry.getValue(), notes);
+					conn, direction, partyEntry.getKey(), date, time, partyEntry.getValue(), notes,
+					"Generate Entries");
 
 				recordCount++;
 			}
@@ -1140,7 +1141,9 @@ public class GenerateEntriesActivity extends Activity {
 
 				double amount = qty * line.unitValue;
 
-				db.insertExpenseBulk(conn, line.label, e.getKey(), time, amount, notes, line.linePartyId);
+				db.insertExpenseBulk(
+					conn, line.label, e.getKey(), time, amount, notes, line.linePartyId,
+					"Generate Entries");
 
 				recordCount++;
 			}

@@ -13,13 +13,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 
     public static final String DATABASE_NAME = "business_erp.db";
-    // Bumped 13 -> 14 to add the item varieties tables (variety_groups,
-    // variety_values, variety_combos, variety_combo_values) and the
-    // nullable combo_id column on purchase_items/sale_items. onUpgrade()
-    // below just re-runs onCreate(), and every CREATE TABLE there uses
-    // IF NOT EXISTS, so this only adds the new tables and never touches
-    // existing data.
-    public static final int DATABASE_VERSION = 14;
+    // Bumped 14 -> 15 to add: a nullable "source" column on every
+    // transaction-like table (purchases/sales/payments/expenses/
+    // party_transfers) recording what created/last touched that row
+    // ("Manual", "Vyapar Import", "Generate Entries", "Bulk Purchase
+    // Import"); expenses.paid_amount, splitting an expense into a paid
+    // portion and a credit/due remainder the same way purchases/sales
+    // already do (existing rows are backfilled to fully paid, matching
+    // their previous implicit behavior); and two new tables,
+    // cash_adjustments (manual cash-in-hand corrections) and
+    // wanted_items (customer requests for something not currently in
+    // stock).
+    public static final int DATABASE_VERSION = 15;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -63,6 +68,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// Junction table: which variety_value (one per group) makes up a given
 	// variety_combo.
 	public static final String TABLE_VARIETY_COMBO_VALUES = "variety_combo_values";
+
+	// Manual corrections to the cash-in-hand figure (e.g. reconciling a
+	// physical till count against what the app computes) - amount is
+	// positive to add cash, negative to remove it. Not tied to any party
+	// or item, so it gets its own table rather than reusing payments.
+	public static final String TABLE_CASH_ADJUSTMENTS = "cash_adjustments";
+
+	// A customer asked for an item this business doesn't currently have
+	// in stock - either an existing catalog item (item_id set) or
+	// something not in the catalog at all (item_id null, item_name is
+	// whatever the customer called it).
+	public static final String TABLE_WANTED_ITEMS = "wanted_items";
 
 
 
@@ -241,6 +258,30 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			")"
 		);
 
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_CASH_ADJUSTMENTS + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"date TEXT NOT NULL, " +
+			"time TEXT NOT NULL, " +
+			"amount REAL NOT NULL DEFAULT 0, " +
+			"notes TEXT, " +
+			"source TEXT" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_WANTED_ITEMS + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"item_id INTEGER, " +
+			"item_name TEXT NOT NULL, " +
+			"date TEXT NOT NULL, " +
+			"time TEXT NOT NULL, " +
+			"party_id INTEGER, " +
+			"notes TEXT, " +
+			"fulfilled INTEGER NOT NULL DEFAULT 0" +
+			")"
+		);
+
 
     }
 	@Override
@@ -261,6 +302,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		addColumnIfMissing(db, TABLE_EXPENSES, "party_id", "INTEGER");
 		addColumnIfMissing(db, TABLE_PURCHASE_ITEMS, "combo_id", "INTEGER");
 		addColumnIfMissing(db, "sale_items", "combo_id", "INTEGER");
+
+		addColumnIfMissing(db, TABLE_PURCHASES, "source", "TEXT");
+		addColumnIfMissing(db, "sales", "source", "TEXT");
+		addColumnIfMissing(db, TABLE_PAYMENTS, "source", "TEXT");
+		addColumnIfMissing(db, TABLE_EXPENSES, "source", "TEXT");
+		addColumnIfMissing(db, TABLE_PARTY_TRANSFERS, "source", "TEXT");
+
+		// Expenses had no paid/credit split before - every existing
+		// expense was implicitly "fully paid in cash" the moment it was
+		// recorded, so backfill paid_amount to match amount for every
+		// row that already existed when this column was added. Only
+		// runs the one time the column is actually created; a later
+		// legitimately-unpaid (credit) expense with paid_amount=0 must
+		// never get overwritten by a repeat of this backfill.
+		if (addColumnIfMissing(db, TABLE_EXPENSES, "paid_amount", "REAL NOT NULL DEFAULT 0")) {
+
+			db.execSQL("UPDATE " + TABLE_EXPENSES + " SET paid_amount = amount");
+		}
 
 		dropPurchaseCodeColumnIfPresent(db);
 	}
@@ -324,7 +383,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// already there - safe to call on every upgrade (and even after
 	// onCreate on a fresh install, where it's a harmless no-op).
 	// =====================
-	private void addColumnIfMissing(
+	// Returns true only when the column didn't already exist and this
+	// call just added it - callers that need to backfill a newly-added
+	// column's data (once, not on every future onUpgrade run) check this
+	// instead of re-deriving "was this just added" themselves.
+	private boolean addColumnIfMissing(
 		SQLiteDatabase db,
 		String table,
 		String column,
@@ -352,7 +415,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 				"ALTER TABLE " + table +
 				" ADD COLUMN " + column + " " + columnDefinition
 			);
+
+			return true;
 		}
+
+		return false;
 	}
 
     // =====================
@@ -1511,6 +1578,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("grand_total", grandTotal);
 		values.put("amount_paid", amountPaid);
 		values.put("notes", notes);
+		values.put("source", "Manual");
 
 		long id = db.insert(
             TABLE_PURCHASES,
@@ -2226,6 +2294,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("grand_total", grandTotal);
 		values.put("amount_paid", amountPaid);
 		values.put("notes", notes);
+		values.put("source", "Manual");
 
 		int rows = db.update(
             TABLE_PURCHASES,
@@ -2334,6 +2403,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("paid_amount", saleData.get("paid_amount").toString());
 		values.put("balance", saleData.get("balance").toString());
 		values.put("notes", saleData.get("notes").toString());
+		values.put("source", "Manual");
 
 		long id = db.insert("sales", null, values);
 
@@ -3246,6 +3316,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("paid_amount", saleData.get("paid_amount").toString());
 		values.put("balance", saleData.get("balance").toString());
 		values.put("notes", saleData.get("notes").toString());
+		values.put("source", "Manual");
 
 		int rows = db.update(
 			"sales",
@@ -3322,6 +3393,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("time", time);
 		values.put("amount", amount);
 		values.put("notes", notes);
+		values.put("source", "Manual");
 
 		long id = db.insert(
 			TABLE_PAYMENTS,
@@ -3479,6 +3551,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("time", time);
 		values.put("amount", amount);
 		values.put("notes", notes);
+		values.put("source", "Manual");
 
 		int rows = db.update(
 			TABLE_PAYMENTS,
@@ -3841,11 +3914,27 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 // INSERT EXPENSE
 // =====================
 
+	// Old 6-arg callers (any left) get the pre-cash/credit-toggle
+	// behavior unchanged - fully paid, matching what every expense
+	// implicitly was before that field existed.
 	public long insertExpense(
 		String item,
 		String date,
 		String time,
 		double amount,
+		String notes,
+		Integer partyId
+	) {
+
+		return insertExpense(item, date, time, amount, amount, notes, partyId);
+	}
+
+	public long insertExpense(
+		String item,
+		String date,
+		String time,
+		double amount,
+		double paidAmount,
 		String notes,
 		Integer partyId
 	) {
@@ -3857,8 +3946,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("date", date);
 		values.put("time", time);
 		values.put("amount", amount);
+		values.put("paid_amount", paidAmount);
 		values.put("notes", notes);
 		values.put("party_id", partyId);
+		values.put("source", "Manual");
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
@@ -3933,6 +4024,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 				)
 			);
 
+			map.put(
+				"paid_amount",
+				cursor.getDouble(
+					cursor.getColumnIndexOrThrow("paid_amount")
+				)
+			);
+
 			int partyIdIndex = cursor.getColumnIndexOrThrow("party_id");
 
 			if (!cursor.isNull(partyIdIndex)) {
@@ -3992,6 +4090,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("amount", cursor.getDouble(
 						cursor.getColumnIndexOrThrow("amount")));
 
+			map.put("paid_amount", cursor.getDouble(
+						cursor.getColumnIndexOrThrow("paid_amount")));
+
 			map.put("notes", cursor.getString(
 						cursor.getColumnIndexOrThrow("notes")));
 
@@ -4013,6 +4114,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 // UPDATE EXPENSE
 // =====================
 
+	// Old 7-arg callers (any left) keep the pre-cash/credit-toggle
+	// behavior - fully paid.
 	public boolean updateExpense(
 		int expenseId,
 		String item,
@@ -4023,14 +4126,30 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		Integer partyId
 	) {
 
+		return updateExpense(expenseId, item, date, time, amount, amount, notes, partyId);
+	}
+
+	public boolean updateExpense(
+		int expenseId,
+		String item,
+		String date,
+		String time,
+		double amount,
+		double paidAmount,
+		String notes,
+		Integer partyId
+	) {
+
 		ContentValues values = new ContentValues();
 
 		values.put("item", item);
 		values.put("date", date);
 		values.put("time", time);
 		values.put("amount", amount);
+		values.put("paid_amount", paidAmount);
 		values.put("notes", notes);
 		values.put("party_id", partyId);
+		values.put("source", "Manual");
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
@@ -4560,7 +4679,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return String.valueOf(nextNo);
 	}
 
-	public long insertSaleBulk(SQLiteDatabase db, HashMap<String, Object> saleData) {
+	public long insertSaleBulk(
+		SQLiteDatabase db, HashMap<String, Object> saleData, String source) {
 
 		ContentValues values = new ContentValues();
 
@@ -4575,6 +4695,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("paid_amount", (Double) saleData.get("paid_amount"));
 		values.put("balance", (Double) saleData.get("balance"));
 		values.put("notes", (String) saleData.get("notes"));
+		values.put("source", source);
 
 		long id = db.insert("sales", null, values);
 
@@ -4594,7 +4715,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		String invoiceNumber,
 		double grandTotal,
 		double amountPaid,
-		String notes) {
+		String notes,
+		String source) {
 
 		// Same fallback as insertPurchase(): a purchase must always carry
 		// an invoice number. Imports preserve whatever the source file
@@ -4615,6 +4737,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("grand_total", grandTotal);
 		values.put("amount_paid", amountPaid);
 		values.put("notes", notes);
+		values.put("source", source);
 
 		long id = db.insert(TABLE_PURCHASES, null, values);
 
@@ -4631,7 +4754,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		String date,
 		String time,
 		double amount,
-		String notes) {
+		String notes,
+		String source) {
 
 		ContentValues values = new ContentValues();
 
@@ -4642,6 +4766,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("time", time);
 		values.put("amount", amount);
 		values.put("notes", notes);
+		values.put("source", source);
 
 		long id = db.insert(TABLE_PAYMENTS, null, values);
 
@@ -4664,7 +4789,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		String time,
 		double amount,
 		String notes,
-		Integer partyId) {
+		Integer partyId,
+		String source) {
 
 		ContentValues values = new ContentValues();
 
@@ -4673,8 +4799,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("date", date);
 		values.put("time", time);
 		values.put("amount", amount);
+		values.put("paid_amount", amount);
 		values.put("notes", notes);
 		values.put("party_id", partyId);
+		values.put("source", source);
 
 		return db.insert(TABLE_EXPENSES, null, values);
 	}
@@ -4780,6 +4908,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("time", time);
 		values.put("amount", amount);
 		values.put("notes", notes);
+		values.put("source", "Vyapar Import");
 
 		long id = db.insert(TABLE_PARTY_TRANSFERS, null, values);
 
@@ -4859,6 +4988,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		db.delete(TABLE_VARIETY_COMBOS, null, null);
 		db.delete(TABLE_VARIETY_VALUES, null, null);
 		db.delete(TABLE_VARIETY_GROUPS, null, null);
+		db.delete(TABLE_CASH_ADJUSTMENTS, null, null);
+		db.delete(TABLE_WANTED_ITEMS, null, null);
 		db.delete(TABLE_ITEMS, null, null);
 		db.delete(TABLE_PARTIES, null, null);
 		db.delete(TABLE_IMPORT_LOG, null, null);
