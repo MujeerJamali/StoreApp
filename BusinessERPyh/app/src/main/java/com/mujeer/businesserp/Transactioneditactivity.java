@@ -935,7 +935,25 @@ public class Transactioneditactivity extends Activity {
 
 		map.put(priceKey, purchasePrice);
 		map.put("total", quantity * purchasePrice);
-		map.put("combo_id", resolveComboIdFromSpinners(varietySpinners, varietyValuesByGroup));
+
+		Integer comboId = resolveComboIdFromSpinners(varietySpinners, varietyValuesByGroup);
+		map.put("combo_id", comboId);
+
+		if (transactionType == TYPE_SALE) {
+
+			int itemId = (Integer) items.get(selectedIndex).get("id");
+
+			String stockError = checkSaleStockAvailability(itemId, comboId, quantity, null);
+
+			if (stockError != null) {
+
+				android.widget.Toast.makeText(
+					this, stockError, android.widget.Toast.LENGTH_LONG
+				).show();
+
+				return false;
+			}
+		}
 
 		transactionItemList.add(map);
 
@@ -1044,6 +1062,92 @@ public class Transactioneditactivity extends Activity {
 		}
 
 		return db.resolveComboId(selections);
+	}
+
+	// =====================
+	// STOCK NEVER GOES NEGATIVE (sales only - a purchase adds stock, so
+	// it never needs this check)
+	// =====================
+	// Returns null if newQty is safe to sell, or a user-facing message
+	// if it would take this item/combo's stock below 0. dbBalance (the
+	// real stored balance) already excludes every OTHER sale ever saved,
+	// but not the lines sitting in transactionItemList that haven't been
+	// written yet this session - those are subtracted here in Java
+	// instead. lineBeingEdited is the exact map instance being replaced
+	// (skip it when summing "other" lines, and give its own quantity
+	// back, since editing it doesn't change what this SAME line already
+	// reserved) - pass null when adding a brand new line.
+	//
+	// Note: when a saved line is edited more than once in one sitting
+	// before Save, the give-back uses its latest in-memory quantity, not
+	// its original saved-to-DB quantity - fine for the common case
+	// (touch a line once, then Save), slightly optimistic/pessimistic
+	// only in the rarer case of re-editing the same line repeatedly
+	// before saving.
+	// =====================
+	private String checkSaleStockAvailability(
+		int itemId,
+		Integer comboId,
+		double newQty,
+		HashMap<String, Object> lineBeingEdited) {
+
+		double dbBalance = db.getAvailableStock(itemId, comboId);
+
+		double committedByOtherLines = 0;
+
+		for (HashMap<String, Object> line : transactionItemList) {
+
+			if (line == lineBeingEdited) {
+				continue;
+			}
+
+			Object lineItemIdObj = line.get("item_id");
+
+			if (!(lineItemIdObj instanceof Integer) ||
+				((Integer) lineItemIdObj).intValue() != itemId) {
+				continue;
+			}
+
+			Integer lineComboId = (Integer) line.get("combo_id");
+
+			boolean sameCombo = (comboId == null && lineComboId == null) ||
+				(comboId != null && comboId.equals(lineComboId));
+
+			if (!sameCombo) {
+				continue;
+			}
+
+			Object qtyObj = line.get("quantity");
+
+			if (qtyObj instanceof Number) {
+				committedByOtherLines += ((Number) qtyObj).doubleValue();
+			}
+		}
+
+		double giveBack = 0;
+
+		if (lineBeingEdited != null && lineBeingEdited.get("quantity") instanceof Number) {
+			giveBack = ((Number) lineBeingEdited.get("quantity")).doubleValue();
+		}
+
+		double available = dbBalance + giveBack - committedByOtherLines;
+
+		if (newQty > available) {
+
+			return "Not enough stock - only " +
+				formatStockQty(available) + " available";
+		}
+
+		return null;
+	}
+
+	private String formatStockQty(double qty) {
+
+		if (qty == Math.floor(qty)) {
+			return String.valueOf((long) qty);
+		}
+
+		return String.format(java.util.Locale.getDefault(), "%.2f", qty);
 	}
 
 	// =====================
@@ -1512,6 +1616,29 @@ public class Transactioneditactivity extends Activity {
 						return;
 					}
 
+					Integer newComboId =
+						resolveComboIdFromSpinners(varietySpinners, varietyValuesByGroup);
+
+					if (transactionType == TYPE_SALE) {
+
+						int newItemId =
+							(Integer) items.get(selectedItemPosition[0]).get("id");
+
+						String stockError = checkSaleStockAvailability(
+							newItemId, newComboId, quantity, oldItem);
+
+						if (stockError != null) {
+
+							android.widget.Toast.makeText(
+								Transactioneditactivity.this,
+								stockError,
+								android.widget.Toast.LENGTH_LONG
+							).show();
+
+							return;
+						}
+					}
+
 					oldItem.put(
 						"item_id",
 						items.get(selectedItemPosition[0]).get("id")
@@ -1544,7 +1671,7 @@ public class Transactioneditactivity extends Activity {
 
 					oldItem.put(
 						"combo_id",
-						resolveComboIdFromSpinners(varietySpinners, varietyValuesByGroup)
+						newComboId
 					);
 
 					transactionItemAdapter.notifyDataSetChanged();

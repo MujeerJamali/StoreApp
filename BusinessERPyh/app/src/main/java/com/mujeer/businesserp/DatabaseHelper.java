@@ -817,6 +817,33 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return map;
 	}
 
+	// The current stock figure a sale should be checked against: a
+	// combo's own balance when the line has one, otherwise the item's
+	// own balance. Used to keep stock from ever going negative on a
+	// sale - see Transactioneditactivity/GenerateEntriesActivity.
+	public double getAvailableStock(int itemId, Integer comboId) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		String table = comboId != null ? TABLE_VARIETY_COMBOS : TABLE_ITEMS;
+		int id = comboId != null ? comboId : itemId;
+
+		Cursor cursor = db.rawQuery(
+			"SELECT balance FROM " + table + " WHERE id=?",
+			new String[]{String.valueOf(id)}
+		);
+
+		double balance = 0;
+
+		if (cursor.moveToFirst()) {
+			balance = cursor.getDouble(0);
+		}
+
+		cursor.close();
+
+		return balance;
+	}
+
 // =====================
 // UPDATE ITEM
 // =====================
@@ -2170,7 +2197,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		Cursor cursor = db.rawQuery(
 
 			"SELECT pi.item_id, i.code, i.name, " +
-			"pi.quantity, pi.purchase_price, pi.total " +
+			"pi.quantity, pi.purchase_price, pi.total, pi.combo_id " +
 			"FROM " + TABLE_PURCHASE_ITEMS + " pi " +
 			"INNER JOIN " + TABLE_ITEMS + " i " +
 			"ON pi.item_id = i.id " +
@@ -2189,6 +2216,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("quantity", cursor.getDouble(3));
 			map.put("purchase_price", cursor.getDouble(4));
 			map.put("total", cursor.getDouble(5));
+
+			if (!cursor.isNull(6)) {
+				map.put("combo_id", cursor.getInt(6));
+			}
 
 			list.add(map);
 		}
@@ -3123,7 +3154,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"items.name, " +
 			"sale_items.qty, " +
 			"sale_items.rate, " +
-			"sale_items.amount " +
+			"sale_items.amount, " +
+			"sale_items.combo_id " +
 			"FROM sale_items " +
 			"INNER JOIN items " +
 			"ON sale_items.item_id = items.id " +
@@ -3143,6 +3175,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("quantity", cursor.getDouble(3));
 			map.put("sale_price", cursor.getDouble(4));
 			map.put("total", cursor.getDouble(5));
+
+			if (!cursor.isNull(6)) {
+				map.put("combo_id", cursor.getInt(6));
+			}
 
 			list.add(map);
 		}

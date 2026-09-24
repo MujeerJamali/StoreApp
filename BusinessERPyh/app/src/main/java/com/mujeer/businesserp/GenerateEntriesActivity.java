@@ -917,6 +917,16 @@ public class GenerateEntriesActivity extends Activity {
 			return;
 		}
 
+		if (entryType == TYPE_SALE) {
+
+			String stockError = checkStockForSaleLines();
+
+			if (stockError != null) {
+				Toast.makeText(this, stockError, Toast.LENGTH_LONG).show();
+				return;
+			}
+		}
+
 		db.beginTransaction();
 
 		boolean success = false;
@@ -952,6 +962,36 @@ public class GenerateEntriesActivity extends Activity {
 		} else {
 			Toast.makeText(this, "Something went wrong - nothing was saved", Toast.LENGTH_LONG).show();
 		}
+	}
+
+	// =====================
+	// STOCK NEVER GOES NEGATIVE (sales only) - checked once, up front,
+	// against every line's full quantity across all its tapped dates,
+	// before any date is actually written. Each selected item has
+	// exactly one line here (see commitSelectedItems()), so there's no
+	// need to sum across lines for the same item/combo the way
+	// Transactioneditactivity's checkSaleStockAvailability() does.
+	// =====================
+	private String checkStockForSaleLines() {
+
+		for (GenerateEntryLine line : lines) {
+
+			int qty = line.totalCount();
+
+			if (qty <= 0 || line.refId == null) {
+				continue;
+			}
+
+			double available = db.getAvailableStock(line.refId, line.comboId);
+
+			if (qty > available) {
+
+				return "Not enough stock for " + line.label + " - only " +
+					formatQty(available) + " available, " + qty + " requested";
+			}
+		}
+
+		return null;
 	}
 
 	private int generatePurchasesOrSales(SQLiteDatabase conn, String time, String notes) {
