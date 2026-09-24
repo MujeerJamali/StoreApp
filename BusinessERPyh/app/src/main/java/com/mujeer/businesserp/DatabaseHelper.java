@@ -5670,6 +5670,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return db.insert(TABLE_CASH_ADJUSTMENTS, null, values);
 	}
 
+	public long insertCashAdjustmentBulk(
+		SQLiteDatabase db, String date, String time, double amount, String notes, String source) {
+
+		ContentValues values = new ContentValues();
+		values.put("date", date);
+		values.put("time", time);
+		values.put("amount", amount);
+		values.put("notes", notes);
+		values.put("source", source);
+
+		return db.insert(TABLE_CASH_ADJUSTMENTS, null, values);
+	}
+
 	// =====================
 	// TODAY / THIS WEEK / THIS MONTH EXPENSE TOTALS (dashboard)
 	// =====================

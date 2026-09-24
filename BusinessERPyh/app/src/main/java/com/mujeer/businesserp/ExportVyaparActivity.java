@@ -149,6 +149,7 @@ public class ExportVyaparActivity extends Activity {
 			exportVarietyValues(local, vyb);
 			exportVarietyCombos(local, vyb);
 			exportVarietyComboValues(local, vyb);
+			exportCashAdjustments(local, vyb);
 			exportExpenseCategories(local, vyb, expenseCategoryNameId);
 			exportPurchases(local, vyb);
 			exportPurchaseItems(local, vyb);
@@ -436,6 +437,21 @@ public class ExportVyaparActivity extends Activity {
 			"PRIMARY KEY (combo_id, group_id)" +
 			")"
 		);
+
+		// Manual cash-in-hand corrections (see CashActivity) - another of
+		// this app's own extensions with no Vyapar equivalent, same
+		// reasoning as the variety_* tables above: ids copied straight
+		// from the local table, no offset needed.
+		vyb.execSQL(
+			"CREATE TABLE businesserp_cash_adjustments (" +
+			"id INTEGER PRIMARY KEY, " +
+			"date TEXT, " +
+			"time TEXT, " +
+			"amount REAL, " +
+			"notes TEXT, " +
+			"source TEXT" +
+			")"
+		);
 	}
 
 	// =====================
@@ -568,6 +584,30 @@ public class ExportVyaparActivity extends Activity {
 			values.put("value_id", c.getLong(2));
 
 			vyb.insert("businesserp_variety_combo_values", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// CASH ADJUSTMENTS -> businesserp_cash_adjustments (1:1 copy)
+	// =====================
+	private void exportCashAdjustments(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery(
+			"SELECT id, date, time, amount, notes, source FROM cash_adjustments", null);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("id", c.getLong(0));
+			values.put("date", c.getString(1));
+			values.put("time", c.getString(2));
+			values.put("amount", c.getDouble(3));
+			values.put("notes", c.getString(4));
+			values.put("source", c.isNull(5) ? "Manual" : c.getString(5));
+
+			vyb.insert("businesserp_cash_adjustments", null, values);
 		}
 
 		c.close();

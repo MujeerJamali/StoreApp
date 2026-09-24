@@ -100,6 +100,7 @@ public class ImportVyaparActivity extends Activity {
         int paymentOutImported, paymentOutDuplicate;
         int transfersImported, transfersDuplicate;
         int expensesImported, expensesDuplicate;
+        int cashAdjustmentsImported, cashAdjustmentsDuplicate;
     }
 
     @Override
@@ -246,6 +247,12 @@ public class ImportVyaparActivity extends Activity {
             boolean hasVarietyTables = tableExists(vyaparDb, "businesserp_variety_groups");
             boolean lineItemsHaveComboId = columnExists(vyaparDb, "kb_lineitems", "combo_id");
 
+            // Another of this app's own extensions (see ExportVyaparActivity)
+            // - absent from a real Vyapar backup, or one exported before
+            // cash adjustments existed, in which case this import step is
+            // simply skipped below rather than failing the whole restore.
+            boolean hasCashAdjustmentsTable = tableExists(vyaparDb, "businesserp_cash_adjustments");
+
             helper = new DatabaseHelper(this);
             helper.beginTransaction();
             SQLiteDatabase db = helper.getMigrationDatabase();
@@ -309,6 +316,12 @@ public class ImportVyaparActivity extends Activity {
 
             setStatus("Importing expenses...");
             importExpenses(vyaparDb, helper, db, partyIdMap, skipped, counts);
+
+            if (hasCashAdjustmentsTable) {
+
+                setStatus("Importing cash adjustments...");
+                importCashAdjustments(vyaparDb, helper, db, skipped, counts);
+            }
 
             setStatus("Logging unsupported transaction types...");
             logUnsupportedTypes(vyaparDb, skipped);
@@ -386,6 +399,10 @@ public class ImportVyaparActivity extends Activity {
 								   + " imported, " + finalCounts.transfersDuplicate + " already imported\n");
                     summary.append("Expenses: " + finalCounts.expensesImported
 								   + " imported, " + finalCounts.expensesDuplicate + " already imported\n");
+                    if (finalCounts.cashAdjustmentsImported > 0 || finalCounts.cashAdjustmentsDuplicate > 0) {
+                        summary.append("Cash adjustments: " + finalCounts.cashAdjustmentsImported
+									   + " imported, " + finalCounts.cashAdjustmentsDuplicate + " already imported\n");
+                    }
 
                     summary.append("\nRows not imported: " + finalSkippedCount);
 
@@ -1635,6 +1652,51 @@ public class ImportVyaparActivity extends Activity {
 
             helper.markImportKeyUsedBulk(db, importKey);
             counts.expensesImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // STEP 11 - CASH ADJUSTMENTS (businesserp_cash_adjustments)
+    // This app's own extension - only present when hasCashAdjustmentsTable
+    // was true. date/time are already in this app's own format here
+    // (unlike kb_transactions' txn_date/txn_time), since
+    // ExportVyaparActivity copies them straight across with no Vyapar-
+    // format conversion - so no formatDate()/formatTime() call is needed
+    // on the way back in either.
+    // =====================
+    private void importCashAdjustments(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT id, date, time, amount, notes, source FROM businesserp_cash_adjustments", null);
+
+        while (c.moveToNext()) {
+
+            long id = c.getLong(0);
+            String date = c.getString(1);
+            String time = c.getString(2);
+            double amount = c.getDouble(3);
+            String notes = c.getString(4);
+            String source = c.isNull(5) ? "Vyapar Import" : c.getString(5);
+
+            String importKey = "vyb_cash_adjustment_" + id;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.cashAdjustmentsDuplicate++;
+                continue;
+            }
+
+            helper.insertCashAdjustmentBulk(
+                db, date, time, amount, notes == null ? "" : notes, source);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.cashAdjustmentsImported++;
         }
 
         c.close();
