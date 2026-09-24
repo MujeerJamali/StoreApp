@@ -38,6 +38,19 @@ public class TwoLineAutoCompleteAdapter extends ArrayAdapter<String> {
 	// typed word anywhere in the text (see SearchUtils), in any order.
 	private final List<String> allItems;
 
+	// Two (or more) rows can carry the exact same display text - e.g. two
+	// items that happen to share a name, or two parties with the same
+	// name. Matching a clicked dropdown row back to "the item/party whose
+	// name equals this text" (via indexOf on a name list) then silently
+	// resolves to whichever one happens to come first, which can be a
+	// completely different row than the one actually clicked. So instead
+	// of leaving callers to re-derive the original index from text,
+	// getOriginalIndex() tracks it directly: for the row currently at
+	// filtered position i, originalIndices[i] is that row's index in the
+	// unfiltered list this adapter was constructed with, kept in lockstep
+	// by the filter below (never by comparing text).
+	private final List<Integer> originalIndices;
+
 	public TwoLineAutoCompleteAdapter(
 		Context context,
 		List<String> items,
@@ -47,6 +60,26 @@ public class TwoLineAutoCompleteAdapter extends ArrayAdapter<String> {
 
 		this.subtitles = subtitles;
 		this.allItems = new ArrayList<String>(items);
+
+		this.originalIndices = new ArrayList<Integer>();
+
+		for (int i = 0; i < items.size(); i++) {
+			originalIndices.add(i);
+		}
+	}
+
+	// The unfiltered-list index of the row currently shown at
+	// 'position' in the dropdown (i.e. what onItemClick's own
+	// 'position' argument actually points at right now) - the only
+	// correct way to resolve a clicked row back to its real item/party,
+	// since two rows can share the same display text.
+	public int getOriginalIndex(int position) {
+
+		if (position < 0 || position >= originalIndices.size()) {
+			return -1;
+		}
+
+		return originalIndices.get(position);
 	}
 
 	@Override
@@ -96,27 +129,34 @@ public class TwoLineAutoCompleteAdapter extends ArrayAdapter<String> {
 
 				FilterResults results = new FilterResults();
 
+				ArrayList<String> matches = new ArrayList<String>();
+				ArrayList<Integer> matchedIndices = new ArrayList<Integer>();
+
 				if (constraint == null || constraint.length() == 0) {
 
-					results.values = new ArrayList<String>(allItems);
-					results.count = allItems.size();
+					matches.addAll(allItems);
 
-					return results;
-				}
+					for (int i = 0; i < allItems.size(); i++) {
+						matchedIndices.add(i);
+					}
 
-				String search = constraint.toString();
+				} else {
 
-				ArrayList<String> matches = new ArrayList<String>();
+					String search = constraint.toString();
 
-				for (String item : allItems) {
+					for (int i = 0; i < allItems.size(); i++) {
 
-					if (SearchUtils.matchesTokensAcrossFields(search, item)) {
+						String item = allItems.get(i);
 
-						matches.add(item);
+						if (SearchUtils.matchesTokensAcrossFields(search, item)) {
+
+							matches.add(item);
+							matchedIndices.add(i);
+						}
 					}
 				}
 
-				results.values = matches;
+				results.values = new Object[]{matches, matchedIndices};
 				results.count = matches.size();
 
 				return results;
@@ -127,10 +167,14 @@ public class TwoLineAutoCompleteAdapter extends ArrayAdapter<String> {
 			protected void publishResults(CharSequence constraint, FilterResults results) {
 
 				clear();
+				originalIndices.clear();
 
 				if (results != null && results.count > 0) {
 
-					addAll((List<String>) results.values);
+					Object[] valuePair = (Object[]) results.values;
+
+					addAll((List<String>) valuePair[0]);
+					originalIndices.addAll((List<Integer>) valuePair[1]);
 				}
 
 				if (results != null && results.count > 0) {

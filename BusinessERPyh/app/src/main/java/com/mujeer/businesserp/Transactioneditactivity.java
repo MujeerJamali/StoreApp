@@ -630,7 +630,7 @@ public class Transactioneditactivity extends Activity {
 			);
 		}
 
-		TwoLineAutoCompleteAdapter adapter =
+		final TwoLineAutoCompleteAdapter adapter =
 			new TwoLineAutoCompleteAdapter(
 			this,
 			itemNames,
@@ -653,13 +653,14 @@ public class Transactioneditactivity extends Activity {
 					long id) {
 
 					// 'position' is the row index within the filtered
-					// dropdown list, not the original 'items' list, so
-					// look the clicked entry up by its displayed text
-					// instead of indexing 'items' directly with it.
-					String clickedText =
-						parent.getItemAtPosition(position).toString();
-
-					int actualIndex = itemNames.indexOf(clickedText);
+					// dropdown list, not the original 'items' list - and
+					// two items can share the exact same name, so looking
+					// the clicked row up by its displayed text (matching
+					// against 'itemNames') can silently resolve to a
+					// DIFFERENT item than the one actually clicked.
+					// getOriginalIndex() tracks the real correspondence
+					// directly instead.
+					int actualIndex = adapter.getOriginalIndex(position);
 
 					if (actualIndex == -1) {
 						return;
@@ -1366,7 +1367,7 @@ public class Transactioneditactivity extends Activity {
 			);
 		}
 
-		TwoLineAutoCompleteAdapter adapter =
+		final TwoLineAutoCompleteAdapter adapter =
 			new TwoLineAutoCompleteAdapter(
 			this,
 			itemNames,
@@ -1404,13 +1405,13 @@ public class Transactioneditactivity extends Activity {
 					int position,
 					long id) {
 
-					// Same fix as in showAddTransactionItemDialog(): map
-					// the clicked row back to 'items' by its text, since
-					// 'position' is only valid within the filtered list.
-					String clickedText =
-						parent.getItemAtPosition(position).toString();
-
-					int actualIndex = itemNames.indexOf(clickedText);
+					// Same fix as in showAddTransactionItemDialog(): two
+					// items can share the exact same name, so resolve the
+					// clicked row via the adapter's own tracked original
+					// index rather than by matching displayed text back
+					// against 'itemNames' (which can't tell two
+					// identically-named items apart).
+					int actualIndex = adapter.getOriginalIndex(position);
 
 					if (actualIndex == -1) {
 						return;
