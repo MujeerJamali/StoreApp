@@ -32,6 +32,7 @@ public class MainActivity extends Activity {
 	Button btn_generate_entries;
 	Button btn_cash;
 	Button btn_wanted_items;
+	Button btn_recurring_expenses;
 
 	Button btn_quick_add;
 
@@ -64,6 +65,7 @@ public class MainActivity extends Activity {
 		btn_generate_entries = findViewById(R.id.btn_generate_entries);
 		btn_cash = findViewById(R.id.btn_cash);
 		btn_wanted_items = findViewById(R.id.btn_wanted_items);
+		btn_recurring_expenses = findViewById(R.id.btn_recurring_expenses);
 
 		btn_quick_add = findViewById(R.id.btn_quick_add);
 
@@ -226,6 +228,19 @@ public class MainActivity extends Activity {
 				}
 			});
 
+		btn_recurring_expenses.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						RecurringExpensesActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
 		btn_quick_add.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
@@ -295,11 +310,31 @@ public class MainActivity extends Activity {
 
 	// Computed off the main thread - a handful of SUM queries, but still
 	// no reason to risk a hitch on the dashboard's own launch/resume path.
+	// Also catches up any due recurring expenses first, so a newly
+	// generated one is already reflected in these same totals.
 	private void loadCashSummary() {
 
 		new Thread(new Runnable() {
 				@Override
 				public void run() {
+
+					final int generatedCount = db.generateDueRecurringExpenses();
+
+					if (generatedCount > 0) {
+
+						runOnUiThread(new Runnable() {
+								@Override
+								public void run() {
+
+									android.widget.Toast.makeText(
+										MainActivity.this,
+										generatedCount + " recurring expense" +
+										(generatedCount == 1 ? "" : "s") + " added",
+										android.widget.Toast.LENGTH_SHORT
+									).show();
+								}
+							});
+					}
 
 					final double cashBalance = db.getCashBalance();
 

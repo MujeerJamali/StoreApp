@@ -3,6 +3,7 @@ package com.mujeer.businesserp;
 import android.content.*;
 import android.database.*;
 import android.database.sqlite.*;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 
@@ -80,6 +81,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// something not in the catalog at all (item_id null, item_name is
 	// whatever the customer called it).
 	public static final String TABLE_WANTED_ITEMS = "wanted_items";
+
+	// A standing rule that auto-generates a real Expense row (fully paid,
+	// same as a plain insertExpense()) for each date it's due - see
+	// generateDueRecurringExpenses(), run once per app open from
+	// MainActivity. last_generated_date is the rule's own bookmark of how
+	// far it's already caught up to, so a rule never double-generates
+	// even across many days the app wasn't opened.
+	public static final String TABLE_RECURRING_EXPENSES = "recurring_expenses";
+
+	public static final int RECURRING_DAILY = 1;
+	public static final int RECURRING_WEEKLY = 2;
+	public static final int RECURRING_MONTHLY = 3;
+	public static final int RECURRING_SPECIFIC_DATES = 4;
 
 
 
@@ -279,6 +293,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"party_id INTEGER, " +
 			"notes TEXT, " +
 			"fulfilled INTEGER NOT NULL DEFAULT 0" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_RECURRING_EXPENSES + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"item TEXT NOT NULL, " +
+			"amount REAL NOT NULL DEFAULT 0, " +
+			"notes TEXT, " +
+			"party_id INTEGER, " +
+			"frequency INTEGER NOT NULL, " +
+			"day_of_week INTEGER, " +
+			"day_of_month INTEGER, " +
+			"specific_dates TEXT, " +
+			"start_date TEXT NOT NULL, " +
+			"last_generated_date TEXT, " +
+			"active INTEGER NOT NULL DEFAULT 1" +
 			")"
 		);
 
@@ -5931,6 +5962,306 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		);
 
 		return rows > 0;
+	}
+
+	// =====================
+	// RECURRING EXPENSES
+	// =====================
+
+	public long insertRecurringExpense(
+		String item, double amount, String notes, Integer partyId,
+		int frequency, Integer dayOfWeek, Integer dayOfMonth,
+		String specificDates, String startDate) {
+
+		ContentValues values = new ContentValues();
+		values.put("item", item);
+		values.put("amount", amount);
+		values.put("notes", notes);
+		values.put("party_id", partyId);
+		values.put("frequency", frequency);
+		values.put("day_of_week", dayOfWeek);
+		values.put("day_of_month", dayOfMonth);
+		values.put("specific_dates", specificDates);
+		values.put("start_date", startDate);
+		values.put("active", 1);
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		return db.insert(TABLE_RECURRING_EXPENSES, null, values);
+	}
+
+	public boolean updateRecurringExpense(
+		int id, String item, double amount, String notes, Integer partyId,
+		int frequency, Integer dayOfWeek, Integer dayOfMonth,
+		String specificDates, String startDate) {
+
+		ContentValues values = new ContentValues();
+		values.put("item", item);
+		values.put("amount", amount);
+		values.put("notes", notes);
+		values.put("party_id", partyId);
+		values.put("frequency", frequency);
+		values.put("day_of_week", dayOfWeek);
+		values.put("day_of_month", dayOfMonth);
+		values.put("specific_dates", specificDates);
+		values.put("start_date", startDate);
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		int rows = db.update(
+			TABLE_RECURRING_EXPENSES, values, "id=?", new String[]{String.valueOf(id)}
+		);
+
+		return rows > 0;
+	}
+
+	public boolean setRecurringExpenseActive(int id, boolean active) {
+
+		ContentValues values = new ContentValues();
+		values.put("active", active ? 1 : 0);
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		int rows = db.update(
+			TABLE_RECURRING_EXPENSES, values, "id=?", new String[]{String.valueOf(id)}
+		);
+
+		return rows > 0;
+	}
+
+	public boolean deleteRecurringExpense(int id) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		int rows = db.delete(
+			TABLE_RECURRING_EXPENSES, "id=?", new String[]{String.valueOf(id)}
+		);
+
+		return rows > 0;
+	}
+
+	public HashMap<String, Object> getRecurringExpenseById(int id) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, item, amount, notes, party_id, frequency, day_of_week, " +
+			"day_of_month, specific_dates, start_date, last_generated_date, active " +
+			"FROM " + TABLE_RECURRING_EXPENSES + " WHERE id=?",
+			new String[]{String.valueOf(id)}
+		);
+
+		HashMap<String, Object> map = null;
+
+		if (cursor.moveToFirst()) {
+			map = recurringExpenseFromCursor(cursor);
+		}
+
+		cursor.close();
+
+		return map;
+	}
+
+	public ArrayList<HashMap<String, Object>> getRecurringExpenses() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, item, amount, notes, party_id, frequency, day_of_week, " +
+			"day_of_month, specific_dates, start_date, last_generated_date, active " +
+			"FROM " + TABLE_RECURRING_EXPENSES + " ORDER BY item",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+			list.add(recurringExpenseFromCursor(cursor));
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	private HashMap<String, Object> recurringExpenseFromCursor(Cursor cursor) {
+
+		HashMap<String, Object> map = new HashMap<String, Object>();
+
+		map.put("id", cursor.getInt(0));
+		map.put("item", cursor.getString(1));
+		map.put("amount", cursor.getDouble(2));
+		map.put("notes", cursor.isNull(3) ? "" : cursor.getString(3));
+		map.put("party_id", cursor.isNull(4) ? null : cursor.getInt(4));
+		map.put("frequency", cursor.getInt(5));
+		map.put("day_of_week", cursor.isNull(6) ? null : cursor.getInt(6));
+		map.put("day_of_month", cursor.isNull(7) ? null : cursor.getInt(7));
+		map.put("specific_dates", cursor.isNull(8) ? "" : cursor.getString(8));
+		map.put("start_date", cursor.getString(9));
+		map.put("last_generated_date", cursor.isNull(10) ? null : cursor.getString(10));
+		map.put("active", cursor.getInt(11) != 0);
+
+		return map;
+	}
+
+	// A long-dormant rule catches up gradually across a few app opens
+	// rather than flooding the Expenses list with a year of backdated
+	// entries in one go.
+	private static final int RECURRING_CATCHUP_LIMIT = 366;
+
+	// Catches every active rule up to today, inserting one real,
+	// fully-paid Expense (same as insertExpense()) per date it's due
+	// since it was last generated (or since its start date, if never
+	// generated before). Meant to be called once per app open, on a
+	// background thread - see MainActivity. Returns how many expenses
+	// were generated, so the caller can tell the user.
+	public int generateDueRecurringExpenses() {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		ArrayList<HashMap<String, Object>> rules = getRecurringExpenses();
+
+		SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+
+		String today = isoFormat.format(new Date());
+
+		int generatedCount = 0;
+
+		for (HashMap<String, Object> rule : rules) {
+
+			if (!(Boolean) rule.get("active")) {
+				continue;
+			}
+
+			int ruleId = (Integer) rule.get("id");
+			int frequency = (Integer) rule.get("frequency");
+			String startDate = (String) rule.get("start_date");
+			String lastGenerated = (String) rule.get("last_generated_date");
+
+			String cursorDateStr = lastGenerated != null ?
+				addDays(isoFormat, lastGenerated, 1) : startDate;
+
+			if (cursorDateStr.compareTo(today) > 0) {
+				continue;
+			}
+
+			Calendar cal = Calendar.getInstance();
+
+			try {
+				cal.setTime(isoFormat.parse(cursorDateStr));
+			} catch (Exception e) {
+				continue;
+			}
+
+			Integer dayOfWeek = (Integer) rule.get("day_of_week");
+			Integer dayOfMonth = (Integer) rule.get("day_of_month");
+
+			HashSet<String> specificDates = new HashSet<String>();
+			String specificDatesRaw = (String) rule.get("specific_dates");
+
+			if (specificDatesRaw != null && specificDatesRaw.trim().length() > 0) {
+				for (String oneDate : specificDatesRaw.split(",")) {
+					specificDates.add(oneDate.trim());
+				}
+			}
+
+			String lastDateCheckedThisRun = lastGenerated;
+
+			for (int i = 0; i < RECURRING_CATCHUP_LIMIT; i++) {
+
+				String dateStr = isoFormat.format(cal.getTime());
+
+				if (dateStr.compareTo(today) > 0) {
+					break;
+				}
+
+				boolean due;
+
+				switch (frequency) {
+
+					case RECURRING_DAILY:
+						due = true;
+						break;
+
+					case RECURRING_WEEKLY:
+						due = dayOfWeek != null &&
+							cal.get(Calendar.DAY_OF_WEEK) == dayOfWeek;
+						break;
+
+					case RECURRING_MONTHLY:
+						due = dayOfMonth != null && isMonthlyDue(cal, dayOfMonth);
+						break;
+
+					case RECURRING_SPECIFIC_DATES:
+						due = specificDates.contains(dateStr);
+						break;
+
+					default:
+						due = false;
+						break;
+				}
+
+				if (due) {
+
+					insertExpense(
+						(String) rule.get("item"),
+						dateStr,
+						"09:00",
+						(Double) rule.get("amount"),
+						(String) rule.get("notes"),
+						(Integer) rule.get("party_id")
+					);
+
+					generatedCount++;
+				}
+
+				lastDateCheckedThisRun = dateStr;
+
+				cal.add(Calendar.DAY_OF_YEAR, 1);
+			}
+
+			if (lastDateCheckedThisRun != null &&
+				!lastDateCheckedThisRun.equals(lastGenerated)) {
+
+				ContentValues values = new ContentValues();
+				values.put("last_generated_date", lastDateCheckedThisRun);
+
+				db.update(
+					TABLE_RECURRING_EXPENSES, values, "id=?",
+					new String[]{String.valueOf(ruleId)}
+				);
+			}
+		}
+
+		return generatedCount;
+	}
+
+	// dayOfMonth clamped to the shorter month (e.g. a "31st" rule falls
+	// on the 30th in a 30-day month, the 28th/29th in February).
+	private boolean isMonthlyDue(Calendar cal, int dayOfMonth) {
+
+		int actualDay = cal.get(Calendar.DAY_OF_MONTH);
+		int maxDayThisMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+
+		int effectiveDay = Math.min(dayOfMonth, maxDayThisMonth);
+
+		return actualDay == effectiveDay;
+	}
+
+	private String addDays(SimpleDateFormat fmt, String dateStr, int days) {
+
+		try {
+
+			Calendar cal = Calendar.getInstance();
+			cal.setTime(fmt.parse(dateStr));
+			cal.add(Calendar.DAY_OF_YEAR, days);
+
+			return fmt.format(cal.getTime());
+
+		} catch (Exception e) {
+
+			return dateStr;
+		}
 	}
 
 }

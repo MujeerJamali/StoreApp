@@ -101,6 +101,14 @@
             android:exported="false" />
 
         <activity
+            android:name=".RecurringExpensesActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".RecurringExpenseEditActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".Importexcelactivity"
             android:label="Importexcel" />
 
