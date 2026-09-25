@@ -60,6 +60,15 @@ public class ImportVyaparActivity extends Activity {
 
     private static final int REQUEST_PICK_VYB = 2001;
 
+    // Guards against two overlapping runImport() calls writing to the same
+    // temp files and the same database transaction at once - e.g. a
+    // rotation recreating this Activity mid-import (its background Thread
+    // outlives the old instance) followed by a second tap on the new
+    // instance's own Pick button. Static/process-wide rather than an
+    // instance field, since it has to survive that recreation. A second
+    // attempt while true is refused outright rather than queued.
+    private static volatile boolean importInProgress = false;
+
     private Button btn_pick_vyb;
     private Button btn_view_skipped_vyb;
     private TextView tv_vyb_result;
@@ -176,6 +185,19 @@ public class ImportVyaparActivity extends Activity {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
 
+                        if (importInProgress) {
+
+                            android.widget.Toast.makeText(
+                                ImportVyaparActivity.this,
+                                "An import is already running - please wait for it to finish.",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show();
+
+                            return;
+                        }
+
+                        importInProgress = true;
+
                         new Thread(new Runnable() {
                                 @Override
                                 public void run() {
@@ -193,6 +215,11 @@ public class ImportVyaparActivity extends Activity {
         runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
+
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+
                     tv_vyb_result.setText(text);
                 }
             });
@@ -357,6 +384,8 @@ public class ImportVyaparActivity extends Activity {
             if (rawFile.exists()) {
                 rawFile.delete();
             }
+
+            importInProgress = false;
         }
 
         ImportVyaparActivity.lastSkippedRows = skipped;
@@ -369,6 +398,10 @@ public class ImportVyaparActivity extends Activity {
         runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
+
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
 
                     if (!finalSuccess) {
 

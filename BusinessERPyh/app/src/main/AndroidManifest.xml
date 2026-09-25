@@ -114,7 +114,8 @@
 
         <activity
             android:name=".ImportVyaparActivity"
-            android:label="Restore Vyapar Backup" />
+            android:label="Restore Vyapar Backup"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".ExportVyaparActivity"
