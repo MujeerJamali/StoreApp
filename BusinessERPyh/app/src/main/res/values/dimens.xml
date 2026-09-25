@@ -7,10 +7,10 @@
     <dimen name="spacing_l">24dp</dimen>
     <dimen name="spacing_xl">32dp</dimen>
 
-    <dimen name="radius_card">16dp</dimen>
-    <dimen name="radius_button">12dp</dimen>
-    <dimen name="radius_input">12dp</dimen>
-    <dimen name="radius_chip">20dp</dimen>
+    <dimen name="radius_card">8dp</dimen>
+    <dimen name="radius_button">6dp</dimen>
+    <dimen name="radius_input">6dp</dimen>
+    <dimen name="radius_chip">10dp</dimen>
 
     <dimen name="elevation_card">2dp</dimen>
     <dimen name="elevation_fab">6dp</dimen>
