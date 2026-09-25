@@ -1461,10 +1461,20 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		args.add(String.valueOf(groupIdToValueId.size()));
 
+		// More than one combo can match the same value-set if duplicates
+		// ever slipped in (e.g. an older buggy export, or a raw data
+		// fix that inserted a fresh combo instead of reusing the
+		// existing one) - without an explicit order, GROUP BY has no
+		// guaranteed row order, so a plain "first match" could silently
+		// return an empty duplicate over the real, stocked combo. Always
+		// prefer whichever match actually has stock, then the oldest
+		// (lowest id) as a deterministic tiebreak.
 		Cursor cursor = db.rawQuery(
-			"SELECT combo_id FROM " + TABLE_VARIETY_COMBO_VALUES +
-			" WHERE " + where.toString() +
-			" GROUP BY combo_id HAVING COUNT(*)=?",
+			"SELECT cv.combo_id FROM " + TABLE_VARIETY_COMBO_VALUES + " cv " +
+			"INNER JOIN " + TABLE_VARIETY_COMBOS + " c ON c.id = cv.combo_id " +
+			"WHERE " + where.toString() +
+			" GROUP BY cv.combo_id HAVING COUNT(*)=?" +
+			" ORDER BY c.balance DESC, cv.combo_id ASC",
 			args.toArray(new String[0])
 		);
 
