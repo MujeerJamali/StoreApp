@@ -88,7 +88,7 @@ public class ExpenseAdapter extends BaseAdapter {
 		);
 
 		tv_date.setText(
-			expense.get("date").toString()
+			RelativeDate.format(expense.get("date").toString())
 		);
 
 		tv_amount.setText(

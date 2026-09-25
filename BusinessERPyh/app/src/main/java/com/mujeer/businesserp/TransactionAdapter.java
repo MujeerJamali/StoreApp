@@ -132,7 +132,7 @@ public class TransactionAdapter extends BaseAdapter {
 		);
 
 		tv_date.setText(
-			transaction.get("date").toString()
+			RelativeDate.format(transaction.get("date").toString())
 		);
 
 		tv_total.setText(

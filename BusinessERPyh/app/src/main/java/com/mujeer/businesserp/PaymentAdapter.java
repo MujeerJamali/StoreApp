@@ -95,7 +95,7 @@ public class PaymentAdapter extends BaseAdapter {
 		);
 
 		tv_date.setText(
-			payment.get("date").toString()
+			RelativeDate.format(payment.get("date").toString())
 		);
 
 		tv_amount.setText(

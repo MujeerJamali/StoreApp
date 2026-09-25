@@ -55,7 +55,8 @@ public class CashLedgerAdapter extends BaseAdapter {
         tvLabel.setText(String.valueOf(row.get("label")));
 
         tvDate.setText(
-            row.get("date") + " " + row.get("time") + " · " + row.get("source")
+            RelativeDate.format(String.valueOf(row.get("date"))) +
+            " " + row.get("time") + " · " + row.get("source")
         );
 
         tvAmount.setText(

@@ -64,7 +64,7 @@ public class WantedItemsAdapter extends BaseAdapter {
 
         tvName.setText(String.valueOf(row.get("item_name")));
 
-        String meta = row.get("date") + " " + row.get("time");
+        String meta = RelativeDate.format(String.valueOf(row.get("date"))) + " " + row.get("time");
 
         if (row.get("party_name") != null) {
             meta += " · " + row.get("party_name");
