@@ -1810,7 +1810,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"FROM " + TABLE_PURCHASES + " p " +
 			"INNER JOIN " + TABLE_PARTIES + " pa " +
 			"ON p.party_id = pa.id " +
-			"ORDER BY p.id DESC",
+			"ORDER BY p.date DESC, p.time DESC",
 
 			null
 		);
@@ -2414,7 +2414,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			args.add(toDate);
 		}
 
-		sql += "ORDER BY p.id DESC";
+		sql += "ORDER BY p.date DESC, p.time DESC";
 
 		Cursor cursor = db.rawQuery(
 			sql,
@@ -2536,7 +2536,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"FROM sales s " +
 			"LEFT JOIN parties p " +
 			"ON s.party_id = p.id " +
-			"ORDER BY s.id DESC",
+			"ORDER BY s.date DESC, s.time DESC",
 
 			null
 		);
@@ -2580,7 +2580,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"LEFT JOIN parties p " +
 			"ON s.party_id = p.id " +
 			"WHERE s.date BETWEEN ? AND ? " +
-			"ORDER BY s.id DESC",
+			"ORDER BY s.date DESC, s.time DESC",
 
 			new String[]{
 				fromDate,
@@ -3759,7 +3759,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"FROM " + TABLE_PAYMENTS + " py " +
 			"INNER JOIN " + TABLE_PARTIES + " p " +
 			"ON py.party_id = p.id " +
-			"ORDER BY py.id DESC",
+			"ORDER BY py.date DESC, py.time DESC",
 
 			null
 		);
@@ -4007,7 +4007,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"INNER JOIN " + TABLE_PARTIES + " p " +
 			"ON py.party_id = p.id " +
 			"WHERE py.date BETWEEN ? AND ? " +
-			"ORDER BY py.id DESC",
+			"ORDER BY py.date DESC, py.time DESC",
 
 			new String[]{
 				fromDate,
@@ -4160,7 +4160,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"INNER JOIN " + TABLE_PARTIES + " p " +
 			"ON py.party_id = p.id " +
 			"WHERE " + whereClause.toString() + " " +
-			"ORDER BY py.id DESC",
+			"ORDER BY py.date DESC, py.time DESC",
 
 			args.toArray(new String[0])
 		);
@@ -4209,7 +4209,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"INNER JOIN " + TABLE_PARTIES + " p " +
 			"ON py.party_id = p.id " +
 			"WHERE py.type=? " +
-			"ORDER BY py.id DESC",
+			"ORDER BY py.date DESC, py.time DESC",
 
 			new String[]{
 				String.valueOf(type)
@@ -4305,7 +4305,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 			"SELECT * FROM " +
 			TABLE_EXPENSES +
-			" ORDER BY id DESC",
+			" ORDER BY date DESC, time DESC",
 
 			null
 		);
