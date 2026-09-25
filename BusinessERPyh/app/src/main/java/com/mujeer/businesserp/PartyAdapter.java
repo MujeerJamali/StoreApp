@@ -65,12 +65,12 @@ public class PartyAdapter extends BaseAdapter implements Filterable {
 
         if (balance > 0) {
 
-            tvBalance.setText(String.format("+%.2f", balance));
+            tvBalance.setText("+" + AmountFormat.format(balance));
             tvBalance.setTextColor(activity.getResources().getColor(R.color.success));
 
         } else if (balance < 0) {
 
-            tvBalance.setText(String.format("-%.2f", Math.abs(balance)));
+            tvBalance.setText("-" + AmountFormat.format(Math.abs(balance)));
             tvBalance.setTextColor(activity.getResources().getColor(R.color.danger));
 
         } else {

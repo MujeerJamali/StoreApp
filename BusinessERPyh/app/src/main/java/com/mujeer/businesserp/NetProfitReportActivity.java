@@ -362,11 +362,11 @@ public class NetProfitReportActivity extends Activity {
 		double expensesTotal = (Double) summary.get("expenses_total");
 		double netProfit = (Double) summary.get("net_profit");
 
-		tv_sales_total.setText(String.format(Locale.getDefault(), "%.2f", salesTotal));
-		tv_item_cost.setText(String.format(Locale.getDefault(), "%.2f", itemCost));
-		tv_expenses_total.setText(String.format(Locale.getDefault(), "%.2f", expensesTotal));
+		tv_sales_total.setText(AmountFormat.format(salesTotal));
+		tv_item_cost.setText(AmountFormat.format(itemCost));
+		tv_expenses_total.setText(AmountFormat.format(expensesTotal));
 
-		tv_net_profit.setText(String.format(Locale.getDefault(), "%.2f", netProfit));
+		tv_net_profit.setText(AmountFormat.format(netProfit));
 
 		tv_net_profit.setTextColor(
 			getResources().getColor(netProfit >= 0 ? R.color.success : R.color.danger)

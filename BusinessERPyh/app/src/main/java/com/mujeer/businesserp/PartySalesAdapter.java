@@ -78,7 +78,7 @@ public class PartySalesAdapter extends BaseAdapter {
 		);
 
 		tv_party_total.setText(
-			String.format(Locale.getDefault(), "%.2f", total)
+			AmountFormat.format(total)
 		);
 
 		return convertView;

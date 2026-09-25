@@ -335,11 +335,11 @@ public class Paymenteditactivity extends Activity {
 		double impact = selectedType == DatabaseHelper.PAYMENT_IN ? amount : -amount;
 
 		tv_cash_before.setText(
-			String.format(Locale.getDefault(), "%.2f", cashBaseline)
+			AmountFormat.format(cashBaseline)
 		);
 
 		tv_cash_after.setText(
-			String.format(Locale.getDefault(), "%.2f", cashBaseline + impact)
+			AmountFormat.format(cashBaseline + impact)
 		);
 	}
 
@@ -397,20 +397,14 @@ public class Paymenteditactivity extends Activity {
 
 		if (balance > 0) {
 
-			return String.format(
-				"Balance: %.2f (Receivable)",
-				balance
-			);
+			return "Balance: " + AmountFormat.format(balance) + " (Receivable)";
 
 		} else if (balance < 0) {
 
-			return String.format(
-				"Balance: %.2f (Payable)",
-				Math.abs(balance)
-			);
+			return "Balance: " + AmountFormat.format(Math.abs(balance)) + " (Payable)";
 		}
 
-		return "Balance: 0.00 (Settled)";
+		return "Balance: 0 (Settled)";
 	}
 
 	private void savePayment() {

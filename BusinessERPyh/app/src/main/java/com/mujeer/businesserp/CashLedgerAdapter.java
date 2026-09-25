@@ -59,7 +59,7 @@ public class CashLedgerAdapter extends BaseAdapter {
         );
 
         tvAmount.setText(
-            String.format(Locale.getDefault(), "%s%.2f", amount >= 0 ? "+" : "", amount)
+            (amount >= 0 ? "+" : "-") + AmountFormat.format(Math.abs(amount))
         );
 
         tvAmount.setTextColor(

@@ -69,7 +69,7 @@ public class GenerateLineListAdapter extends BaseAdapter {
 		tvLabel.setTextColor(activity.getResources().getColor(
 			configured ? R.color.text_primary : R.color.text_hint));
 		tvDetail.setText(formatDetail(line));
-		tvTotal.setText(String.format(Locale.US, "%.2f", line.totalValue()));
+		tvTotal.setText(AmountFormat.format(line.totalValue()));
 
 		return convertView;
 	}
@@ -106,7 +106,7 @@ public class GenerateLineListAdapter extends BaseAdapter {
 		}
 
 		if (showUnitValue) {
-			sb.append("  ·  @ ").append(String.format(Locale.US, "%.2f", line.unitValue));
+			sb.append("  ·  @ ").append(AmountFormat.format(line.unitValue));
 		}
 
 		return sb.toString();

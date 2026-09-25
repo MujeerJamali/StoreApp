@@ -282,10 +282,10 @@ public class Transactionviewactivity extends Activity {
 				"Invoice: " + purchase.get("invoice_number"));
 
 			tv_purchase_total.setText(
-				"Grand Total: " + purchase.get("grand_total"));
+				"Grand Total: " + AmountFormat.format((Double) purchase.get("grand_total")));
 
 			tv_purchase_paid.setText(
-				"Amount Paid: " + purchase.get("amount_paid"));
+				"Amount Paid: " + AmountFormat.format((Double) purchase.get("amount_paid")));
 
 			tv_purchase_notes.setText(
 				"Notes: " + purchase.get("notes"));
@@ -391,7 +391,7 @@ public class Transactionviewactivity extends Activity {
 			tv_purchase_party.setText("Customer: " + sale.get("party_name"));
 
 			tv_purchase_paid.setText(
-				"Paid Amount: " + sale.get("paid_amount")
+				"Paid Amount: " + AmountFormat.format(Double.parseDouble(sale.get("paid_amount").toString()))
 			);
 
 			android.widget.Toast.makeText(
@@ -422,11 +422,11 @@ public class Transactionviewactivity extends Activity {
 		);
 
 		tv_purchase_total.setText(
-			"Grand Total: " + sale.get("grand_total")
+			"Grand Total: " + AmountFormat.format(Double.parseDouble(sale.get("grand_total").toString()))
 		);
 
 		tv_purchase_paid.setText(
-			"Amount Paid: " + sale.get("paid_amount")
+			"Amount Paid: " + AmountFormat.format(Double.parseDouble(sale.get("paid_amount").toString()))
 		);
 
 		tv_purchase_notes.setText(

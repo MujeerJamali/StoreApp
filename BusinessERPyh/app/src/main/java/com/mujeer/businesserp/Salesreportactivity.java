@@ -266,7 +266,7 @@ public class Salesreportactivity extends Activity {
 		}
 
 		tv_total_sales.setText(
-			String.format(Locale.getDefault(), "%.2f", total)
+			AmountFormat.format(total)
 		);
 
 		tv_sales_count.setText(String.valueOf(count));

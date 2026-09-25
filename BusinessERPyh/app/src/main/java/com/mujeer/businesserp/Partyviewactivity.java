@@ -194,20 +194,20 @@ public class Partyviewactivity extends Activity {
             if (balance > 0) {
 
                 tv_party_balance.setText(
-                    String.format("%.2f (Receivable)", balance)
+                    AmountFormat.format(balance) + " (Receivable)"
                 );
                 tv_party_balance.setTextColor(getResources().getColor(R.color.success));
 
             } else if (balance < 0) {
 
                 tv_party_balance.setText(
-                    String.format("%.2f (Payable)", Math.abs(balance))
+                    AmountFormat.format(Math.abs(balance)) + " (Payable)"
                 );
                 tv_party_balance.setTextColor(getResources().getColor(R.color.danger));
 
             } else {
 
-                tv_party_balance.setText("0.00 (Settled)");
+                tv_party_balance.setText("0 (Settled)");
                 tv_party_balance.setTextColor(getResources().getColor(R.color.text_secondary));
             }
         }

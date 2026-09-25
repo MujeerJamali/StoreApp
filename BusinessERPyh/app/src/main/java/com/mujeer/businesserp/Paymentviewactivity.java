@@ -94,7 +94,7 @@ public class Paymentviewactivity extends Activity {
 
 		tv_amount.setText(
 			"Amount: Rs. " +
-			payment.get("amount").toString()
+			AmountFormat.format((Double) payment.get("amount"))
 		);
 
 		String notes = "";

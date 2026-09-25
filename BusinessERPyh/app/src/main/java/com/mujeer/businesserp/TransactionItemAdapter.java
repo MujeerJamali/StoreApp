@@ -129,15 +129,15 @@ public class TransactionItemAdapter extends BaseAdapter {
 
         tvCode.setText("Code: " + item.get("code"));
         tvName.setText("Item: " + item.get("name"));
-        tvQuantity.setText("Qty: " + item.get("quantity"));
+        tvQuantity.setText("Qty: " + AmountFormat.format((Double) item.get("quantity")));
         Object price = item.get("purchase_price");
 
 		if (price == null) {
 			price = item.get("sale_price");
 		}
 
-		tvPrice.setText("Price: " + price);
-        tvTotal.setText("Total: " + item.get("total"));
+		tvPrice.setText("Price: " + AmountFormat.format((Double) price));
+        tvTotal.setText("Total: " + AmountFormat.format((Double) item.get("total")));
 
         return convertView;
     }

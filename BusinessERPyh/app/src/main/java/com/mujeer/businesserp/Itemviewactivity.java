@@ -249,8 +249,8 @@ public class Itemviewactivity extends Activity {
 
             tv_item_code.setText((String) item.get("code"));
             tv_item_name.setText((String) item.get("name"));
-            tv_purchase_price.setText(String.valueOf(item.get("purchase_price")));
-            tv_sale_price.setText(String.valueOf(item.get("sale_price")));
+            tv_purchase_price.setText(AmountFormat.format((Double) item.get("purchase_price")));
+            tv_sale_price.setText(AmountFormat.format((Double) item.get("sale_price")));
 
             double stock = 0;
 
@@ -258,7 +258,7 @@ public class Itemviewactivity extends Activity {
                 stock = (Double) item.get("balance");
             }
 
-            tv_item_stock.setText(String.valueOf(stock));
+            tv_item_stock.setText(AmountFormat.format(stock));
 
             if (stock <= 0) {
                 tv_item_stock.setTextColor(getResources().getColor(R.color.danger));
@@ -303,7 +303,7 @@ public class Itemviewactivity extends Activity {
             labelView.setLayoutParams(labelParams);
 
             TextView stockView = new TextView(this);
-            stockView.setText(String.valueOf(balance));
+            stockView.setText(AmountFormat.format(balance));
             stockView.setTextColor(
                 balance <= 0
                     ? getResources().getColor(R.color.danger)

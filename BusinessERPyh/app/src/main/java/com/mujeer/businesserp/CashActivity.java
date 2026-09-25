@@ -83,7 +83,7 @@ public class CashActivity extends Activity {
                     public void run() {
 
                         tvCashBalance.setText(
-                            String.format(Locale.getDefault(), "%.2f", balance)
+                            AmountFormat.format(balance)
                         );
 
                         tvCashBalance.setTextColor(

@@ -753,7 +753,7 @@ public class GenerateEntriesActivity extends Activity {
 
 		tvSummary.setText(
 			line.dateCounts.size() + " date(s), " + totalCount + " total · Total: " +
-			String.format(Locale.US, "%.2f", total));
+			AmountFormat.format(total));
 	}
 
 	private void onLineSaveClicked(
@@ -880,7 +880,7 @@ public class GenerateEntriesActivity extends Activity {
 			grandTotal += line.totalValue();
 		}
 
-		tvGrandTotal.setText("Grand Total: " + String.format(Locale.US, "%.2f", grandTotal));
+		tvGrandTotal.setText("Grand Total: " + AmountFormat.format(grandTotal));
 
 		lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
 			@Override
@@ -1227,12 +1227,12 @@ public class GenerateEntriesActivity extends Activity {
 		double balance = balanceObj == null ? 0 : Double.parseDouble(balanceObj.toString());
 
 		if (balance > 0) {
-			return String.format(Locale.US, "Balance: %.2f (Receivable)", balance);
+			return "Balance: " + AmountFormat.format(balance) + " (Receivable)";
 		} else if (balance < 0) {
-			return String.format(Locale.US, "Balance: %.2f (Payable)", Math.abs(balance));
+			return "Balance: " + AmountFormat.format(Math.abs(balance)) + " (Payable)";
 		}
 
-		return "Balance: 0.00 (Settled)";
+		return "Balance: 0 (Settled)";
 	}
 
 	private String typeLabel(int type) {

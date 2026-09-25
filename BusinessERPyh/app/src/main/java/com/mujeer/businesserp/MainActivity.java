@@ -325,7 +325,7 @@ public class MainActivity extends Activity {
 							public void run() {
 
 								tv_cash_balance.setText(
-									String.format(Locale.getDefault(), "%.2f", cashBalance)
+									AmountFormat.format(cashBalance)
 								);
 
 								tv_cash_balance.setTextColor(
@@ -335,15 +335,15 @@ public class MainActivity extends Activity {
 								);
 
 								tv_expense_today.setText(
-									String.format(Locale.getDefault(), "%.2f", expenseToday)
+									AmountFormat.format(expenseToday)
 								);
 
 								tv_expense_week.setText(
-									String.format(Locale.getDefault(), "%.2f", expenseWeek)
+									AmountFormat.format(expenseWeek)
 								);
 
 								tv_expense_month.setText(
-									String.format(Locale.getDefault(), "%.2f", expenseMonth)
+									AmountFormat.format(expenseMonth)
 								);
 							}
 						});

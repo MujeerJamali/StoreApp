@@ -82,9 +82,9 @@ public class StockWorthReportActivity extends Activity {
 		int shoesCount = (Integer) summary.get("shoes_count");
 		int nonShoesCount = (Integer) summary.get("non_shoes_count");
 
-		tv_total_worth.setText(String.format(Locale.getDefault(), "%.2f", totalWorth));
-		tv_shoes_worth.setText(String.format(Locale.getDefault(), "%.2f", shoesWorth));
-		tv_non_shoes_worth.setText(String.format(Locale.getDefault(), "%.2f", nonShoesWorth));
+		tv_total_worth.setText(AmountFormat.format(totalWorth));
+		tv_shoes_worth.setText(AmountFormat.format(shoesWorth));
+		tv_non_shoes_worth.setText(AmountFormat.format(nonShoesWorth));
 
 		tv_shoes_count.setText(shoesCount + (shoesCount == 1 ? " item" : " items"));
 		tv_non_shoes_count.setText(nonShoesCount + (nonShoesCount == 1 ? " item" : " items"));

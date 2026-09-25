@@ -528,20 +528,14 @@ public class Transactioneditactivity extends Activity {
 
 		if (balance > 0) {
 
-			return String.format(
-				"Balance: %.2f (Receivable)",
-				balance
-			);
+			return "Balance: " + AmountFormat.format(balance) + " (Receivable)";
 
 		} else if (balance < 0) {
 
-			return String.format(
-				"Balance: %.2f (Payable)",
-				Math.abs(balance)
-			);
+			return "Balance: " + AmountFormat.format(Math.abs(balance)) + " (Payable)";
 		}
 
-		return "Balance: 0.00 (Settled)";
+		return "Balance: 0 (Settled)";
 	}
 
 	private String formatItemSubtitle(
@@ -562,11 +556,7 @@ public class Transactioneditactivity extends Activity {
 			0 :
 			Double.parseDouble(stockObj.toString());
 
-		return String.format(
-			"Price: %.2f | Stock: %s",
-			price,
-			formatStockAmount(stock)
-		);
+		return "Price: " + AmountFormat.format(price) + " | Stock: " + formatStockAmount(stock);
 	}
 
 	private String formatStockAmount(double stock) {
@@ -1757,11 +1747,7 @@ public class Transactioneditactivity extends Activity {
 		}
 
 		tv_grand_total.setText(
-			String.format(
-				Locale.getDefault(),
-				"%.2f",
-				total
-			)
+			AmountFormat.format(total)
 		);
 
 		updateDefaultAmountPaid(total);
@@ -1819,11 +1805,11 @@ public class Transactioneditactivity extends Activity {
 		double impact = transactionType == TYPE_PURCHASE ? -paid : paid;
 
 		tv_cash_before.setText(
-			String.format(Locale.getDefault(), "%.2f", cashBaseline)
+			AmountFormat.format(cashBaseline)
 		);
 
 		tv_cash_after.setText(
-			String.format(Locale.getDefault(), "%.2f", cashBaseline + impact)
+			AmountFormat.format(cashBaseline + impact)
 		);
 	}
 
@@ -1843,7 +1829,7 @@ public class Transactioneditactivity extends Activity {
 		updatingAmountPaidProgrammatically = true;
 
 		et_amount_paid.setText(
-			String.format(Locale.getDefault(), "%.2f", grandTotal)
+			AmountFormat.formatPlain(grandTotal)
 		);
 
 		updatingAmountPaidProgrammatically = false;
@@ -1869,7 +1855,7 @@ public class Transactioneditactivity extends Activity {
 					}
 
 					et_amount_paid.setText(
-						String.format(Locale.getDefault(), "%.2f", total)
+						AmountFormat.formatPlain(total)
 					);
 
 				} else {

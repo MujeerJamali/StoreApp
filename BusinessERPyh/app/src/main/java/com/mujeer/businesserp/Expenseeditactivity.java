@@ -357,11 +357,11 @@ public class Expenseeditactivity extends Activity {
 		}
 
 		tv_cash_before.setText(
-			String.format(Locale.getDefault(), "%.2f", cashBaseline)
+			AmountFormat.format(cashBaseline)
 		);
 
 		tv_cash_after.setText(
-			String.format(Locale.getDefault(), "%.2f", cashBaseline - paid)
+			AmountFormat.format(cashBaseline - paid)
 		);
 	}
 

@@ -182,7 +182,7 @@ public class Expenseviewactivity extends Activity {
 
 		tv_amount.setText(
 			"Amount: Rs. " +
-			expense.get("amount").toString()
+			AmountFormat.format((Double) expense.get("amount"))
 		);
 
 		String notes = "";
