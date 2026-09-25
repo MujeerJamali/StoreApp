@@ -287,6 +287,14 @@ public class ImportVyaparActivity extends Activity {
                 importVarietyCombos(vyaparDb, helper, db, itemIdMap, varietyComboIdMap, skipped, counts);
                 importVarietyComboValues(
                     vyaparDb, helper, db, varietyComboIdMap, varietyGroupIdMap, varietyValueIdMap, skipped);
+
+                // A backup can carry duplicate combo rows for the exact
+                // same item+value combination (e.g. from an older buggy
+                // export, or a raw data fix that created a fresh combo
+                // instead of reusing the existing one) - collapse those
+                // now, before line items get their combo_id repointed
+                // below, so a duplicate is never chosen over the original.
+                helper.mergeDuplicateVarietyCombos(db);
             }
 
             setStatus("Importing purchases...");

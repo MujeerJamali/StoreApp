@@ -1435,6 +1435,121 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return comboId;
 	}
 
+	// Collapses combos that map to the exact same item + value selections
+	// down to one - can happen from an older/buggy export, or a raw data
+	// fix that inserted a fresh combo instead of reusing the existing
+	// one. Called once after a Vyapar import's variety tables are in
+	// place, before line items get their combo_id resolved, so a
+	// duplicate can never be the one a line item ends up pointing at.
+	// Keeps the lowest (oldest) combo id per group as canonical, moves
+	// the others' balance and any line-item references onto it, then
+	// deletes the duplicates.
+	public void mergeDuplicateVarietyCombos(SQLiteDatabase db) {
+
+		HashMap<Integer, Integer> comboItem = new HashMap<Integer, Integer>();
+
+		Cursor comboCursor = db.rawQuery(
+			"SELECT id, item_id FROM " + TABLE_VARIETY_COMBOS, null);
+
+		while (comboCursor.moveToNext()) {
+			comboItem.put(comboCursor.getInt(0), comboCursor.getInt(1));
+		}
+
+		comboCursor.close();
+
+		HashMap<Integer, String> comboSignature = new HashMap<Integer, String>();
+
+		Cursor cvCursor = db.rawQuery(
+			"SELECT combo_id, group_id, value_id FROM " +
+			TABLE_VARIETY_COMBO_VALUES + " ORDER BY combo_id, group_id", null);
+
+		while (cvCursor.moveToNext()) {
+
+			int comboId = cvCursor.getInt(0);
+			String pair = cvCursor.getInt(1) + ":" + cvCursor.getInt(2);
+			String existing = comboSignature.get(comboId);
+
+			comboSignature.put(
+				comboId, existing == null ? pair : existing + "," + pair);
+		}
+
+		cvCursor.close();
+
+		// item_id -> signature -> combo ids sharing it, in ascending order.
+		HashMap<Integer, HashMap<String, ArrayList<Integer>>> groups =
+			new HashMap<Integer, HashMap<String, ArrayList<Integer>>>();
+
+		ArrayList<Integer> comboIdsAscending = new ArrayList<Integer>(comboItem.keySet());
+		java.util.Collections.sort(comboIdsAscending);
+
+		for (int comboId : comboIdsAscending) {
+
+			int itemId = comboItem.get(comboId);
+			String signature = comboSignature.get(comboId);
+
+			if (signature == null) {
+				continue;
+			}
+
+			if (!groups.containsKey(itemId)) {
+				groups.put(itemId, new HashMap<String, ArrayList<Integer>>());
+			}
+
+			HashMap<String, ArrayList<Integer>> bySignature = groups.get(itemId);
+
+			if (!bySignature.containsKey(signature)) {
+				bySignature.put(signature, new ArrayList<Integer>());
+			}
+
+			bySignature.get(signature).add(comboId);
+		}
+
+		for (HashMap<String, ArrayList<Integer>> bySignature : groups.values()) {
+
+			for (ArrayList<Integer> comboIds : bySignature.values()) {
+
+				if (comboIds.size() < 2) {
+					continue;
+				}
+
+				int canonical = comboIds.get(0);
+
+				for (int i = 1; i < comboIds.size(); i++) {
+
+					int dupe = comboIds.get(i);
+
+					db.execSQL(
+						"UPDATE " + TABLE_VARIETY_COMBOS +
+						" SET balance = balance + (SELECT balance FROM " +
+						TABLE_VARIETY_COMBOS + " WHERE id=?) WHERE id=?",
+						new Object[]{dupe, canonical}
+					);
+
+					db.execSQL(
+						"UPDATE " + TABLE_PURCHASE_ITEMS +
+						" SET combo_id=? WHERE combo_id=?",
+						new Object[]{canonical, dupe}
+					);
+
+					db.execSQL(
+						"UPDATE sale_items SET combo_id=? WHERE combo_id=?",
+						new Object[]{canonical, dupe}
+					);
+
+					db.execSQL(
+						"DELETE FROM " + TABLE_VARIETY_COMBO_VALUES + " WHERE combo_id=?",
+						new Object[]{dupe}
+					);
+
+					db.execSQL(
+						"DELETE FROM " + TABLE_VARIETY_COMBOS + " WHERE id=?",
+						new Object[]{dupe}
+					);
+				}
+			}
+		}
+	}
+
 	// The inverse of resolveComboId(): given a combo id, returns its
 	// group_id -> value_id selections, so a dropdown can be restored to
 	// its previous selection when re-editing an existing line.
