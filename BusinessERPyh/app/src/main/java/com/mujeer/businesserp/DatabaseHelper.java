@@ -144,7 +144,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"invoice_number TEXT, " +
 			"grand_total REAL NOT NULL DEFAULT 0, " +
 			"amount_paid REAL NOT NULL DEFAULT 0, " +
-			"notes TEXT" +
+			"notes TEXT, " +
+			"source TEXT" +
 			");"
 		);
 
@@ -155,7 +156,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"item_id INTEGER NOT NULL, " +
 			"quantity REAL NOT NULL, " +
 			"purchase_price REAL NOT NULL, " +
-			"total REAL NOT NULL" +
+			"total REAL NOT NULL, " +
+			"combo_id INTEGER" +
 			");"
 		);
 
@@ -172,7 +174,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"grand_total REAL DEFAULT 0, " +
 			"paid_amount REAL DEFAULT 0, " +
 			"balance REAL DEFAULT 0, " +
-			"notes TEXT" +
+			"notes TEXT, " +
+			"source TEXT" +
 			")"
 		);
 
@@ -183,7 +186,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"item_id INTEGER, " +
 			"qty REAL DEFAULT 0, " +
 			"rate REAL DEFAULT 0, " +
-			"amount REAL DEFAULT 0" +
+			"amount REAL DEFAULT 0, " +
+			"combo_id INTEGER" +
 			")"
 		);
 
@@ -196,7 +200,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"date TEXT NOT NULL, " +
 			"time TEXT NOT NULL, " +
 			"amount REAL NOT NULL DEFAULT 0, " +
-			"notes TEXT" +
+			"notes TEXT, " +
+			"source TEXT" +
 			")"
 		);
 
@@ -209,7 +214,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"time TEXT NOT NULL, " +
 			"amount REAL NOT NULL DEFAULT 0, " +
 			"notes TEXT, " +
-			"party_id INTEGER" +
+			"party_id INTEGER, " +
+			"source TEXT, " +
+			"paid_amount REAL NOT NULL DEFAULT 0" +
 			")"
 		);
 
@@ -228,7 +235,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"date TEXT NOT NULL, " +
 			"time TEXT NOT NULL, " +
 			"amount REAL NOT NULL DEFAULT 0, " +
-			"notes TEXT" +
+			"notes TEXT, " +
+			"source TEXT" +
 			")"
 		);
 
