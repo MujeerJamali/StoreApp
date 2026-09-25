@@ -1,9 +1,11 @@
 package com.mujeer.businesserp;
 
 import android.app.Activity;
+import android.app.DatePickerDialog;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 
@@ -16,16 +18,24 @@ import java.util.Locale;
 public class Partysalesreportactivity extends Activity {
 
 	private static final int RANGE_TODAY = 0;
-	private static final int RANGE_WEEK = 1;
-	private static final int RANGE_MONTH = 2;
-	private static final int RANGE_QUARTER = 3;
-	private static final int RANGE_YEAR = 4;
+	private static final int RANGE_YESTERDAY = 1;
+	private static final int RANGE_WEEK = 2;
+	private static final int RANGE_MONTH = 3;
+	private static final int RANGE_QUARTER = 4;
+	private static final int RANGE_YEAR = 5;
+	private static final int RANGE_CUSTOM = 6;
 
 	private Button btn_range_today;
+	private Button btn_range_yesterday;
 	private Button btn_range_week;
 	private Button btn_range_month;
 	private Button btn_range_quarter;
 	private Button btn_range_year;
+	private Button btn_range_custom;
+
+	private View container_custom_range;
+	private EditText et_custom_from;
+	private EditText et_custom_to;
 
 	private Button btn_sort_amount_desc;
 	private Button btn_sort_amount_asc;
@@ -61,10 +71,16 @@ public class Partysalesreportactivity extends Activity {
 		setTitle("Sales by Party");
 
 		btn_range_today = findViewById(R.id.btn_range_today);
+		btn_range_yesterday = findViewById(R.id.btn_range_yesterday);
 		btn_range_week = findViewById(R.id.btn_range_week);
 		btn_range_month = findViewById(R.id.btn_range_month);
 		btn_range_quarter = findViewById(R.id.btn_range_quarter);
 		btn_range_year = findViewById(R.id.btn_range_year);
+		btn_range_custom = findViewById(R.id.btn_range_custom);
+
+		container_custom_range = findViewById(R.id.container_custom_range);
+		et_custom_from = findViewById(R.id.et_custom_from);
+		et_custom_to = findViewById(R.id.et_custom_to);
 
 		btn_sort_amount_desc = findViewById(R.id.btn_sort_amount_desc);
 		btn_sort_amount_asc = findViewById(R.id.btn_sort_amount_asc);
@@ -79,10 +95,35 @@ public class Partysalesreportactivity extends Activity {
 		adapter = new PartySalesAdapter(this, partySalesList);
 		lv_party_sales.setAdapter(adapter);
 
+		String today = dateFormat.format(new java.util.Date());
+		et_custom_from.setText(today);
+		et_custom_to.setText(today);
+
+		et_custom_from.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					showDatePicker(et_custom_from);
+				}
+			});
+
+		et_custom_to.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					showDatePicker(et_custom_to);
+				}
+			});
+
 		btn_range_today.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
 					selectRange(RANGE_TODAY);
+				}
+			});
+
+		btn_range_yesterday.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					selectRange(RANGE_YESTERDAY);
 				}
 			});
 
@@ -111,6 +152,13 @@ public class Partysalesreportactivity extends Activity {
 				@Override
 				public void onClick(View v) {
 					selectRange(RANGE_YEAR);
+				}
+			});
+
+		btn_range_custom.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					selectRange(RANGE_CUSTOM);
 				}
 			});
 
@@ -151,27 +199,65 @@ public class Partysalesreportactivity extends Activity {
 		loadReport();
 	}
 
+	private void showDatePicker(final EditText target) {
+
+		Calendar calendar = Calendar.getInstance();
+
+		try {
+			calendar.setTime(dateFormat.parse(target.getText().toString()));
+		} catch (Exception e) {
+		}
+
+		new DatePickerDialog(
+			this,
+			R.style.AppAlertDialogTheme,
+			new DatePickerDialog.OnDateSetListener() {
+				@Override
+				public void onDateSet(
+					android.widget.DatePicker view, int year, int month, int dayOfMonth) {
+
+					target.setText(
+						String.format(Locale.getDefault(), "%04d-%02d-%02d", year, month + 1, dayOfMonth)
+					);
+
+					if (selectedRange == RANGE_CUSTOM) {
+						loadReport();
+					}
+				}
+			},
+			calendar.get(Calendar.YEAR),
+			calendar.get(Calendar.MONTH),
+			calendar.get(Calendar.DAY_OF_MONTH)
+		).show();
+	}
+
 	private void selectRange(int range) {
 
 		selectedRange = range;
 
 		Button[] buttons = {
 			btn_range_today,
+			btn_range_yesterday,
 			btn_range_week,
 			btn_range_month,
 			btn_range_quarter,
-			btn_range_year
+			btn_range_year,
+			btn_range_custom
 		};
 
 		int[] ranges = {
 			RANGE_TODAY,
+			RANGE_YESTERDAY,
 			RANGE_WEEK,
 			RANGE_MONTH,
 			RANGE_QUARTER,
-			RANGE_YEAR
+			RANGE_YEAR,
+			RANGE_CUSTOM
 		};
 
 		toggleButtons(buttons, ranges, range);
+
+		container_custom_range.setVisibility(range == RANGE_CUSTOM ? View.VISIBLE : View.GONE);
 
 		loadReport();
 	}
@@ -220,6 +306,13 @@ public class Partysalesreportactivity extends Activity {
 	// start of that period through today.
 	private String[] computeRange(int range) {
 
+		if (range == RANGE_CUSTOM) {
+			return new String[]{
+				et_custom_from.getText().toString().trim(),
+				et_custom_to.getText().toString().trim()
+			};
+		}
+
 		Calendar from = Calendar.getInstance();
 		Calendar to = Calendar.getInstance();
 
@@ -229,6 +322,13 @@ public class Partysalesreportactivity extends Activity {
 		from.set(Calendar.MILLISECOND, 0);
 
 		switch (range) {
+
+			case RANGE_YESTERDAY:
+
+				from.add(Calendar.DAY_OF_YEAR, -1);
+				to.add(Calendar.DAY_OF_YEAR, -1);
+
+				break;
 
 			case RANGE_WEEK:
 

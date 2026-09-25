@@ -40,6 +40,17 @@
                     android:text="Today" />
 
                 <Button
+                    android:id="@+id/btn_range_yesterday"
+                    style="@style/AppButton.Outline.Small"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:minWidth="0dp"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:text="Yesterday" />
+
+                <Button
                     android:id="@+id/btn_range_week"
                     style="@style/AppButton.Outline.Small"
                     android:layout_width="wrap_content"

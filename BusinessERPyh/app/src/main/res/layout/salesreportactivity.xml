@@ -31,6 +31,17 @@
                 android:text="Today" />
 
             <Button
+                android:id="@+id/btn_range_yesterday"
+                style="@style/AppButton.Outline.Small"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:minWidth="0dp"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:text="Yesterday" />
+
+            <Button
                 android:id="@+id/btn_range_week"
                 style="@style/AppButton.Outline.Small"
                 android:layout_width="wrap_content"
@@ -68,14 +79,72 @@
                 style="@style/AppButton.Outline.Small"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
                 android:minWidth="0dp"
                 android:paddingStart="18dp"
                 android:paddingEnd="18dp"
                 android:text="Year" />
 
+            <Button
+                android:id="@+id/btn_range_custom"
+                style="@style/AppButton.Outline.Small"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="0dp"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:text="Custom Range" />
+
         </LinearLayout>
 
     </HorizontalScrollView>
+
+    <LinearLayout
+        android:id="@+id/container_custom_range"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="From" />
+            <EditText
+                android:id="@+id/et_custom_from"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:focusable="false"
+                android:hint="From date"
+                android:inputType="text|textNoSuggestions" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:orientation="vertical">
+
+            <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="To" />
+            <EditText
+                android:id="@+id/et_custom_to"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:focusable="false"
+                android:hint="To date"
+                android:inputType="text|textNoSuggestions" />
+
+        </LinearLayout>
+
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"

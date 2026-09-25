@@ -29,8 +29,10 @@ public class NetProfitReportActivity extends Activity {
 	private static final int RANGE_YEAR = 4;
 	private static final int RANGE_ALL_TIME = 5;
 	private static final int RANGE_CUSTOM = 6;
+	private static final int RANGE_YESTERDAY = 7;
 
 	private Button btn_range_today;
+	private Button btn_range_yesterday;
 	private Button btn_range_week;
 	private Button btn_range_month;
 	private Button btn_range_quarter;
@@ -69,6 +71,7 @@ public class NetProfitReportActivity extends Activity {
 		setTitle("Net Profit");
 
 		btn_range_today = findViewById(R.id.btn_range_today);
+		btn_range_yesterday = findViewById(R.id.btn_range_yesterday);
 		btn_range_week = findViewById(R.id.btn_range_week);
 		btn_range_month = findViewById(R.id.btn_range_month);
 		btn_range_quarter = findViewById(R.id.btn_range_quarter);
@@ -111,6 +114,13 @@ public class NetProfitReportActivity extends Activity {
 				@Override
 				public void onClick(View v) {
 					selectRange(RANGE_TODAY);
+				}
+			});
+
+		btn_range_yesterday.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					selectRange(RANGE_YESTERDAY);
 				}
 			});
 
@@ -202,12 +212,12 @@ public class NetProfitReportActivity extends Activity {
 		selectedRange = range;
 
 		Button[] buttons = {
-			btn_range_today, btn_range_week, btn_range_month,
+			btn_range_today, btn_range_yesterday, btn_range_week, btn_range_month,
 			btn_range_quarter, btn_range_year, btn_range_all_time, btn_range_custom
 		};
 
 		int[] ranges = {
-			RANGE_TODAY, RANGE_WEEK, RANGE_MONTH,
+			RANGE_TODAY, RANGE_YESTERDAY, RANGE_WEEK, RANGE_MONTH,
 			RANGE_QUARTER, RANGE_YEAR, RANGE_ALL_TIME, RANGE_CUSTOM
 		};
 
@@ -255,6 +265,11 @@ public class NetProfitReportActivity extends Activity {
 		from.set(Calendar.MILLISECOND, 0);
 
 		switch (range) {
+
+			case RANGE_YESTERDAY:
+				from.add(Calendar.DAY_OF_YEAR, -1);
+				to.add(Calendar.DAY_OF_YEAR, -1);
+				break;
 
 			case RANGE_WEEK:
 				from.setFirstDayOfWeek(Calendar.MONDAY);
@@ -320,6 +335,10 @@ public class NetProfitReportActivity extends Activity {
 		int range_forLabel) {
 
 		switch (range_forLabel) {
+
+			case RANGE_YESTERDAY:
+				tv_range_label.setText("Yesterday");
+				break;
 
 			case RANGE_WEEK:
 				tv_range_label.setText("This Week");
