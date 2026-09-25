@@ -25,7 +25,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // cash_adjustments (manual cash-in-hand corrections) and
     // wanted_items (customer requests for something not currently in
     // stock).
-    public static final int DATABASE_VERSION = 15;
+    // Bumped 15 -> 16 to add recurring_expenses (standing rules that
+    // auto-generate expense entries) - onUpgrade() only runs onCreate()
+    // again when this number goes up, so without the bump an existing
+    // install never gets the new table and generateDueRecurringExpenses()
+    // (called every app open) crashes with "no such table".
+    public static final int DATABASE_VERSION = 16;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
