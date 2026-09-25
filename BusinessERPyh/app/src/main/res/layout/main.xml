@@ -146,85 +146,78 @@
 
             </LinearLayout>
 
-            <!-- Row 1: Parties / Items -->
+            <!-- Modules: plain one-line text rows, no icons - matches the
+                 Tools list below instead of the old icon-grid cards. -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:background="@drawable/bg_card"
+                android:elevation="@dimen/elevation_card"
+                android:orientation="vertical">
 
                 <Button
                     android:id="@+id/btn_parties"
-                    style="@style/DashboardCard"
-                    android:layout_marginEnd="6dp"
-                    android:drawableTop="@drawable/badge_parties"
+                    style="@style/ToolRow"
                     android:text="Parties" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
 
                 <Button
                     android:id="@+id/btn_items"
-                    style="@style/DashboardCard"
-                    android:layout_marginStart="6dp"
-                    android:drawableTop="@drawable/badge_items"
+                    style="@style/ToolRow"
                     android:text="Items" />
 
-            </LinearLayout>
-
-            <!-- Row 2: Purchases / Sales -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal">
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
 
                 <Button
                     android:id="@+id/btn_transactions_purchase"
-                    style="@style/DashboardCard"
-                    android:layout_marginEnd="6dp"
-                    android:drawableTop="@drawable/badge_purchase"
+                    style="@style/ToolRow"
                     android:text="Purchases" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
 
                 <Button
                     android:id="@+id/btn_transactions_sale"
-                    style="@style/DashboardCard"
-                    android:layout_marginStart="6dp"
-                    android:drawableTop="@drawable/badge_sales"
+                    style="@style/ToolRow"
                     android:text="Sales" />
 
-            </LinearLayout>
-
-            <!-- Row 3: Payments / Expenses -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal">
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
 
                 <Button
                     android:id="@+id/btn_payments"
-                    style="@style/DashboardCard"
-                    android:layout_marginEnd="6dp"
-                    android:drawableTop="@drawable/badge_payments"
+                    style="@style/ToolRow"
                     android:text="Payments" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
 
                 <Button
                     android:id="@+id/btn_expenses"
-                    style="@style/DashboardCard"
-                    android:layout_marginStart="6dp"
-                    android:drawableTop="@drawable/badge_expenses"
+                    style="@style/ToolRow"
                     android:text="Expenses" />
 
-            </LinearLayout>
-
-            <!-- Row 4: Reports -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal">
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
 
                 <Button
                     android:id="@+id/btn_reports"
-                    style="@style/DashboardCard"
-                    android:drawableTop="@drawable/badge_reports"
+                    style="@style/ToolRow"
                     android:text="Reports" />
 
             </LinearLayout>
@@ -252,7 +245,6 @@
                 <Button
                     android:id="@+id/btn_import"
                     style="@style/ToolRow"
-                    android:drawableStart="@drawable/badge_import"
                     android:text="Import" />
 
                 <View
@@ -263,7 +255,6 @@
                 <Button
                     android:id="@+id/btn_generate_entries"
                     style="@style/ToolRow"
-                    android:drawableStart="@drawable/badge_generate"
                     android:text="Generate Entries" />
 
                 <View
