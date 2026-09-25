@@ -22,15 +22,17 @@ import java.util.Locale;
 // =====================
 public class ItemMonthlyRankReportActivity extends Activity {
 
-	private static final int RANGE_MONTH = 0;
-	private static final int RANGE_QUARTER = 1;
-	private static final int RANGE_YEAR = 2;
-	private static final int RANGE_ALL_TIME = 3;
-	private static final int RANGE_CUSTOM = 4;
+	private static final int RANGE_YESTERDAY = 0;
+	private static final int RANGE_MONTH = 1;
+	private static final int RANGE_QUARTER = 2;
+	private static final int RANGE_YEAR = 3;
+	private static final int RANGE_ALL_TIME = 4;
+	private static final int RANGE_CUSTOM = 5;
 
 	private Button btn_metric_sales;
 	private Button btn_metric_profit;
 
+	private Button btn_range_yesterday;
 	private Button btn_range_month;
 	private Button btn_range_quarter;
 	private Button btn_range_year;
@@ -74,6 +76,7 @@ public class ItemMonthlyRankReportActivity extends Activity {
 		btn_metric_sales = findViewById(R.id.btn_metric_sales);
 		btn_metric_profit = findViewById(R.id.btn_metric_profit);
 
+		btn_range_yesterday = findViewById(R.id.btn_range_yesterday);
 		btn_range_month = findViewById(R.id.btn_range_month);
 		btn_range_quarter = findViewById(R.id.btn_range_quarter);
 		btn_range_year = findViewById(R.id.btn_range_year);
@@ -125,6 +128,13 @@ public class ItemMonthlyRankReportActivity extends Activity {
 				@Override
 				public void onClick(View v) {
 					selectMetric(true);
+				}
+			});
+
+		btn_range_yesterday.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					selectRange(RANGE_YESTERDAY);
 				}
 			});
 
@@ -256,10 +266,13 @@ public class ItemMonthlyRankReportActivity extends Activity {
 		selectedRange = range;
 
 		Button[] buttons = {
-			btn_range_month, btn_range_quarter, btn_range_year, btn_range_all_time, btn_range_custom
+			btn_range_yesterday, btn_range_month, btn_range_quarter,
+			btn_range_year, btn_range_all_time, btn_range_custom
 		};
 
-		int[] ranges = {RANGE_MONTH, RANGE_QUARTER, RANGE_YEAR, RANGE_ALL_TIME, RANGE_CUSTOM};
+		int[] ranges = {
+			RANGE_YESTERDAY, RANGE_MONTH, RANGE_QUARTER, RANGE_YEAR, RANGE_ALL_TIME, RANGE_CUSTOM
+		};
 
 		for (int i = 0; i < buttons.length; i++) {
 
