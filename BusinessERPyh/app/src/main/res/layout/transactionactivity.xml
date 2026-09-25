@@ -32,31 +32,13 @@
         android:inputType="text|textNoSuggestions"
         />
 
-        <LinearLayout
+        <Button
+            android:id="@+id/btn_filter"
+            style="@style/AppButton.Outline.Small"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/btn_filter"
-                style="@style/AppButton.Outline.Small"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="6dp"
-                android:text="Filter" />
-
-            <Button
-                android:id="@+id/btn_delete_all"
-                style="@style/AppButton.Danger.Small"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="6dp"
-                android:text="Delete All" />
-
-        </LinearLayout>
+            android:text="Filter" />
 
         <TextView
             android:id="@+id/tv_empty"

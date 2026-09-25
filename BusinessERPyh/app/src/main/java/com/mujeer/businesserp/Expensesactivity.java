@@ -22,7 +22,6 @@ public class Expensesactivity extends Activity {
 	private TextView tv_empty;
 
 	private Button btn_add;
-	private Button btn_delete_all;
 	private Button btn_filter;
 
 	private ListView lv_expenses;
@@ -45,7 +44,6 @@ public class Expensesactivity extends Activity {
 		tv_empty = findViewById(R.id.tv_empty);
 
 		btn_add = findViewById(R.id.btn_add);
-		btn_delete_all = findViewById(R.id.btn_delete_all);
 		btn_filter = findViewById(R.id.btn_filter);
 
 		lv_expenses = findViewById(R.id.lv_expenses);
@@ -73,56 +71,6 @@ public class Expensesactivity extends Activity {
 					);
 
 					startActivity(intent);
-				}
-			}
-		);
-
-		btn_delete_all.setOnClickListener(
-			new View.OnClickListener() {
-
-				@Override
-				public void onClick(View v) {
-
-					new android.app.AlertDialog.Builder(
-						Expensesactivity.this
-					)
-
-						.setTitle(
-						"Delete All Expenses"
-					)
-
-						.setMessage(
-						"Are you sure you want to delete all expenses?"
-					)
-
-						.setPositiveButton(
-						"Delete",
-						new android.content.DialogInterface.OnClickListener() {
-
-							@Override
-							public void onClick(
-								android.content.DialogInterface dialog,
-								int which) {
-
-								db.deleteAllExpenses();
-
-								loadExpenses();
-
-								Toast.makeText(
-									Expensesactivity.this,
-									"All expenses deleted.",
-									Toast.LENGTH_SHORT
-								).show();
-							}
-						}
-					)
-
-						.setNegativeButton(
-						"Cancel",
-						null
-					)
-
-						.show();
 				}
 			}
 		);

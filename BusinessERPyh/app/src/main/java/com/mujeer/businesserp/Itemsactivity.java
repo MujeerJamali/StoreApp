@@ -24,7 +24,6 @@ public class Itemsactivity extends Activity {
     TextView tv_no_items;
 
     Button btn_add_item;
-    Button btn_delete_all_items;
 
     ListView lv_items;
 
@@ -43,8 +42,6 @@ public class Itemsactivity extends Activity {
         tv_no_items = findViewById(R.id.tv_no_items);
 
         btn_add_item = findViewById(R.id.btn_add_item);
-        btn_delete_all_items = findViewById(R.id.btn_delete_all_items);
-
         lv_items = findViewById(R.id.lv_items);
 
         lv_items.setEmptyView(tv_no_items);
@@ -80,33 +77,6 @@ public class Itemsactivity extends Activity {
 									  Itemsactivity.this,
 									  Additemactivity.class
 								  ));
-				}
-			});
-
-        btn_delete_all_items.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-
-					new AlertDialog.Builder(Itemsactivity.this)
-                        .setTitle("Delete All Items")
-                        .setMessage("Are you sure you want to delete all items?")
-                        .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-
-                                db.deleteAllItems();
-
-                                loadItems();
-
-                                Toast.makeText(
-									Itemsactivity.this,
-									"All items deleted",
-									Toast.LENGTH_SHORT
-                                ).show();
-                            }
-                        })
-                        .setNegativeButton("Cancel", null)
-                        .show();
 				}
 			});
 

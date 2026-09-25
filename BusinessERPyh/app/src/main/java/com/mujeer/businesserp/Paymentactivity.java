@@ -22,7 +22,6 @@ public class Paymentactivity extends Activity {
 	private TextView tv_empty;
 
 	private Button btn_add;
-	private Button btn_delete_all;
 	private Button btn_filter;
 
 	private ListView lv_payments;
@@ -45,7 +44,6 @@ public class Paymentactivity extends Activity {
 		tv_empty = findViewById(R.id.tv_empty);
 
 		btn_add = findViewById(R.id.btn_add);
-		btn_delete_all = findViewById(R.id.btn_delete_all);
 		btn_filter = findViewById(R.id.btn_filter);
 
 		lv_payments = findViewById(R.id.lv_payments);
@@ -71,56 +69,6 @@ public class Paymentactivity extends Activity {
 					);
 
 					startActivity(intent);
-				}
-			}
-		);
-
-		btn_delete_all.setOnClickListener(
-			new View.OnClickListener() {
-
-				@Override
-				public void onClick(View v) {
-
-					new android.app.AlertDialog.Builder(
-						Paymentactivity.this
-					)
-
-						.setTitle(
-						"Delete All Payments"
-					)
-
-						.setMessage(
-						"Are you sure you want to delete ALL payments?\n\nThis action cannot be undone."
-					)
-
-						.setPositiveButton(
-						"Delete All",
-						new android.content.DialogInterface.OnClickListener() {
-
-							@Override
-							public void onClick(
-								android.content.DialogInterface dialog,
-								int which) {
-
-								db.deleteAllPayments();
-
-								loadPayments();
-
-								Toast.makeText(
-									Paymentactivity.this,
-									"All payments deleted.",
-									Toast.LENGTH_SHORT
-								).show();
-							}
-						}
-					)
-
-						.setNegativeButton(
-						"Cancel",
-						null
-					)
-
-						.show();
 				}
 			}
 		);

@@ -24,7 +24,6 @@ import java.util.HashMap;
     TextView tv_no_parties;
 
     Button btn_add_party;
-    Button btn_delete_all_parties;
 
     ListView lv_parties;
 
@@ -43,7 +42,6 @@ import java.util.HashMap;
         tv_no_parties = findViewById(R.id.tv_no_parties);
 
         btn_add_party = findViewById(R.id.btn_add_party);
-        btn_delete_all_parties = findViewById(R.id.btn_delete_all_parties);
 
         lv_parties = findViewById(R.id.lv_parties);
 
@@ -82,33 +80,6 @@ import java.util.HashMap;
                 ));
 				}
 					});
-
-						btn_delete_all_parties.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-
-					new AlertDialog.Builder(Partiesactivity.this)
-                        .setTitle("Delete All Parties")
-                        .setMessage("Are you sure you want to delete all parties?")
-					.setPositiveButton("Delete", new DialogInterface.OnClickListener() {
-					@Override
-					public void onClick(DialogInterface dialog, int which) {
-
-					db.deleteAllParties();
-
-			loadParties();
-
-	Toast.makeText(
-	Partiesactivity.this,
-	"All parties deleted",
-		Toast.LENGTH_SHORT
-		).show();
-	}
-	})
-	.setNegativeButton("Cancel", null)
-		.show();
-		}
-        });
 
 			lv_parties.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override

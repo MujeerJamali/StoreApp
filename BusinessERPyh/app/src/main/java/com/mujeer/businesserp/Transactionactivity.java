@@ -28,7 +28,6 @@ public class Transactionactivity extends Activity {
 	private TextView tv_page_title;
 
 	private Button btn_add;
-	private Button btn_delete_all;
 	private Button btn_filter;
 
 	private ListView lv_transactions;
@@ -55,7 +54,6 @@ public class Transactionactivity extends Activity {
 		tv_page_title = findViewById(R.id.tv_page_title);
 
 		btn_add = findViewById(R.id.btn_add);
-		btn_delete_all = findViewById(R.id.btn_delete_all);
 		btn_filter = findViewById(R.id.btn_filter);
 
 		lv_transactions = findViewById(R.id.lv_transactions);
@@ -66,7 +64,6 @@ public class Transactionactivity extends Activity {
 			tv_page_title.setText("Purchases");
 
 			btn_add.setText("+");
-			btn_delete_all.setText("Delete All");
 
 		} else {
 
@@ -74,7 +71,6 @@ public class Transactionactivity extends Activity {
 			tv_page_title.setText("Sales");
 
 			btn_add.setText("+");
-			btn_delete_all.setText("Delete All");
 		}
 
 		db = new DatabaseHelper(this);
@@ -190,80 +186,6 @@ public class Transactionactivity extends Activity {
 					}
 
 					return true;
-				}
-			}
-		);
-
-		btn_delete_all.setOnClickListener(
-			new View.OnClickListener() {
-
-				@Override
-				public void onClick(View v) {
-
-					if (transactionType == TYPE_PURCHASE) {
-
-						new android.app.AlertDialog.Builder(
-							Transactionactivity.this
-						)
-							.setTitle("Delete All Purchases")
-							.setMessage(
-							"Are you sure you want to delete ALL purchases?\n\nThis action cannot be undone."
-						)
-							.setPositiveButton(
-							"Yes",
-							new android.content.DialogInterface.OnClickListener() {
-
-								@Override
-								public void onClick(
-									android.content.DialogInterface dialog,
-									int which) {
-
-									db.deleteAllPurchases();
-
-									refreshList();
-
-									android.widget.Toast.makeText(
-										Transactionactivity.this,
-										"All purchases deleted.",
-										android.widget.Toast.LENGTH_SHORT
-									).show();
-								}
-							}
-						)
-							.setNegativeButton("No", null)
-							.show();
-
-					} else {
-
-						new android.app.AlertDialog.Builder(
-							Transactionactivity.this
-						)
-							.setTitle("Delete All Sales")
-							.setMessage("Are you sure you want to delete all sales?")
-							.setPositiveButton(
-							"Delete All",
-							new android.content.DialogInterface.OnClickListener() {
-
-								@Override
-								public void onClick(
-									android.content.DialogInterface dialog,
-									int which) {
-
-									db.deleteAllSales();
-
-									refreshList();
-
-									android.widget.Toast.makeText(
-										Transactionactivity.this,
-										"All sales deleted",
-										android.widget.Toast.LENGTH_SHORT
-									).show();
-								}
-							}
-						)
-							.setNegativeButton("Cancel", null)
-							.show();
-					}
 				}
 			}
 		);
