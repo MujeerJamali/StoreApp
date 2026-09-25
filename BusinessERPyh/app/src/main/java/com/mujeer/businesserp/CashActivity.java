@@ -60,6 +60,24 @@ public class CashActivity extends Activity {
             }
         });
 
+        lvLedger.setOnItemClickListener(
+            new android.widget.AdapterView.OnItemClickListener() {
+                @Override
+                public void onItemClick(
+                    android.widget.AdapterView<?> parent, View view, int position, long id) {
+
+                    HashMap<String, Object> row =
+                        (HashMap<String, Object>) parent.getItemAtPosition(position);
+
+                    int adjustmentId = (Integer) row.get("adjustment_id");
+
+                    if (adjustmentId != 0) {
+                        promptEditAdjustment(adjustmentId, row);
+                    }
+                }
+            }
+        );
+
         loadCash();
     }
 
@@ -118,6 +136,91 @@ public class CashActivity extends Activity {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
                     saveAdjustment(etAmount, etNotes);
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void promptEditAdjustment(
+        final int adjustmentId, HashMap<String, Object> row) {
+
+        View view = getLayoutInflater().inflate(R.layout.dialog_cash_adjustment, null);
+
+        final EditText etAmount = view.findViewById(R.id.et_adjustment_amount);
+        final EditText etNotes = view.findViewById(R.id.et_adjustment_notes);
+
+        etAmount.setText(
+            AmountFormat.formatPlain((Double) row.get("amount"))
+        );
+        etNotes.setText(String.valueOf(row.get("notes")));
+
+        final String date = String.valueOf(row.get("date"));
+        final String time = String.valueOf(row.get("time"));
+
+        new AlertDialog.Builder(this)
+            .setTitle("Edit Cash Adjustment")
+            .setView(view)
+            .setPositiveButton("Save", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    updateAdjustment(adjustmentId, date, time, etAmount, etNotes);
+                }
+            })
+            .setNeutralButton("Delete", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    confirmDeleteAdjustment(adjustmentId);
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void updateAdjustment(
+        int adjustmentId, String date, String time, EditText etAmount, EditText etNotes) {
+
+        double amount;
+
+        try {
+
+            amount = Double.parseDouble(etAmount.getText().toString().trim());
+
+        } catch (Exception e) {
+
+            Toast.makeText(this, "Enter a valid amount", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (amount == 0) {
+
+            Toast.makeText(this, "Amount cannot be 0", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        db.updateCashAdjustment(
+            adjustmentId, date, time, amount, etNotes.getText().toString().trim()
+        );
+
+        Toast.makeText(this, "Adjustment updated", Toast.LENGTH_SHORT).show();
+
+        loadCash();
+    }
+
+    private void confirmDeleteAdjustment(final int adjustmentId) {
+
+        new AlertDialog.Builder(this)
+            .setTitle("Delete Adjustment")
+            .setMessage("Delete this cash adjustment? This cannot be undone.")
+            .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+
+                    db.deleteCashAdjustment(adjustmentId);
+
+                    Toast.makeText(CashActivity.this, "Adjustment deleted", Toast.LENGTH_SHORT).show();
+
+                    loadCash();
                 }
             })
             .setNegativeButton("Cancel", null)

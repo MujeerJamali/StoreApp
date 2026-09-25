@@ -5709,42 +5709,42 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		Cursor cursor = db.rawQuery(
 			"SELECT date, time, paid_amount AS amount, " +
-			"('Sale - ' || COALESCE(pa.name, 'Cash Sale')) AS label, source " +
+			"('Sale - ' || COALESCE(pa.name, 'Cash Sale')) AS label, source, 0, NULL " +
 			"FROM sales s LEFT JOIN " + TABLE_PARTIES + " pa ON s.party_id = pa.id " +
 			"WHERE paid_amount != 0 " +
 
 			"UNION ALL " +
 
 			"SELECT date, time, -amount_paid, " +
-			"('Purchase - ' || pa.name), source " +
+			"('Purchase - ' || pa.name), source, 0, NULL " +
 			"FROM " + TABLE_PURCHASES + " p " +
 			"INNER JOIN " + TABLE_PARTIES + " pa ON p.party_id = pa.id " +
 			"WHERE amount_paid != 0 " +
 
 			"UNION ALL " +
 
-			"SELECT date, time, amount, ('Payment In - ' || pa.name), source " +
+			"SELECT date, time, amount, ('Payment In - ' || pa.name), source, 0, NULL " +
 			"FROM " + TABLE_PAYMENTS + " pm " +
 			"INNER JOIN " + TABLE_PARTIES + " pa ON pm.party_id = pa.id " +
 			"WHERE type=" + PAYMENT_IN + " " +
 
 			"UNION ALL " +
 
-			"SELECT date, time, -amount, ('Payment Out - ' || pa.name), source " +
+			"SELECT date, time, -amount, ('Payment Out - ' || pa.name), source, 0, NULL " +
 			"FROM " + TABLE_PAYMENTS + " pm " +
 			"INNER JOIN " + TABLE_PARTIES + " pa ON pm.party_id = pa.id " +
 			"WHERE type=" + PAYMENT_OUT + " " +
 
 			"UNION ALL " +
 
-			"SELECT date, time, -paid_amount, ('Expense - ' || item), source " +
+			"SELECT date, time, -paid_amount, ('Expense - ' || item), source, 0, NULL " +
 			"FROM " + TABLE_EXPENSES + " WHERE paid_amount != 0 " +
 
 			"UNION ALL " +
 
 			"SELECT date, time, amount, " +
 			"('Adjustment' || CASE WHEN notes IS NOT NULL AND notes != '' " +
-			"THEN ' - ' || notes ELSE '' END), source " +
+			"THEN ' - ' || notes ELSE '' END), source, id, notes " +
 			"FROM " + TABLE_CASH_ADJUSTMENTS +
 
 			" ORDER BY date DESC, time DESC",
@@ -5761,6 +5761,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("amount", cursor.getDouble(2));
 			map.put("label", cursor.getString(3));
 			map.put("source", cursor.isNull(4) ? "Manual" : cursor.getString(4));
+			map.put("adjustment_id", cursor.getInt(5));
+			map.put("notes", cursor.isNull(6) ? "" : cursor.getString(6));
 
 			list.add(map);
 		}
@@ -5796,6 +5798,29 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("source", source);
 
 		return db.insert(TABLE_CASH_ADJUSTMENTS, null, values);
+	}
+
+	public void updateCashAdjustment(
+		int id, String date, String time, double amount, String notes) {
+
+		ContentValues values = new ContentValues();
+		values.put("date", date);
+		values.put("time", time);
+		values.put("amount", amount);
+		values.put("notes", notes);
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.update(
+			TABLE_CASH_ADJUSTMENTS, values, "id=?", new String[]{String.valueOf(id)}
+		);
+	}
+
+	public void deleteCashAdjustment(int id) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.delete(TABLE_CASH_ADJUSTMENTS, "id=?", new String[]{String.valueOf(id)});
 	}
 
 	// =====================
