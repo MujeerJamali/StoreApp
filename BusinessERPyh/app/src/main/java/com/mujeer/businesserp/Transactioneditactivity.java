@@ -1085,6 +1085,7 @@ public class Transactioneditactivity extends Activity {
 		}
 
 		Map<Integer, Integer> selections = new LinkedHashMap<Integer, Integer>();
+		StringBuilder debugSelections = new StringBuilder();
 
 		for (Map.Entry<Integer, Spinner> entry : varietySpinners.entrySet()) {
 
@@ -1095,9 +1096,34 @@ public class Transactioneditactivity extends Activity {
 				varietyValuesByGroup.get(groupId).get(position);
 
 			selections.put(groupId, (Integer) selectedValue.get("id"));
+
+			debugSelections.append("group=").append(groupId)
+				.append(" position=").append(position)
+				.append(" -> value_id=").append(selectedValue.get("id"))
+				.append(" label=").append(selectedValue.get("label"))
+				.append("\n");
 		}
 
-		return db.resolveComboId(selections);
+		// TEMPORARY - diagnosing a live "creates a new combo every time"
+		// report. Shows exactly what's about to be resolved, and what
+		// already exists in the database for it, before resolveComboId()
+		// can self-heal a new combo and hide the evidence. Remove once
+		// the cause is confirmed.
+		String debugState = db.debugComboState(selections);
+
+		Integer resolved = db.resolveComboId(selections);
+
+		new android.app.AlertDialog.Builder(this)
+			.setTitle("DEBUG: combo resolution")
+			.setMessage(
+				"Selected:\n" + debugSelections.toString() +
+				"\nExisting in DB before resolving:\n" + debugState +
+				"\nresolveComboId() returned: " + resolved
+			)
+			.setPositiveButton("OK", null)
+			.show();
+
+		return resolved;
 	}
 
 	// =====================

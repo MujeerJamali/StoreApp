@@ -1391,6 +1391,59 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return label.toString();
 	}
 
+	// TEMPORARY - diagnosing a live "creates a new combo every time" report.
+	// Raw ground truth for exactly what resolveComboId() is about to see,
+	// with no self-heal side effect - every existing combo_id that already
+	// matches each individual (group_id, value_id) selection given, plus
+	// its own balance. Remove once the cause is confirmed.
+	public String debugComboState(Map<Integer, Integer> groupIdToValueId) {
+
+		if (groupIdToValueId == null || groupIdToValueId.isEmpty()) {
+			return "debugComboState: no selections given";
+		}
+
+		SQLiteDatabase db = this.getReadableDatabase();
+		StringBuilder out = new StringBuilder();
+
+		for (Map.Entry<Integer, Integer> entry : groupIdToValueId.entrySet()) {
+
+			int groupId = entry.getKey();
+			int valueId = entry.getValue();
+
+			out.append("group=").append(groupId).append(" value=").append(valueId).append(" -> ");
+
+			Cursor cursor = db.rawQuery(
+				"SELECT cv.combo_id, c.balance, c.item_id FROM " +
+				TABLE_VARIETY_COMBO_VALUES + " cv " +
+				"INNER JOIN " + TABLE_VARIETY_COMBOS + " c ON c.id = cv.combo_id " +
+				"WHERE cv.group_id=? AND cv.value_id=?",
+				new String[]{String.valueOf(groupId), String.valueOf(valueId)}
+			);
+
+			boolean any = false;
+
+			while (cursor.moveToNext()) {
+
+				any = true;
+
+				out.append("[combo=").append(cursor.getInt(0))
+					.append(" balance=").append(cursor.getDouble(1))
+					.append(" item=").append(cursor.getInt(2))
+					.append("] ");
+			}
+
+			cursor.close();
+
+			if (!any) {
+				out.append("(none found)");
+			}
+
+			out.append("\n");
+		}
+
+		return out.toString();
+	}
+
 	// Given the value selected for every group of an item, finds the
 	// combo row that matches all of them. Returns null if there are no
 	// selections (the item has no variety groups - nothing to resolve).
