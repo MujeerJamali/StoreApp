@@ -1391,59 +1391,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return label.toString();
 	}
 
-	// TEMPORARY - diagnosing a live "creates a new combo every time" report.
-	// Raw ground truth for exactly what resolveComboId() is about to see,
-	// with no self-heal side effect - every existing combo_id that already
-	// matches each individual (group_id, value_id) selection given, plus
-	// its own balance. Remove once the cause is confirmed.
-	public String debugComboState(Map<Integer, Integer> groupIdToValueId) {
-
-		if (groupIdToValueId == null || groupIdToValueId.isEmpty()) {
-			return "debugComboState: no selections given";
-		}
-
-		SQLiteDatabase db = this.getReadableDatabase();
-		StringBuilder out = new StringBuilder();
-
-		for (Map.Entry<Integer, Integer> entry : groupIdToValueId.entrySet()) {
-
-			int groupId = entry.getKey();
-			int valueId = entry.getValue();
-
-			out.append("group=").append(groupId).append(" value=").append(valueId).append(" -> ");
-
-			Cursor cursor = db.rawQuery(
-				"SELECT cv.combo_id, c.balance, c.item_id FROM " +
-				TABLE_VARIETY_COMBO_VALUES + " cv " +
-				"INNER JOIN " + TABLE_VARIETY_COMBOS + " c ON c.id = cv.combo_id " +
-				"WHERE cv.group_id=? AND cv.value_id=?",
-				new String[]{String.valueOf(groupId), String.valueOf(valueId)}
-			);
-
-			boolean any = false;
-
-			while (cursor.moveToNext()) {
-
-				any = true;
-
-				out.append("[combo=").append(cursor.getInt(0))
-					.append(" balance=").append(cursor.getDouble(1))
-					.append(" item=").append(cursor.getInt(2))
-					.append("] ");
-			}
-
-			cursor.close();
-
-			if (!any) {
-				out.append("(none found)");
-			}
-
-			out.append("\n");
-		}
-
-		return out.toString();
-	}
-
 	// Given the value selected for every group of an item, finds the
 	// combo row that matches all of them. Returns null if there are no
 	// selections (the item has no variety groups - nothing to resolve).
@@ -1514,10 +1461,22 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		args.add(String.valueOf(groupIdToValueId.size()));
 
+		// THE root cause of "every single Add Sale/Purchase creates a new
+		// combo": db.rawQuery() binds every arg in the String[] as TEXT,
+		// and SQLite does NOT coerce types when comparing a computed
+		// value like COUNT(*) (INTEGER) against a bound TEXT parameter
+		// the way it does for a plain column comparison (group_id=? works
+		// because "group_id" has INTEGER affinity) - INTEGER 1 vs TEXT
+		// '1' are simply never equal. HAVING COUNT(*)=? has therefore
+		// always evaluated false, for every call, since this method was
+		// written: findComboId() has never once found an existing combo,
+		// only ever self-healed a fresh one. CAST(? AS INTEGER) forces
+		// the comparison to actually work.
+		//
 		// More than one combo can match the same value-set if duplicates
-		// ever slipped in (e.g. an older buggy export, or a raw data
-		// fix that inserted a fresh combo instead of reusing the
-		// existing one) - without an explicit order, GROUP BY has no
+		// ever slipped in regardless (e.g. an older buggy export, or a
+		// raw data fix that inserted a fresh combo instead of reusing
+		// the existing one) - without an explicit order, GROUP BY has no
 		// guaranteed row order, so a plain "first match" could silently
 		// return an empty duplicate over the real, stocked combo. Always
 		// prefer whichever match actually has stock, then the oldest
@@ -1526,7 +1485,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"SELECT cv.combo_id FROM " + TABLE_VARIETY_COMBO_VALUES + " cv " +
 			"INNER JOIN " + TABLE_VARIETY_COMBOS + " c ON c.id = cv.combo_id " +
 			"WHERE " + where.toString() +
-			" GROUP BY cv.combo_id HAVING COUNT(*)=?" +
+			" GROUP BY cv.combo_id HAVING COUNT(*)=CAST(? AS INTEGER)" +
 			" ORDER BY c.balance DESC, cv.combo_id ASC",
 			args.toArray(new String[0])
 		);
