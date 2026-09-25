@@ -273,9 +273,11 @@ public class Transactionactivity extends Activity {
 
 			"All",
 			"Today",
+			"Yesterday",
 			"This Week",
 			"This Month",
-			"This Year"
+			"This Year",
+			"Custom Range"
 
 		};
 
@@ -331,6 +333,34 @@ public class Transactionactivity extends Activity {
 
 						case 2:
 
+							btn_filter.setText("Yesterday");
+
+							java.text.SimpleDateFormat sdfYesterday =
+								new java.text.SimpleDateFormat(
+								"yyyy-MM-dd",
+								java.util.Locale.getDefault()
+							);
+
+							java.util.Calendar calendarYesterday =
+								java.util.Calendar.getInstance();
+
+							calendarYesterday.add(
+								java.util.Calendar.DAY_OF_YEAR,
+								-1
+							);
+
+							String yesterday =
+								sdfYesterday.format(calendarYesterday.getTime());
+
+							loadTransactions(
+								yesterday,
+								yesterday
+							);
+
+							break;
+
+						case 3:
+
 							btn_filter.setText("This Week");
 
 							java.util.Calendar calendar =
@@ -365,7 +395,7 @@ public class Transactionactivity extends Activity {
 
 							break;
 
-						case 3:
+						case 4:
 
 							btn_filter.setText("This Month");
 
@@ -403,7 +433,7 @@ public class Transactionactivity extends Activity {
 
 							break;
 
-						case 4:
+						case 5:
 
 							btn_filter.setText("This Year");
 
@@ -448,12 +478,75 @@ public class Transactionactivity extends Activity {
 							);
 
 							break;
+
+						case 6:
+
+							showCustomRangeDialog();
+
+							break;
 					}
 				}
 			}
 		)
 
 			.show();
+	}
+
+	// "Custom Range" from the filter dialog: pick a From date, then a To
+	// date, then load - each date reuses the app's themed DatePickerDialog.
+	private void showCustomRangeDialog() {
+
+		final java.text.SimpleDateFormat sdf =
+			new java.text.SimpleDateFormat(
+			"yyyy-MM-dd", java.util.Locale.getDefault());
+
+		final java.util.Calendar calendar = java.util.Calendar.getInstance();
+
+		new android.app.DatePickerDialog(
+			this,
+			R.style.AppAlertDialogTheme,
+			new android.app.DatePickerDialog.OnDateSetListener() {
+
+				@Override
+				public void onDateSet(
+					android.widget.DatePicker fromView,
+					int fromYear, int fromMonth, int fromDay) {
+
+					final String fromDate = String.format(
+						java.util.Locale.getDefault(),
+						"%04d-%02d-%02d", fromYear, fromMonth + 1, fromDay
+					);
+
+					new android.app.DatePickerDialog(
+						Transactionactivity.this,
+						R.style.AppAlertDialogTheme,
+						new android.app.DatePickerDialog.OnDateSetListener() {
+
+							@Override
+							public void onDateSet(
+								android.widget.DatePicker toView,
+								int toYear, int toMonth, int toDay) {
+
+								String toDate = String.format(
+									java.util.Locale.getDefault(),
+									"%04d-%02d-%02d", toYear, toMonth + 1, toDay
+								);
+
+								btn_filter.setText("Custom Range");
+
+								loadTransactions(fromDate, toDate);
+							}
+						},
+						calendar.get(java.util.Calendar.YEAR),
+						calendar.get(java.util.Calendar.MONTH),
+						calendar.get(java.util.Calendar.DAY_OF_MONTH)
+					).show();
+				}
+			},
+			calendar.get(java.util.Calendar.YEAR),
+			calendar.get(java.util.Calendar.MONTH),
+			calendar.get(java.util.Calendar.DAY_OF_MONTH)
+		).show();
 	}
 	
 	private void loadTransactions(
