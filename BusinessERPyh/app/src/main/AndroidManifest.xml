@@ -158,6 +158,14 @@
             android:name=".ItemMonthlyRankReportActivity"
             android:label="Item Monthly Rank" />
 
+        <activity
+            android:name=".AverageCartReportActivity"
+            android:label="Average Cart" />
+
+        <activity
+            android:name=".ProfitSplitReportActivity"
+            android:label="Profit: Cash Sale vs Party" />
+
         <!-- Bulk "generate entries" via calendar taps -->
         <activity
             android:name=".GenerateEntriesActivity"

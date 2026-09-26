@@ -84,6 +84,26 @@
             style="@style/ToolRow"
             android:text="Item Monthly Rank (Sales/Profit)" />
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
+            android:id="@+id/btn_report_average_cart"
+            style="@style/ToolRow"
+            android:text="Average Cart Size/Amount" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
+            android:id="@+id/btn_report_profit_split"
+            style="@style/ToolRow"
+            android:text="Profit: Cash Sale vs Party" />
+
     </LinearLayout>
 
 </LinearLayout>

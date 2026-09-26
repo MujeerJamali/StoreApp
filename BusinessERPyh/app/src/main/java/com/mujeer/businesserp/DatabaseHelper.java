@@ -2865,6 +2865,110 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// REPORT: AVERAGE CART SIZE/AMOUNT FOR A DATE RANGE
+	// "Cart size" is the total quantity of items on a sale (not the
+	// number of distinct products), averaged across every sale in
+	// range - a sale with no line items (an edge case, not a normal
+	// one) counts as size 0 rather than being left out, so it still
+	// pulls the average down like it should.
+	// =====================
+	public HashMap<String, Object> getCartStatsSummary(String fromDate, String toDate) {
+
+		HashMap<String, Object> map = new HashMap<String, Object>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT COUNT(*), COALESCE(AVG(item_qty), 0), COALESCE(AVG(grand_total), 0) " +
+			"FROM (" +
+			"SELECT s.id, s.grand_total, COALESCE(SUM(si.qty), 0) AS item_qty " +
+			"FROM sales s LEFT JOIN sale_items si ON si.sale_id = s.id " +
+			"WHERE s.date BETWEEN ? AND ? " +
+			"GROUP BY s.id" +
+			")",
+			new String[]{fromDate, toDate}
+		);
+
+		int count = 0;
+		double avgCartSize = 0;
+		double avgCartAmount = 0;
+
+		if (cursor.moveToFirst()) {
+
+			count = cursor.getInt(0);
+			avgCartSize = cursor.getDouble(1);
+			avgCartAmount = cursor.getDouble(2);
+		}
+
+		cursor.close();
+
+		map.put("count", count);
+		map.put("avg_cart_size", avgCartSize);
+		map.put("avg_cart_amount", avgCartAmount);
+
+		return map;
+	}
+
+	// =====================
+	// REPORT: PROFIT SPLIT - CASH SALE VS NAMED PARTY, FOR A DATE RANGE
+	// A sale counts as "Cash Sale" if it has no party at all, or its
+	// party is literally named "Cash Sale" (the synthetic party this app
+	// and a Vyapar import both use for a walk-in/unnamed customer) -
+	// every other party is a real, named customer. Profit per line item
+	// mirrors Net Profit's own cost basis (amount - qty * current
+	// purchase_price).
+	// =====================
+	public HashMap<String, Object> getProfitSplitByPartyType(String fromDate, String toDate) {
+
+		HashMap<String, Object> map = new HashMap<String, Object>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT " +
+			"CASE WHEN pa.id IS NULL OR pa.name = 'Cash Sale' THEN 'cash' ELSE 'party' END AS bucket, " +
+			"COALESCE(SUM(si.amount - si.qty * i.purchase_price), 0) AS profit " +
+			"FROM sales s " +
+			"LEFT JOIN " + TABLE_PARTIES + " pa ON pa.id = s.party_id " +
+			"INNER JOIN sale_items si ON si.sale_id = s.id " +
+			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = si.item_id " +
+			"WHERE s.date BETWEEN ? AND ? " +
+			"GROUP BY bucket",
+			new String[]{fromDate, toDate}
+		);
+
+		double cashProfit = 0;
+		double partyProfit = 0;
+
+		while (cursor.moveToNext()) {
+
+			String bucket = cursor.getString(0);
+			double profit = cursor.getDouble(1);
+
+			if ("cash".equals(bucket)) {
+				cashProfit = profit;
+			} else {
+				partyProfit = profit;
+			}
+		}
+
+		cursor.close();
+
+		double totalProfit = cashProfit + partyProfit;
+
+		double cashPercent = totalProfit == 0 ? 0 : (cashProfit / totalProfit) * 100.0;
+		double partyPercent = totalProfit == 0 ? 0 : (partyProfit / totalProfit) * 100.0;
+
+		map.put("cash_profit", cashProfit);
+		map.put("party_profit", partyProfit);
+		map.put("total_profit", totalProfit);
+		map.put("cash_percent", cashPercent);
+		map.put("party_percent", partyPercent);
+
+		return map;
+	}
+
+	// =====================
 	// REPORTS: SALES BY PARTY FOR A DATE RANGE
 	// =====================
 
