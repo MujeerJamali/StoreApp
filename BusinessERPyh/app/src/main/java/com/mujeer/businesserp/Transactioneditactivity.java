@@ -1930,9 +1930,16 @@ public class Transactioneditactivity extends Activity {
 		}
 
 
-		double grandTotal = Double.parseDouble(
-            tv_grand_total.getText().toString()
-		);
+		// Computed straight from the line items, not read back from
+		// tv_grand_total's own text - that TextView shows comma-grouped
+		// thousands (AmountFormat.format()), which Double.parseDouble()
+		// can't parse and would throw on any total >= 1000, crashing the
+		// save for larger purchases while small ones (no comma) worked.
+		double grandTotal = 0;
+
+		for (HashMap<String, Object> item : transactionItemList) {
+			grandTotal += (Double) item.get("total");
+		}
 
 		if (amountPaid > grandTotal) {
 
