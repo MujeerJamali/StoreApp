@@ -100,7 +100,7 @@ public class PaymentAdapter extends BaseAdapter {
 
 		tv_amount.setText(
 			"Rs. " +
-			payment.get("amount").toString()
+			AmountFormat.format(Double.parseDouble(payment.get("amount").toString()))
 		);
 
 		return convertView;

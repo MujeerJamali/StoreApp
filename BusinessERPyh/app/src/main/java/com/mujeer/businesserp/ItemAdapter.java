@@ -77,14 +77,11 @@ public class ItemAdapter extends BaseAdapter implements Filterable {
     }
 
     // Drops a trailing ".0" for whole-number quantities so stock reads
-    // like "12" instead of "12.0", but keeps decimals when they matter.
+    // like "12" instead of "12.0", but keeps decimals when they matter
+    // (capped to 2 places - see AmountFormat.formatPlain()).
     private String formatQty(double qty) {
 
-        if (qty == Math.rint(qty)) {
-            return String.valueOf((long) qty);
-        }
-
-        return String.valueOf(qty);
+        return AmountFormat.formatPlain(qty);
     }
 
     @Override

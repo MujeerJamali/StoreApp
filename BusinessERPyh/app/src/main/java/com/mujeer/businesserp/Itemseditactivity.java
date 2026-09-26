@@ -57,8 +57,8 @@ public class Itemseditactivity extends Activity {
             HashMap<String, Object> item = db.getItemById(itemId);
 
             et_item_name.setText((String) item.get("name"));
-            et_purchase_price.setText(String.valueOf(item.get("purchase_price")));
-            et_sale_price.setText(String.valueOf(item.get("sale_price")));
+            et_purchase_price.setText(AmountFormat.formatPlain((Double) item.get("purchase_price")));
+            et_sale_price.setText(AmountFormat.formatPlain((Double) item.get("sale_price")));
 
             double stock = 0;
 
@@ -66,7 +66,7 @@ public class Itemseditactivity extends Activity {
                 stock = (Double) item.get("balance");
             }
 
-            tv_item_stock.setText(String.valueOf(stock));
+            tv_item_stock.setText(AmountFormat.formatPlain(stock));
 
             if (stock <= 0) {
                 tv_item_stock.setTextColor(getResources().getColor(R.color.danger));

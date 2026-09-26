@@ -93,7 +93,7 @@ public class ExpenseAdapter extends BaseAdapter {
 
 		tv_amount.setText(
 			"Rs. " +
-			expense.get("amount").toString()
+			AmountFormat.format(Double.parseDouble(expense.get("amount").toString()))
 		);
 
 		return convertView;

@@ -588,12 +588,7 @@ public class Transactioneditactivity extends Activity {
 
 	private String formatStockAmount(double stock) {
 
-		if (stock == Math.rint(stock)) {
-
-			return String.valueOf((long) stock);
-		}
-
-		return String.valueOf(stock);
+		return AmountFormat.formatPlain(stock);
 	}
 
     private void setCurrentDateTime() {

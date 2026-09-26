@@ -1301,10 +1301,6 @@ public class GenerateEntriesActivity extends Activity {
 
 	private String formatQty(double qty) {
 
-		if (qty == Math.rint(qty)) {
-			return String.valueOf((long) qty);
-		}
-
-		return String.valueOf(qty);
+		return AmountFormat.formatPlain(qty);
 	}
 }

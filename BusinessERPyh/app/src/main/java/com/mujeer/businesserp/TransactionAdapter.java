@@ -136,7 +136,7 @@ public class TransactionAdapter extends BaseAdapter {
 		);
 
 		tv_total.setText(
-			transaction.get("grand_total").toString()
+			AmountFormat.format(Double.parseDouble(transaction.get("grand_total").toString()))
 		);
 
 		return convertView;
