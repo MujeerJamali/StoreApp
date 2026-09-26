@@ -748,15 +748,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 				if (map.get("purchase_price") != null &&
 					map.get("purchase_price").toString().trim().length() > 0) {
 
-					purchasePrice = Double.parseDouble(
-						map.get("purchase_price").toString().trim());
+					try {
+						purchasePrice = Double.parseDouble(
+							map.get("purchase_price").toString().trim());
+					} catch (Exception e) {
+					}
 				}
 
 				if (map.get("sale_price") != null &&
 					map.get("sale_price").toString().trim().length() > 0) {
 
-					salePrice = Double.parseDouble(
-						map.get("sale_price").toString().trim());
+					try {
+						salePrice = Double.parseDouble(
+							map.get("sale_price").toString().trim());
+					} catch (Exception e) {
+					}
 				}
 
 				values.put("purchase_price", purchasePrice);

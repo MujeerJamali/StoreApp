@@ -419,9 +419,24 @@ public class Expenseeditactivity extends Activity {
 			return;
 		}
 
-		double amount = Double.parseDouble(
-			et_amount.getText().toString().trim()
-		);
+		double amount;
+
+		try {
+
+			amount = Double.parseDouble(
+				et_amount.getText().toString().trim()
+			);
+
+		} catch (Exception e) {
+
+			android.widget.Toast.makeText(
+				this,
+				"Enter a valid amount",
+				android.widget.Toast.LENGTH_SHORT
+			).show();
+
+			return;
+		}
 
 		double paidAmount = 0;
 
