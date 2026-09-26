@@ -84,15 +84,21 @@ public class Transactioneditactivity extends Activity {
 	HashMap<String, Object> saleMap = new HashMap<>();
 
 	// Existing Expenses (Petrol/Shipping/Packaging/...) linked via
-	// "+ Select Expenses" while this purchase isn't saved yet - see
-	// openSelectExpenses()/onActivityResult(). Each map holds
-	// expense_id/amount/item/date. Only written for real
-	// (applySingleExpensePurchaseLink) once savePurchase() actually
-	// succeeds, same "nothing touches the database until Save" pattern
-	// transactionItemList already follows. Always empty in edit mode,
-	// where "+ Select Expenses" instead writes straight to the database
-	// (see openSelectExpenses()) since the purchase already has a real
-	// id to link against.
+	// "+ Select Expenses", staged here regardless of new-purchase or
+	// edit-mode - see openSelectExpenses()/onActivityResult(). Each map
+	// holds expense_id/amount/item/date, plus "selections" (an
+	// ArrayList<HashMap<String,Object>> of {"purchase_id": Integer},
+	// matching db.applyExpensePurchaseLinks()'s own shape) when this was
+	// picked in edit mode's multi-purchase step - a brand-new purchase's
+	// entry has no "selections" key at all, since singlePurchaseMode
+	// skips that step and implicitly means "100% to this purchase".
+	// Nothing here is written to the database until savePurchase()
+	// actually succeeds, same "nothing touches the database until Save"
+	// pattern transactionItemList already follows - "+ Select Expenses"
+	// used to write an edit-mode pick straight to the database instead,
+	// bypassing Update Transaction and only showing up once the screen
+	// was reloaded from scratch; staging it here like everything else
+	// fixed both problems at once.
 	ArrayList<HashMap<String, Object>> pendingLinkedExpenses = new ArrayList<>();
 
 	// A purchase created before the Purchase Costs feature may still
@@ -582,21 +588,33 @@ public class Transactioneditactivity extends Activity {
 			&& resultCode == RESULT_OK
 			&& data != null) {
 
-			if (isEditMode) {
+			if (data.hasExtra("expense_id")) {
 
-				// This purchase already has a real id - LinkExpenseActivity
-				// wrote the purchase_expense_links row(s) straight to the
-				// database itself (see openSelectExpenses()), so just
-				// re-read what's now applied.
-				refreshLinkedExpensesDisplay();
-
-			} else if (data.hasExtra("expense_id")) {
-
+				// LinkExpenseActivity never writes to the database itself
+				// (see openSelectExpenses()) - this is always a pending
+				// pick, applied for real only once Save/Update Transaction
+				// succeeds (see savePurchase()), whether this is a
+				// brand-new purchase or editing an already-saved one.
 				HashMap<String, Object> pending = new HashMap<String, Object>();
 				pending.put("expense_id", data.getIntExtra("expense_id", -1));
 				pending.put("amount", data.getDoubleExtra("amount", 0));
 				pending.put("item", data.getStringExtra("item"));
 				pending.put("date", data.getStringExtra("date"));
+
+				if (data.hasExtra("purchase_ids")) {
+
+					int[] purchaseIds = data.getIntArrayExtra("purchase_ids");
+					ArrayList<HashMap<String, Object>> selections = new ArrayList<>();
+
+					for (int purchaseId : purchaseIds) {
+
+						HashMap<String, Object> selection = new HashMap<>();
+						selection.put("purchase_id", purchaseId);
+						selections.add(selection);
+					}
+
+					pending.put("selections", selections);
+				}
 
 				pendingLinkedExpenses.add(pending);
 
@@ -608,13 +626,15 @@ public class Transactioneditactivity extends Activity {
 	// =====================
 	// Opens LinkExpenseActivity to link an existing Expense as this
 	// purchase's landed cost. An already-saved purchase (editing an
-	// existing one) has a real id to link against, so the multi-select-
-	// purchases step there writes straight to the database and can also
-	// split the expense across OTHER purchases; a purchase still being
-	// entered has no id yet, so it's opened in single-purchase mode
-	// instead, which just hands the picked expense back as a pending
-	// entry (see onActivityResult()) applied for real once savePurchase()
-	// succeeds.
+	// existing one) has a real id to preselect in the multi-select-
+	// purchases step there, which can also split the expense across
+	// OTHER purchases; a purchase still being entered has no id yet, so
+	// it's opened in single-purchase mode instead, which skips that step
+	// entirely (nothing else to split across before this purchase even
+	// exists). Either way LinkExpenseActivity only ever hands the pick
+	// back as a pending entry (see onActivityResult()) - applied for
+	// real only once Save/Update Transaction succeeds (see
+	// savePurchase()), never written to the database just from picking.
 	// =====================
 	private void openSelectExpenses() {
 
@@ -632,16 +652,19 @@ public class Transactioneditactivity extends Activity {
 	}
 
 	// =====================
-	// Rebuilds container_pending_purchase_costs_list from whichever
-	// source currently holds the truth: an already-saved purchase reads
-	// straight from the database (getLinkedExpensesForPurchase - "+
-	// Select Expenses" already wrote there directly), a not-yet-saved
-	// one reads the in-memory pendingLinkedExpenses (nothing written to
-	// the database until Save succeeds). Either way "Remove" is offered -
-	// for a pending row that's a plain in-memory removal; for an
-	// already-applied one it deletes the link row only (same "not
+	// Rebuilds container_pending_purchase_costs_list from BOTH sources at
+	// once: an already-saved purchase's links from a PREVIOUS save
+	// (straight from the database, via getLinkedExpensesForPurchase) and
+	// anything picked THIS session via "+ Select Expenses" (from the
+	// in-memory pendingLinkedExpenses - nothing written to the database
+	// until Save/Update Transaction succeeds, for a brand-new purchase
+	// and an edit alike). The two need different "Remove" behavior, so
+	// a pending row is labeled to tell them apart: removing an
+	// already-applied row deletes its link right away (same "not
 	// retroactively corrected" simplification as the rest of this
-	// feature - the extra_cost_per_unit blend it already applied stays).
+	// feature - the extra_cost_per_unit blend it already applied stays),
+	// while removing a pending row is a plain in-memory removal, since
+	// nothing was written for it yet.
 	// =====================
 	private void refreshLinkedExpensesDisplay() {
 
@@ -684,42 +707,41 @@ public class Transactioneditactivity extends Activity {
 
 				container_pending_purchase_costs_list.addView(row);
 			}
+		}
 
-		} else {
+		for (int i = 0; i < pendingLinkedExpenses.size(); i++) {
 
-			for (int i = 0; i < pendingLinkedExpenses.size(); i++) {
+			final int index = i;
+			HashMap<String, Object> pending = pendingLinkedExpenses.get(i);
 
-				final int index = i;
-				HashMap<String, Object> pending = pendingLinkedExpenses.get(i);
+			View row = getLayoutInflater().inflate(
+				R.layout.transaction_purchase_cost_row,
+				container_pending_purchase_costs_list,
+				false
+			);
 
-				View row = getLayoutInflater().inflate(
-					R.layout.transaction_purchase_cost_row,
-					container_pending_purchase_costs_list,
-					false
-				);
+			TextView tvLabel = row.findViewById(R.id.tv_tpc_label);
+			Button btnRemove = row.findViewById(R.id.btn_tpc_remove);
 
-				TextView tvLabel = row.findViewById(R.id.tv_tpc_label);
-				Button btnRemove = row.findViewById(R.id.btn_tpc_remove);
+			tvLabel.setText(
+				pending.get("item") + " - " +
+				AmountFormat.format((Double) pending.get("amount")) +
+				" - " + pending.get("date") +
+				(isEditMode ? " (pending - applies on Update)" : "")
+			);
 
-				tvLabel.setText(
-					pending.get("item") + " - " +
-					AmountFormat.format((Double) pending.get("amount")) +
-					" - " + pending.get("date")
-				);
+			btnRemove.setVisibility(View.VISIBLE);
 
-				btnRemove.setVisibility(View.VISIBLE);
+			btnRemove.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
 
-				btnRemove.setOnClickListener(new View.OnClickListener() {
-						@Override
-						public void onClick(View v) {
+						pendingLinkedExpenses.remove(index);
+						refreshLinkedExpensesDisplay();
+					}
+				});
 
-							pendingLinkedExpenses.remove(index);
-							refreshLinkedExpensesDisplay();
-						}
-					});
-
-				container_pending_purchase_costs_list.addView(row);
-			}
+			container_pending_purchase_costs_list.addView(row);
 		}
 	}
 
@@ -2748,10 +2770,10 @@ public class Transactioneditactivity extends Activity {
 			itemsSubtotal += (Double) item.get("total");
 		}
 
-		// pendingLinkedExpenses (and, once saved, "+ Select Expenses"
-		// writing straight to the database - see openSelectExpenses())
-		// never touch grand_total - a linked expense's cash/party-balance
-		// effect is already fully owned by the expense record itself.
+		// pendingLinkedExpenses never touches grand_total, whether it's
+		// applied here on save or was already applied on a previous save
+		// - a linked expense's cash/party-balance effect is already fully
+		// owned by the expense record itself.
 		// legacyOtherCharges/legacyOtherChargesToParty carry forward a
 		// pre-Purchase-Costs purchase's old Other Charges contribution
 		// unchanged (see loadPurchase()) so editing such a purchase here
@@ -2902,19 +2924,20 @@ public class Transactioneditactivity extends Activity {
 		// Save all purchase items
 		for (HashMap<String, Object> item : transactionItemList) {
 
-			// Blend this line's share of every pending linked Expense into
-			// the item's running extra_cost_per_unit BEFORE this
-			// purchase's stock is added in (see applyExtraCostToItem()'s
-			// own ordering note) - combined into one call per item rather
-			// than one call per pending expense, since calling it more
-			// than once here would blend this same incoming quantity into
-			// the weighted average multiple times over. Only for a
-			// brand-new purchase - editing one doesn't try to undo/redo
-			// an already-blended average, and its linked Expenses (added
-			// via "+ Select Expenses", which writes straight to the
-			// database for an already-saved purchase) blend themselves
-			// individually at the time each one is linked instead.
-			if (!isEditMode && itemsSubtotal > 0) {
+			// Blend this line's share of every pending linked Expense that
+			// goes 100% to THIS purchase (no "selections" - see
+			// pendingLinkedExpenses' own field comment) into the item's
+			// running extra_cost_per_unit BEFORE this purchase's stock is
+			// added in (see applyExtraCostToItem()'s own ordering note) -
+			// combined into one call per item rather than one call per
+			// pending expense, since calling it more than once here would
+			// blend this same incoming quantity into the weighted average
+			// multiple times over. A pending entry WITH "selections" (an
+			// edit-mode pick, possibly split across other purchases too)
+			// blends itself instead inside applyExpensePurchaseLinks()
+			// below, once purchase_items has this purchase's newly
+			// (re)inserted rows to query.
+			if (itemsSubtotal > 0) {
 
 				double lineShare =
 					((Double) item.get("total")).doubleValue() / itemsSubtotal;
@@ -2922,6 +2945,11 @@ public class Transactioneditactivity extends Activity {
 				double combinedPendingCost = 0;
 
 				for (HashMap<String, Object> pending : pendingLinkedExpenses) {
+
+					if (pending.get("selections") != null) {
+						continue;
+					}
+
 					combinedPendingCost += ((Double) pending.get("amount")) * lineShare;
 				}
 
@@ -2951,24 +2979,38 @@ public class Transactioneditactivity extends Activity {
 			);
 			}
 
-		// Write each pending linked Expense through to a real
-		// purchase_expense_links row now that purchaseId (and this
-		// purchase's own purchase_items rows, just inserted above) exist
-		// for real - landed-cost blending already happened per-line above
-		// (see the ordering note there), so applySingleExpensePurchaseLink()
-		// only needs to record the link itself. Only relevant for a
-		// brand-new purchase - pendingLinkedExpenses stays empty in edit
-		// mode (see its own field comment).
-		if (!isEditMode) {
+		// Apply every pending linked Expense now that purchaseId (and this
+		// purchase's own purchase_items rows, just inserted/reinserted
+		// above) exist for real - for both a brand-new purchase and an
+		// edit alike (see pendingLinkedExpenses' own field comment). An
+		// entry with no "selections" goes 100% to this purchase and
+		// already had its landed-cost blend done per-line above (see the
+		// ordering note there), so this only needs to record the link
+		// itself. An entry WITH "selections" (an edit-mode pick, possibly
+		// split across other purchases too) is applied via
+		// applyExpensePurchaseLinks(), which blends each selected
+		// purchase's own share into ITS OWN items - including this one's,
+		// now that they're freshly (re)inserted.
+		for (HashMap<String, Object> pending : pendingLinkedExpenses) {
 
-			for (HashMap<String, Object> pending : pendingLinkedExpenses) {
+			int expenseId = (Integer) pending.get("expense_id");
+			double pendingAmount = (Double) pending.get("amount");
 
-				int expenseId = (Integer) pending.get("expense_id");
-				double pendingAmount = (Double) pending.get("amount");
+			@SuppressWarnings("unchecked")
+			ArrayList<HashMap<String, Object>> selections =
+				(ArrayList<HashMap<String, Object>>) pending.get("selections");
+
+			if (selections != null) {
+
+				db.applyExpensePurchaseLinks(expenseId, pendingAmount, selections);
+
+			} else {
 
 				db.applySingleExpensePurchaseLink(expenseId, purchaseId, pendingAmount);
 			}
 		}
+
+		pendingLinkedExpenses.clear();
 
 		if (draftId != -1) {
 			db.deleteDraft(draftId);

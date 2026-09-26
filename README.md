@@ -39,7 +39,11 @@ BusinessERPyh/                  Gradle project root
   to first type something that fails to match. A Purchase's "+ Select
   Expenses" button links one or more existing **Expenses** to it as
   landed cost (see below) — works even before the purchase itself is
-  saved.
+  saved, and either way nothing is written until Save/Update Transaction
+  is actually pressed: a pick made while editing an already-saved
+  Purchase shows in the Linked Expenses list right away, tagged
+  "(pending - applies on Update)", exactly like a new Purchase's picks
+  do, rather than committing to the database the moment it's picked.
 - **Cost Items / Linking Expenses to Purchases** — Expenses double as the
   source of a purchase's landed costs (petrol, shipping, packaging, ...);
   there's no separate "Purchase Cost" record to create. Cost Items is

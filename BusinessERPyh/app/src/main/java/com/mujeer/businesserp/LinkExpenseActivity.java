@@ -255,15 +255,15 @@ public class LinkExpenseActivity extends Activity {
 		int expenseId = (Integer) selectedExpense.get("id");
 		double amount = (Double) selectedExpense.get("amount");
 
+		Intent result = new Intent();
+		result.putExtra("expense_id", expenseId);
+		result.putExtra("amount", amount);
+		result.putExtra("item", String.valueOf(selectedExpense.get("item")));
+		result.putExtra("date", String.valueOf(selectedExpense.get("date")));
+
 		if (singlePurchaseMode) {
 
-			Intent result = new Intent();
-			result.putExtra("expense_id", expenseId);
-			result.putExtra("amount", amount);
-			result.putExtra("item", String.valueOf(selectedExpense.get("item")));
-			result.putExtra("date", String.valueOf(selectedExpense.get("date")));
 			setResult(RESULT_OK, result);
-
 			finish();
 			return;
 		}
@@ -275,11 +275,26 @@ public class LinkExpenseActivity extends Activity {
 			return;
 		}
 
-		db.applyExpensePurchaseLinks(expenseId, amount, selections);
+		// Never writes to the database here - this always hands the pick
+		// back as a pending selection, exactly like singlePurchaseMode
+		// does above, for Transactioneditactivity to apply only once
+		// Save/Update Transaction actually succeeds (see its own
+		// onActivityResult()/savePurchase()). Editing an existing purchase
+		// used to write straight to the database the moment this screen
+		// finished, bypassing Update Transaction entirely and (per a
+		// pending.get("selections") == null-shaped entry only being read
+		// by the single-purchase apply path) leaving the newly-linked
+		// row invisible in the caller's display until it was reloaded
+		// from scratch - both fixed by deferring uniformly instead.
+		int[] purchaseIds = new int[selections.size()];
 
-		Toast.makeText(this, "Expense linked", Toast.LENGTH_SHORT).show();
+		for (int i = 0; i < selections.size(); i++) {
+			purchaseIds[i] = (Integer) selections.get(i).get("purchase_id");
+		}
 
-		setResult(RESULT_OK);
+		result.putExtra("purchase_ids", purchaseIds);
+		setResult(RESULT_OK, result);
+
 		finish();
 	}
 }
