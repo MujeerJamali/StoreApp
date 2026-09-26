@@ -727,6 +727,8 @@ public class Transactioneditactivity extends Activity {
 						varietySpinners,
 						varietyValuesByGroup
 					);
+
+					showKeyboardOn(etQuantity);
 				}
 			});
 
@@ -1743,6 +1745,8 @@ public class Transactioneditactivity extends Activity {
 						varietySpinners,
 						varietyValuesByGroup
 					);
+
+					showKeyboardOn(etQuantity);
 				}
 			});
 
