@@ -314,6 +314,14 @@ public class Transactioneditactivity extends Activity {
 				}
 			});
 
+        // Created (once) before loadParties() so it's already in the
+        // in-memory list below - a new Sale defaults its party to this,
+        // since most walk-in sales have no real named customer. Left
+        // out for Purchase on purpose.
+        if (!isEditMode && transactionType == TYPE_SALE) {
+            db.getOrCreatePartyId("Cash Sale");
+        }
+
         loadParties();
         setCurrentDateTime();
 
@@ -354,6 +362,10 @@ public class Transactioneditactivity extends Activity {
 
 			if (transactionType == TYPE_PURCHASE) {
 				loadPrefilledItemsFromIntent();
+			}
+
+			if (transactionType == TYPE_SALE) {
+				actv_party.setText("Cash Sale", false);
 			}
 
 			if (draftId != -1) {
@@ -2947,7 +2959,10 @@ public class Transactioneditactivity extends Activity {
 
 		setListViewHeightBasedOnChildren(lv_transaction_items);
 
-		actv_party.setText("", false);
+		actv_party.setText(
+			transactionType == TYPE_SALE ? "Cash Sale" : "",
+			false
+		);
 
 		et_notes.setText("");
 		et_notes.setVisibility(View.GONE);

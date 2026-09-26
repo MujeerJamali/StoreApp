@@ -95,6 +95,11 @@ public class Expenseeditactivity extends Activity {
 
 		db = new DatabaseHelper(this);
 
+		// Created (once) before loadPartyAutoComplete() so it's already
+		// in the in-memory list below - a new Expense defaults its party
+		// to this, since most expenses aren't billed to a real party.
+		db.getOrCreatePartyId("Cash Expenses");
+
 		loadPartyAutoComplete();
 
 		cb_full_paid.setOnCheckedChangeListener(fullPaidCheckedChangeListener);
@@ -199,6 +204,8 @@ public class Expenseeditactivity extends Activity {
 			);
 
 			et_amount_paid.setText("0");
+
+			actv_party.setText("Cash Expenses", false);
 
 			focusAndShowKeyboard(et_item);
 

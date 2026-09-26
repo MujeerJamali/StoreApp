@@ -5353,6 +5353,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		);
 	}
 
+	// Non-bulk convenience wrapper for a single call outside an existing
+	// import transaction - e.g. defaulting a new Sale/Expense's party to
+	// a synthetic "Cash Sale"/"Cash Expenses" party, creating it the
+	// first time it's needed on an install with no such party yet.
+	public int getOrCreatePartyId(String name) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+		return getOrCreatePartyIdBulk(db, name);
+	}
+
 	public int getOrCreatePartyIdBulk(SQLiteDatabase db, String name) {
 
 		if (name == null || name.trim().length() == 0) {
