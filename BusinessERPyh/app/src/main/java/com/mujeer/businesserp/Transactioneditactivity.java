@@ -802,6 +802,15 @@ public class Transactioneditactivity extends Activity {
 			null
 		);
 
+		// Created here (rather than at the end, as it used to be) so
+		// actvItem's own item-click listener below can dismiss it before
+		// jumping to Additemactivity for the "+ Add New Item" row - see
+		// that listener.
+		final AlertDialog dialog =
+			new AlertDialog.Builder(this)
+			.setView(view)
+			.create();
+
 		final AutoCompleteTextView actvItem =
 			view.findViewById(R.id.actv_item);
 
@@ -890,7 +899,8 @@ public class Transactioneditactivity extends Activity {
 			new TwoLineAutoCompleteAdapter(
 			this,
 			itemNames,
-			itemSubtitles
+			itemSubtitles,
+			"+ Add New Item"
 		);
 
 		actvItem.setAdapter(adapter);
@@ -907,6 +917,25 @@ public class Transactioneditactivity extends Activity {
 					View view,
 					int position,
 					long id) {
+
+					// Always the dropdown's last row - jumps straight to
+					// Additemactivity rather than requiring the typed text
+					// to mismatch first (see promptCreateNewItemFromDialog()
+					// for that older, still-available fallback via the
+					// Add/Add & New buttons).
+					if (adapter.isAddNewPosition(position)) {
+
+						actvItem.setText("", false);
+						dialog.dismiss();
+
+						Intent intent = new Intent(
+							Transactioneditactivity.this,
+							Additemactivity.class
+						);
+
+						startActivityForResult(intent, REQUEST_ADD_NEW_ITEM);
+						return;
+					}
 
 					// 'position' is the row index within the filtered
 					// dropdown list, not the original 'items' list - and
@@ -978,11 +1007,6 @@ public class Transactioneditactivity extends Activity {
 				}
 			}
 		}
-
-		final AlertDialog dialog =
-			new AlertDialog.Builder(this)
-			.setView(view)
-			.create();
 
 		btnCancel.setOnClickListener(
 			new View.OnClickListener() {

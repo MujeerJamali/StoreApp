@@ -1,8 +1,10 @@
 package com.mujeer.businesserp;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -23,6 +25,10 @@ import android.app.TimePickerDialog;
 import java.util.Calendar;
 
 public class Expenseeditactivity extends Activity {
+
+	// "+ Add New Cost Item" row - see loadCostItemAutoComplete()/
+	// openAddCostItem()/onActivityResult().
+	private static final int REQUEST_ADD_COST_ITEM = 6001;
 
 	private TextView tv_code;
 
@@ -64,6 +70,14 @@ public class Expenseeditactivity extends Activity {
 	private Map<String, Integer> partyIdByName;
 	private Map<Integer, String> partyNameById;
 
+	// name -> id for the Cost Item field, same purpose as partyIdByName
+	// above - saveExpense() requires the typed text to resolve to one of
+	// these rather than silently creating a new Cost Item (see
+	// loadCostItemAutoComplete()/openAddCostItem() for how a genuinely
+	// new one gets added instead).
+	private Map<String, Integer> costItemIdByName;
+	private TwoLineAutoCompleteAdapter costItemAdapter;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -102,6 +116,18 @@ public class Expenseeditactivity extends Activity {
 
 		loadPartyAutoComplete();
 		loadCostItemAutoComplete();
+
+		et_item.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+				@Override
+				public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+					if (costItemAdapter != null && costItemAdapter.isAddNewPosition(position)) {
+
+						et_item.setText("", false);
+						openAddCostItem();
+					}
+				}
+			});
 
 		cb_full_paid.setOnCheckedChangeListener(fullPaidCheckedChangeListener);
 
@@ -318,10 +344,13 @@ public class Expenseeditactivity extends Activity {
 	}
 
 	// Item is a reusable Cost Item (Petrol, Shipping, Packaging, ...) -
-	// same list Purchase Costs draws from. Unlike the Party field above,
-	// typing a name that doesn't exist yet is fine: saveExpense() calls
-	// getOrCreateCostItemId() so a brand-new category is simply added,
-	// there's no "select a valid one" requirement.
+	// same list Purchase Costs draws from. The dropdown always carries
+	// one extra "+ Add New Cost Item" row at the bottom (even when
+	// nothing/only-wrong things match what's typed) - tapping it opens
+	// CostItemEditActivity and, once a new one is actually created there,
+	// selects it here (see openAddCostItem()/onActivityResult()).
+	// Typing a name that doesn't exist and just hitting Save is NOT
+	// enough on its own - see saveExpense()'s validation.
 	private void loadCostItemAutoComplete() {
 
 		ArrayList<HashMap<String, Object>> costItems = db.getCostItems();
@@ -329,19 +358,48 @@ public class Expenseeditactivity extends Activity {
 		ArrayList<String> costItemNames = new ArrayList<String>();
 		HashMap<String, String> costItemSubtitles = new HashMap<String, String>();
 
+		costItemIdByName = new HashMap<String, Integer>();
+
 		for (HashMap<String, Object> costItem : costItems) {
 
 			String name = (String) costItem.get("name");
+			int id = (Integer) costItem.get("id");
 
 			costItemNames.add(name);
 			costItemSubtitles.put(name, "");
+			costItemIdByName.put(name, id);
 		}
 
-		TwoLineAutoCompleteAdapter adapter =
-			new TwoLineAutoCompleteAdapter(this, costItemNames, costItemSubtitles);
+		costItemAdapter = new TwoLineAutoCompleteAdapter(
+			this, costItemNames, costItemSubtitles, "+ Add New Cost Item"
+		);
 
-		et_item.setAdapter(adapter);
+		et_item.setAdapter(costItemAdapter);
 		et_item.setThreshold(1);
+	}
+
+	private void openAddCostItem() {
+
+		Intent intent = new Intent(this, CostItemEditActivity.class);
+		intent.putExtra("cost_item_id", 0);
+
+		startActivityForResult(intent, REQUEST_ADD_COST_ITEM);
+	}
+
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+		super.onActivityResult(requestCode, resultCode, data);
+
+		if (requestCode == REQUEST_ADD_COST_ITEM && resultCode == RESULT_OK && data != null) {
+
+			String newName = data.getStringExtra("cost_item_name");
+
+			loadCostItemAutoComplete();
+
+			if (newName != null) {
+				et_item.setText(newName, false);
+			}
+		}
 	}
 
 	private final CompoundButton.OnCheckedChangeListener fullPaidCheckedChangeListener =
@@ -559,10 +617,20 @@ public class Expenseeditactivity extends Activity {
 			return;
 		}
 
-		// Keeps the Cost Items list (also used by Purchase Costs) in sync
-		// with whatever's typed here - a name not seen before is simply
-		// added, same "reusable list" treatment Parties/Items already get.
-		db.getOrCreateCostItemId(item);
+		// Must resolve to an existing Cost Item, same requirement the
+		// Party field enforces below - a typo or an unrecognized name
+		// doesn't silently create a new category (see loadCostItemAutoComplete()'s
+		// "+ Add New Cost Item" row for how to actually add one).
+		if (costItemIdByName == null || !costItemIdByName.containsKey(item)) {
+
+			Toast.makeText(
+				this,
+				"Select a valid cost item, or tap \"+ Add New Cost Item\" first",
+				Toast.LENGTH_LONG
+			).show();
+
+			return;
+		}
 
 		if (et_amount.getText().toString().trim().isEmpty()) {
 

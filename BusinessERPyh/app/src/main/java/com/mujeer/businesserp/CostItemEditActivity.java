@@ -3,6 +3,7 @@ package com.mujeer.businesserp;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -81,16 +82,30 @@ public class CostItemEditActivity extends Activity {
 			return;
 		}
 
+		int savedId;
+
 		if (costItemId == 0) {
 
-			db.getOrCreateCostItemId(name);
+			savedId = db.getOrCreateCostItemId(name);
 
 		} else {
 
 			db.updateCostItem(costItemId, name);
+			savedId = costItemId;
 		}
 
 		Toast.makeText(this, "Cost item saved", Toast.LENGTH_SHORT).show();
+
+		// Harmless when opened via plain startActivity() (e.g. from
+		// CostItemsActivity's own list/FAB) - nothing is waiting on a
+		// result then. A caller that opened this via startActivityForResult
+		// (the "+ Add New Cost Item" row in a Cost Item autocomplete - see
+		// TwoLineAutoCompleteAdapter) uses this to select the item it just
+		// created once control returns to it.
+		Intent result = new Intent();
+		result.putExtra("cost_item_id", savedId);
+		result.putExtra("cost_item_name", name);
+		setResult(RESULT_OK, result);
 
 		finish();
 	}

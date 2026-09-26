@@ -32,12 +32,21 @@ BusinessERPyh/                  Gradle project root
   items only show sizes with stock, bulk Excel import for purchases. The
   Add/Edit Item dialog's Quantity, Price and Total fields are linked live:
   editing Total back-solves Price at the current Quantity (e.g. 4 @ 50 =
-  200; changing Total to 100 sets Price to 25). A Purchase's "+ Add
+  200; changing Total to 100 sets Price to 25). The Add Item dialog's
+  item dropdown always carries a "+ Add New Item" row at the bottom,
+  even when what's typed already has (wrong) matches — tapping it jumps
+  straight to creating the item and returns with it selected, no need
+  to first type something that fails to match. A Purchase's "+ Add
   Purchase Cost" button attaches one or more **Purchase Costs** to it
   (see below) — works even before the purchase itself is saved.
 - **Cost Items / Purchase Costs** — a reusable category list (Petrol,
   Shipping, Packaging, ...), shared between Purchase Costs and the
-  Expense screen's Item field. A Purchase Cost is one cost event (a Cost
+  Expense screen's Item field. Both those fields require picking an
+  existing Cost Item — like the Item dropdown above, they always carry
+  a "+ Add New Cost Item" row at the bottom to create one on the spot
+  and come back with it selected; typing an unrecognized name and
+  saving anyway is rejected rather than silently creating one. A
+  Purchase Cost is one cost event (a Cost
   Item + a total amount + when it happened) that splits proportionally
   by value across one or more purchases, each with its own choice of
   whether that share adds to the supplier's owed balance or is a cash
@@ -59,8 +68,10 @@ BusinessERPyh/                  Gradle project root
   autocomplete starts already populated instead of empty.
 - **Payments** — payment in/out against a party.
 - **Expenses** — one-off and **recurring** (weekly/monthly/specific
-  dates); the Item field is a Cost Item autocomplete (typing a new name
-  simply adds it to the list) rather than free text.
+  dates); the Item field is a Cost Item autocomplete rather than free
+  text — it must resolve to an existing Cost Item, typing an
+  unrecognized name and saving anyway is rejected (see "+ Add New" row
+  below).
 - **Cash** — a single ledger of all cash movement (sales, purchases,
   payments, expenses, manual adjustments); tapping a row opens its real
   source transaction. **A transaction is rejected if it would take the

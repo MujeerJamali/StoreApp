@@ -51,15 +51,33 @@ public class TwoLineAutoCompleteAdapter extends ArrayAdapter<String> {
 	// by the filter below (never by comparing text).
 	private final List<Integer> originalIndices;
 
+	// Non-null shows one extra row, always last regardless of what the
+	// typed text filters down to (even zero real matches) - "+ Add New
+	// Item"/"+ Add New Cost Item"/etc. Selecting it isn't a real item;
+	// callers check isAddNewPosition() before trusting getOriginalIndex()
+	// or the text AutoCompleteTextView auto-fills on tap (see its own
+	// call sites for the create-and-return-selected flow this backs).
+	private final String addNewLabel;
+
 	public TwoLineAutoCompleteAdapter(
 		Context context,
 		List<String> items,
 		Map<String, String> subtitles) {
 
+		this(context, items, subtitles, null);
+	}
+
+	public TwoLineAutoCompleteAdapter(
+		Context context,
+		List<String> items,
+		Map<String, String> subtitles,
+		String addNewLabel) {
+
 		super(context, android.R.layout.simple_dropdown_item_1line, items);
 
 		this.subtitles = subtitles;
 		this.allItems = new ArrayList<String>(items);
+		this.addNewLabel = addNewLabel;
 
 		this.originalIndices = new ArrayList<Integer>();
 
@@ -68,14 +86,39 @@ public class TwoLineAutoCompleteAdapter extends ArrayAdapter<String> {
 		}
 	}
 
+	// True when 'position' is the always-last "+ Add New ..." row rather
+	// than a real item/party - see addNewLabel.
+	public boolean isAddNewPosition(int position) {
+
+		return addNewLabel != null && position == super.getCount();
+	}
+
+	@Override
+	public int getCount() {
+
+		return super.getCount() + (addNewLabel != null ? 1 : 0);
+	}
+
+	@Override
+	public String getItem(int position) {
+
+		if (isAddNewPosition(position)) {
+			return addNewLabel;
+		}
+
+		return super.getItem(position);
+	}
+
 	// The unfiltered-list index of the row currently shown at
 	// 'position' in the dropdown (i.e. what onItemClick's own
 	// 'position' argument actually points at right now) - the only
 	// correct way to resolve a clicked row back to its real item/party,
-	// since two rows can share the same display text.
+	// since two rows can share the same display text. Returns -1 for
+	// the "+ Add New ..." row (see isAddNewPosition()), same as an
+	// out-of-range position.
 	public int getOriginalIndex(int position) {
 
-		if (position < 0 || position >= originalIndices.size()) {
+		if (isAddNewPosition(position) || position < 0 || position >= originalIndices.size()) {
 			return -1;
 		}
 
@@ -97,9 +140,26 @@ public class TwoLineAutoCompleteAdapter extends ArrayAdapter<String> {
 		TextView tvLine1 = convertView.findViewById(R.id.tv_line1);
 		TextView tvLine2 = convertView.findViewById(R.id.tv_line2);
 
+		if (isAddNewPosition(position)) {
+
+			tvLine1.setText(addNewLabel);
+			tvLine1.setTextColor(
+				convertView.getResources().getColor(R.color.primary)
+			);
+			tvLine1.setTypeface(null, android.graphics.Typeface.BOLD);
+
+			tvLine2.setVisibility(View.GONE);
+
+			return convertView;
+		}
+
 		String primary = getItem(position);
 
 		tvLine1.setText(primary);
+		tvLine1.setTextColor(
+			convertView.getResources().getColor(R.color.text_primary)
+		);
+		tvLine1.setTypeface(null, android.graphics.Typeface.NORMAL);
 
 		String secondary =
 			primary == null ?
@@ -157,7 +217,12 @@ public class TwoLineAutoCompleteAdapter extends ArrayAdapter<String> {
 				}
 
 				results.values = new Object[]{matches, matchedIndices};
-				results.count = matches.size();
+
+				// +1 so AutoCompleteTextView's own popup-visibility check
+				// (driven by this count, separately from the adapter's
+				// getCount()) still opens the dropdown to show the
+				// "+ Add New ..." row even when nothing real matches.
+				results.count = matches.size() + (addNewLabel != null ? 1 : 0);
 
 				return results;
 			}
@@ -169,15 +234,20 @@ public class TwoLineAutoCompleteAdapter extends ArrayAdapter<String> {
 				clear();
 				originalIndices.clear();
 
-				if (results != null && results.count > 0) {
+				int realMatchCount = 0;
+
+				if (results != null && results.values != null) {
 
 					Object[] valuePair = (Object[]) results.values;
+					List<String> matches = (List<String>) valuePair[0];
 
-					addAll((List<String>) valuePair[0]);
+					realMatchCount = matches.size();
+
+					addAll(matches);
 					originalIndices.addAll((List<Integer>) valuePair[1]);
 				}
 
-				if (results != null && results.count > 0) {
+				if (realMatchCount > 0 || addNewLabel != null) {
 
 					notifyDataSetChanged();
 

@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -25,8 +26,13 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 public class PurchaseCostEditActivity extends Activity {
+
+	// "+ Add New Cost Item" row - see loadCostItemAutoComplete()/
+	// openAddCostItem()/onActivityResult().
+	private static final int REQUEST_ADD_COST_ITEM = 6001;
 
 	private AutoCompleteTextView actv_cost_item;
 	private EditText et_pc_amount;
@@ -66,6 +72,13 @@ public class PurchaseCostEditActivity extends Activity {
 
 	private PurchaseSelectionAdapter pickerAdapter;
 
+	// name -> id for the Cost Item field - save() requires the typed
+	// text to resolve to one of these rather than silently creating a
+	// new Cost Item (see loadCostItemAutoComplete()'s "+ Add New Cost
+	// Item" row for how to actually add one).
+	private Map<String, Integer> costItemIdByName;
+	private TwoLineAutoCompleteAdapter costItemAdapter;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -100,6 +113,18 @@ public class PurchaseCostEditActivity extends Activity {
 		db = new DatabaseHelper(this);
 
 		loadCostItemAutoComplete();
+
+		actv_cost_item.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+				@Override
+				public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+					if (costItemAdapter != null && costItemAdapter.isAddNewPosition(position)) {
+
+						actv_cost_item.setText("", false);
+						openAddCostItem();
+					}
+				}
+			});
 
 		et_pc_date.setOnClickListener(new View.OnClickListener() {
 			@Override
@@ -170,17 +195,48 @@ public class PurchaseCostEditActivity extends Activity {
 		ArrayList<String> names = new ArrayList<>();
 		HashMap<String, String> subtitles = new HashMap<>();
 
+		costItemIdByName = new HashMap<>();
+
 		for (HashMap<String, Object> costItem : costItems) {
 
 			String name = (String) costItem.get("name");
+			int id = (Integer) costItem.get("id");
+
 			names.add(name);
 			subtitles.put(name, "");
+			costItemIdByName.put(name, id);
 		}
 
-		TwoLineAutoCompleteAdapter adapter = new TwoLineAutoCompleteAdapter(this, names, subtitles);
+		costItemAdapter = new TwoLineAutoCompleteAdapter(
+			this, names, subtitles, "+ Add New Cost Item"
+		);
 
-		actv_cost_item.setAdapter(adapter);
+		actv_cost_item.setAdapter(costItemAdapter);
 		actv_cost_item.setThreshold(1);
+	}
+
+	private void openAddCostItem() {
+
+		Intent intent = new Intent(this, CostItemEditActivity.class);
+		intent.putExtra("cost_item_id", 0);
+
+		startActivityForResult(intent, REQUEST_ADD_COST_ITEM);
+	}
+
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+		super.onActivityResult(requestCode, resultCode, data);
+
+		if (requestCode == REQUEST_ADD_COST_ITEM && resultCode == RESULT_OK && data != null) {
+
+			String newName = data.getStringExtra("cost_item_name");
+
+			loadCostItemAutoComplete();
+
+			if (newName != null) {
+				actv_cost_item.setText(newName, false);
+			}
+		}
 	}
 
 	private void setupPurchasePicker() {
@@ -314,7 +370,18 @@ public class PurchaseCostEditActivity extends Activity {
 
 		String notes = et_pc_notes.getText().toString().trim();
 
-		int costItemId = db.getOrCreateCostItemId(costItemName);
+		Integer costItemId = costItemIdByName == null ? null : costItemIdByName.get(costItemName);
+
+		if (costItemId == null) {
+
+			Toast.makeText(
+				this,
+				"Select a valid cost item, or tap \"+ Add New Cost Item\" first",
+				Toast.LENGTH_LONG
+			).show();
+
+			return;
+		}
 
 		if (purchaseCostId != 0) {
 
