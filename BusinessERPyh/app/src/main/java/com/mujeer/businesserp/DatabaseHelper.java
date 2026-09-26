@@ -5812,42 +5812,42 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		Cursor cursor = db.rawQuery(
 			"SELECT date, time, paid_amount AS amount, " +
-			"('Sale - ' || COALESCE(pa.name, 'Cash Sale')) AS label, source, 0, NULL " +
+			"('Sale - ' || COALESCE(pa.name, 'Cash Sale')) AS label, source, 0, NULL, 'sale', s.id " +
 			"FROM sales s LEFT JOIN " + TABLE_PARTIES + " pa ON s.party_id = pa.id " +
 			"WHERE paid_amount != 0 " +
 
 			"UNION ALL " +
 
 			"SELECT date, time, -amount_paid, " +
-			"('Purchase - ' || pa.name), source, 0, NULL " +
+			"('Purchase - ' || pa.name), source, 0, NULL, 'purchase', p.id " +
 			"FROM " + TABLE_PURCHASES + " p " +
 			"INNER JOIN " + TABLE_PARTIES + " pa ON p.party_id = pa.id " +
 			"WHERE amount_paid != 0 " +
 
 			"UNION ALL " +
 
-			"SELECT date, time, amount, ('Payment In - ' || pa.name), source, 0, NULL " +
+			"SELECT date, time, amount, ('Payment In - ' || pa.name), source, 0, NULL, 'payment', pm.id " +
 			"FROM " + TABLE_PAYMENTS + " pm " +
 			"INNER JOIN " + TABLE_PARTIES + " pa ON pm.party_id = pa.id " +
 			"WHERE type=" + PAYMENT_IN + " " +
 
 			"UNION ALL " +
 
-			"SELECT date, time, -amount, ('Payment Out - ' || pa.name), source, 0, NULL " +
+			"SELECT date, time, -amount, ('Payment Out - ' || pa.name), source, 0, NULL, 'payment', pm.id " +
 			"FROM " + TABLE_PAYMENTS + " pm " +
 			"INNER JOIN " + TABLE_PARTIES + " pa ON pm.party_id = pa.id " +
 			"WHERE type=" + PAYMENT_OUT + " " +
 
 			"UNION ALL " +
 
-			"SELECT date, time, -paid_amount, ('Expense - ' || item), source, 0, NULL " +
+			"SELECT date, time, -paid_amount, ('Expense - ' || item), source, 0, NULL, 'expense', id " +
 			"FROM " + TABLE_EXPENSES + " WHERE paid_amount != 0 " +
 
 			"UNION ALL " +
 
 			"SELECT date, time, amount, " +
 			"('Adjustment' || CASE WHEN notes IS NOT NULL AND notes != '' " +
-			"THEN ' - ' || notes ELSE '' END), source, id, notes " +
+			"THEN ' - ' || notes ELSE '' END), source, id, notes, 'adjustment', id " +
 			"FROM " + TABLE_CASH_ADJUSTMENTS +
 
 			" ORDER BY date DESC, time DESC",
@@ -5866,6 +5866,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("source", cursor.isNull(4) ? "Manual" : cursor.getString(4));
 			map.put("adjustment_id", cursor.getInt(5));
 			map.put("notes", cursor.isNull(6) ? "" : cursor.getString(6));
+			map.put("record_type", cursor.getString(7));
+			map.put("record_id", cursor.getInt(8));
 
 			list.add(map);
 		}

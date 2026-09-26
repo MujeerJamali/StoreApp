@@ -3,6 +3,7 @@ package com.mujeer.businesserp;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -72,7 +73,12 @@ public class CashActivity extends Activity {
                     int adjustmentId = (Integer) row.get("adjustment_id");
 
                     if (adjustmentId != 0) {
+
                         promptEditAdjustment(adjustmentId, row);
+
+                    } else {
+
+                        openRecord(row);
                     }
                 }
             }
@@ -116,6 +122,54 @@ public class CashActivity extends Activity {
                 });
             }
         }).start();
+    }
+
+    // Every non-adjustment row (Sale/Purchase/Payment/Expense) opens the
+    // real transaction it came from, using record_type/record_id from
+    // getCashLedger() - adjustment rows never reach here, they're
+    // intercepted for promptEditAdjustment() before this is called.
+    private void openRecord(HashMap<String, Object> row) {
+
+        String recordType = String.valueOf(row.get("record_type"));
+        int recordId = (Integer) row.get("record_id");
+
+        Intent intent;
+
+        switch (recordType) {
+
+            case "sale":
+
+                intent = new Intent(this, Transactionviewactivity.class);
+                intent.putExtra("transaction_type", 1);
+                intent.putExtra("transaction_id", recordId);
+                startActivity(intent);
+                break;
+
+            case "purchase":
+
+                intent = new Intent(this, Transactionviewactivity.class);
+                intent.putExtra("transaction_type", 0);
+                intent.putExtra("transaction_id", recordId);
+                startActivity(intent);
+                break;
+
+            case "payment":
+
+                intent = new Intent(this, Paymentviewactivity.class);
+                intent.putExtra("payment_id", recordId);
+                startActivity(intent);
+                break;
+
+            case "expense":
+
+                intent = new Intent(this, Expenseviewactivity.class);
+                intent.putExtra("expense_id", recordId);
+                startActivity(intent);
+                break;
+
+            default:
+                break;
+        }
     }
 
     private void promptAddAdjustment() {
