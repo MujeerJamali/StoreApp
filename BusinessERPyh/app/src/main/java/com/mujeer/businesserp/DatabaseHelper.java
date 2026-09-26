@@ -469,7 +469,61 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		addColumnIfMissing(db, TABLE_PURCHASES, "other_charges", "REAL NOT NULL DEFAULT 0");
 		addColumnIfMissing(db, TABLE_PURCHASES, "other_charges_to_party", "INTEGER NOT NULL DEFAULT 1");
 
+		// cost_items (created above by onCreate(db)) is brand new as of
+		// this version - every expense/recurring-expense rule recorded
+		// before it existed has its "item" as plain free text with no
+		// Cost Item behind it. Seed one in for each distinct value
+		// already in use so upgrading doesn't lose that history - the
+		// Expense screen's Item field autocomplete (see
+		// Expenseeditactivity) then already offers everything already in
+		// use, instead of starting empty. Gated to oldVersion < 19 (when
+		// cost_items was introduced) so it only ever runs the one time.
+		if (oldVersion < 19) {
+			backfillCostItemsFromExistingItemText(db);
+		}
+
 		dropPurchaseCodeColumnIfPresent(db);
+	}
+
+	// =====================
+	// See its call site in onUpgrade() above. Reads TABLE_EXPENSES.item
+	// and TABLE_RECURRING_EXPENSES.item directly off the db parameter
+	// (never through a public getXxx()/getOrCreateCostItemId() helper,
+	// which would call back into getWritableDatabase() while the
+	// database isn't finished opening yet) and inserts one cost_items
+	// row per distinct value, ignoring an already-seeded duplicate.
+	// =====================
+	private void backfillCostItemsFromExistingItemText(SQLiteDatabase db) {
+
+		String[] sourceQueries = {
+			"SELECT DISTINCT item FROM " + TABLE_EXPENSES +
+				" WHERE item IS NOT NULL AND TRIM(item) != ''",
+			"SELECT DISTINCT item FROM " + TABLE_RECURRING_EXPENSES +
+				" WHERE item IS NOT NULL AND TRIM(item) != ''"
+		};
+
+		for (String sql : sourceQueries) {
+
+			Cursor cursor = db.rawQuery(sql, null);
+
+			while (cursor.moveToNext()) {
+
+				String item = cursor.getString(0).trim();
+
+				if (item.length() == 0) {
+					continue;
+				}
+
+				ContentValues values = new ContentValues();
+				values.put("name", item);
+
+				db.insertWithOnConflict(
+					TABLE_COST_ITEMS, null, values, SQLiteDatabase.CONFLICT_IGNORE
+				);
+			}
+
+			cursor.close();
+		}
 	}
 
 	// =====================

@@ -53,7 +53,10 @@ BusinessERPyh/                  Gradle project root
   reversible (same simplification as Extra Cost/Unit and Purchase Price
   themselves) — only its category/date/notes can be changed afterward,
   and deleting one removes the record without undoing its already-
-  applied cash/balance/landed-cost effects.
+  applied cash/balance/landed-cost effects. Upgrading to this version
+  seeds a Cost Item for every distinct item text already used by an
+  existing Expense or Recurring Expense rule, one-time, so the Item
+  autocomplete starts already populated instead of empty.
 - **Payments** — payment in/out against a party.
 - **Expenses** — one-off and **recurring** (weekly/monthly/specific
   dates); the Item field is a Cost Item autocomplete (typing a new name
