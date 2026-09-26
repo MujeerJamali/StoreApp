@@ -50,6 +50,14 @@ public class Transactioneditactivity extends Activity {
 	// parked Sale/Purchase - once the real save succeeds, this draft row
 	// is deleted so it doesn't linger alongside the now-real transaction.
 	private int draftId = -1;
+
+	// Set (to the line being edited) when the "+ Add New Item" row is
+	// tapped from the EDIT Item dialog rather than the Add Item dialog -
+	// -1 means "not applicable" (either nothing pending, or the pending
+	// create came from the Add dialog instead). onActivityResult() checks
+	// this to decide whether to reopen showEditTransactionItem() on that
+	// same line (with the new item preselected) or showAddTransactionItemDialog().
+	private int pendingEditPositionForNewItem = -1;
 	
 	AutoCompleteTextView actv_party;
     EditText et_date, et_time, et_invoice_number, et_amount_paid, et_notes;
@@ -545,15 +553,29 @@ public class Transactioneditactivity extends Activity {
 	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 		super.onActivityResult(requestCode, resultCode, data);
 
-		if (requestCode == REQUEST_ADD_NEW_ITEM
-			&& resultCode == RESULT_OK
-			&& data != null) {
+		if (requestCode == REQUEST_ADD_NEW_ITEM) {
 
-			int newItemId = data.getIntExtra("item_id", -1);
+			int newItemId = (resultCode == RESULT_OK && data != null)
+				? data.getIntExtra("item_id", -1)
+				: -1;
 
-			if (newItemId != -1) {
+			if (newItemId != -1 && pendingEditPositionForNewItem != -1) {
+
+				int editPosition = pendingEditPositionForNewItem;
+				pendingEditPositionForNewItem = -1;
+
+				showEditTransactionItem(editPosition, newItemId);
+
+			} else if (newItemId != -1) {
 
 				showAddTransactionItemDialog(newItemId);
+
+			} else {
+
+				// Cancelled (back button, etc.) - don't let a stale
+				// pending edit position redirect some later, unrelated
+				// "+ Add New Item" tap from the Add dialog into edit mode.
+				pendingEditPositionForNewItem = -1;
 			}
 		}
 
@@ -2012,6 +2034,16 @@ public class Transactioneditactivity extends Activity {
 	}
 
 	private void showEditTransactionItem(final int editPosition) {
+		showEditTransactionItem(editPosition, null);
+	}
+
+	// presetItemId is only non-null when reopening this dialog after
+	// creating a brand-new item via the "+ Add New Item" dropdown row
+	// (see onActivityResult()) - it overrides oldItem's own item_id for
+	// which row starts selected, and (since it's a different item to the
+	// one this line used to be) its own price and a fresh, unselected set
+	// of variety dropdowns are used instead of oldItem's.
+	private void showEditTransactionItem(final int editPosition, final Integer presetItemId) {
 
 		final HashMap<String, Object> oldItem =
 			transactionItemList.get(editPosition);
@@ -2185,6 +2217,10 @@ public class Transactioneditactivity extends Activity {
 
 		int selectedPosition = 0;
 
+		int matchAgainstItemId = presetItemId != null ?
+			presetItemId.intValue() :
+			((Integer) oldItem.get("item_id")).intValue();
+
 		for (int i = 0; i < items.size(); i++) {
 
 			HashMap<String, Object> item = items.get(i);
@@ -2193,8 +2229,7 @@ public class Transactioneditactivity extends Activity {
 				(String) item.get("name")
 			);
 
-			if (((Integer) item.get("id")).intValue() ==
-				((Integer) oldItem.get("item_id")).intValue()) {
+			if (((Integer) item.get("id")).intValue() == matchAgainstItemId) {
 
 				selectedPosition = i;
 			}
@@ -2222,7 +2257,8 @@ public class Transactioneditactivity extends Activity {
 			new TwoLineAutoCompleteAdapter(
 			this,
 			itemNames,
-			itemSubtitlesEdit
+			itemSubtitlesEdit,
+			"+ Add New Item"
 		);
 
 		actvItem.setAdapter(adapter);
@@ -2231,7 +2267,10 @@ public class Transactioneditactivity extends Activity {
 
 		Map<Integer, Integer> preselectedVarietyValues = null;
 
-		if (oldItem.get("combo_id") != null) {
+		// A presetItemId means this is a different item than the line
+		// used to be (just created via "+ Add New Item"), so its old
+		// combo selection doesn't apply.
+		if (presetItemId == null && oldItem.get("combo_id") != null) {
 			preselectedVarietyValues =
 				db.getComboSelections((Integer) oldItem.get("combo_id"));
 		}
@@ -2246,6 +2285,15 @@ public class Transactioneditactivity extends Activity {
 
 		final int[] selectedItemPosition = {selectedPosition};
 
+		// Created here (rather than at the end, as it used to be) so
+		// actvItem's own item-click listener below can dismiss it before
+		// jumping to Additemactivity for the "+ Add New Item" row - see
+		// that listener.
+		final AlertDialog dialog =
+			new AlertDialog.Builder(this)
+			.setView(view)
+			.create();
+
 		actvItem.setOnItemClickListener(
 			new AdapterView.OnItemClickListener() {
 
@@ -2255,6 +2303,27 @@ public class Transactioneditactivity extends Activity {
 					View view,
 					int position,
 					long id) {
+
+					// Always the dropdown's last row - jumps straight to
+					// Additemactivity, then reopens THIS SAME line's Edit
+					// dialog (not the Add dialog) with the new item
+					// preselected - see pendingEditPositionForNewItem/
+					// onActivityResult().
+					if (adapter.isAddNewPosition(position)) {
+
+						actvItem.setText("", false);
+						dialog.dismiss();
+
+						pendingEditPositionForNewItem = editPosition;
+
+						Intent intent = new Intent(
+							Transactioneditactivity.this,
+							Additemactivity.class
+						);
+
+						startActivityForResult(intent, REQUEST_ADD_NEW_ITEM);
+						return;
+					}
 
 					// Same fix as in showAddTransactionItemDialog(): two
 					// items can share the exact same name, so resolve the
@@ -2295,17 +2364,16 @@ public class Transactioneditactivity extends Activity {
 			oldItem.get("quantity").toString()
 		);
 
+		// A presetItemId means a different item than the line used to be -
+		// its own price, not the old item's.
 		etPurchasePrice.setText(
+			presetItemId != null ?
+			items.get(selectedPosition).get(priceField).toString() :
 			oldItem.get(priceField).toString()
 		);
 
 		final Double[] exactPriceOverride =
 			wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
-
-		final AlertDialog dialog =
-			new AlertDialog.Builder(this)
-			.setView(view)
-			.create();
 
 		btnCancel.setOnClickListener(
 			new View.OnClickListener() {
