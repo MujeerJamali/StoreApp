@@ -628,7 +628,8 @@ public class Transactioneditactivity extends Activity {
 		final EditText etTotal =
 			view.findViewById(R.id.et_item_total);
 
-		wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
+		final Double[] exactPriceOverride =
+			wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
 
 		final LinearLayout containerVarieties =
 			view.findViewById(R.id.container_dialog_varieties);
@@ -827,6 +828,7 @@ public class Transactioneditactivity extends Activity {
 						selectedPosition[0],
 						etQuantity,
 						etPurchasePrice,
+						exactPriceOverride,
 						varietySpinners,
 						varietyValuesByGroup)) {
 
@@ -861,6 +863,7 @@ public class Transactioneditactivity extends Activity {
 						selectedPosition[0],
 						etQuantity,
 						etPurchasePrice,
+						exactPriceOverride,
 						varietySpinners,
 						varietyValuesByGroup)) {
 
@@ -897,13 +900,23 @@ public class Transactioneditactivity extends Activity {
 	// Total to 100 sets Price to 25). 'suppress' stops the two directions
 	// from bouncing off each other - each side turns the other's watcher
 	// off while it writes its own programmatic setText().
+	//
+	// Every number shown in this app is capped to 2 decimals, Price
+	// included - but a Total-driven Price can genuinely need more than 2
+	// (210 / 36 = 5.8333...) to make the typed Total exact. The returned
+	// array holds that exact value, invisibly, whenever the displayed
+	// (rounded) Price wouldn't multiply back out to the right Total; the
+	// caller must prefer this over re-parsing the Price field when it
+	// actually saves the item. A genuine (non-programmatic) edit to
+	// Price clears it, since the user's typed number then takes over.
 	// =====================
-	private void wireQuantityPriceTotalSync(
+	private Double[] wireQuantityPriceTotalSync(
 		final EditText etQuantity,
 		final EditText etPurchasePrice,
 		final EditText etTotal) {
 
 		final boolean[] suppress = {false};
+		final Double[] exactPriceOverride = {null};
 
 		android.text.TextWatcher recomputeTotal = new android.text.TextWatcher() {
 
@@ -923,16 +936,26 @@ public class Transactioneditactivity extends Activity {
 				}
 
 				double quantity = 0;
-				double price = 0;
 
 				try {
 					quantity = Double.parseDouble(etQuantity.getText().toString().trim());
 				} catch (Exception e) {
 				}
 
-				try {
-					price = Double.parseDouble(etPurchasePrice.getText().toString().trim());
-				} catch (Exception e) {
+				double price;
+
+				if (exactPriceOverride[0] != null) {
+
+					price = exactPriceOverride[0];
+
+				} else {
+
+					price = 0;
+
+					try {
+						price = Double.parseDouble(etPurchasePrice.getText().toString().trim());
+					} catch (Exception e) {
+					}
 				}
 
 				suppress[0] = true;
@@ -943,6 +966,25 @@ public class Transactioneditactivity extends Activity {
 
 		etQuantity.addTextChangedListener(recomputeTotal);
 		etPurchasePrice.addTextChangedListener(recomputeTotal);
+
+		etPurchasePrice.addTextChangedListener(new android.text.TextWatcher() {
+
+			@Override
+			public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+			}
+
+			@Override
+			public void onTextChanged(CharSequence s, int start, int before, int count) {
+			}
+
+			@Override
+			public void afterTextChanged(android.text.Editable s) {
+
+				if (!suppress[0]) {
+					exactPriceOverride[0] = null;
+				}
+			}
+		});
 
 		etTotal.addTextChangedListener(new android.text.TextWatcher() {
 
@@ -981,22 +1023,23 @@ public class Transactioneditactivity extends Activity {
 					return;
 				}
 
-				// Deliberately NOT AmountFormat.formatPlain() here: that
-				// rounds to 2 decimals, which would quietly change what
-				// Total actually comes out to once Price is re-multiplied
-				// by Quantity (e.g. 210 / 36 = 5.8333... - rounding that to
-				// "5.83" makes the real total 209.88, not the 210 that was
-				// typed). Keep Price at full precision so the typed Total
-				// is honored exactly, however many decimals that takes.
+				double exactPrice = total / quantity;
+
+				exactPriceOverride[0] = exactPrice;
+
 				suppress[0] = true;
-				etPurchasePrice.setText(String.valueOf(total / quantity));
+				etPurchasePrice.setText(AmountFormat.formatPlain(exactPrice));
 				suppress[0] = false;
 			}
 		});
 
 		// Seed Total from whatever Quantity/Price already hold (e.g. an
 		// existing row being edited) without bouncing that initial write
-		// back into Price.
+		// back into Price. If that existing price already carries more
+		// precision than 2 decimals (e.g. it was itself saved from an
+		// exact-Total edit in an earlier session), preserve it the same
+		// way - as an override behind a cleaned-up display - rather than
+		// silently truncating it the moment this dialog opens.
 		double initialQuantity = 0;
 		double initialPrice = 0;
 
@@ -1010,9 +1053,29 @@ public class Transactioneditactivity extends Activity {
 		} catch (Exception e) {
 		}
 
+		String roundedPriceText = AmountFormat.formatPlain(initialPrice);
+
+		double roundedPrice = 0;
+
+		try {
+			roundedPrice = Double.parseDouble(roundedPriceText);
+		} catch (Exception e) {
+		}
+
+		if (Math.abs(roundedPrice - initialPrice) > 0.0001) {
+
+			exactPriceOverride[0] = initialPrice;
+
+			suppress[0] = true;
+			etPurchasePrice.setText(roundedPriceText);
+			suppress[0] = false;
+		}
+
 		suppress[0] = true;
 		etTotal.setText(AmountFormat.formatPlain(initialQuantity * initialPrice));
 		suppress[0] = false;
+
+		return exactPriceOverride;
 	}
 
 	// =====================
@@ -1205,6 +1268,7 @@ public class Transactioneditactivity extends Activity {
 		int selectedIndex,
 		EditText etQuantity,
 		EditText etPurchasePrice,
+		Double[] exactPriceOverride,
 		Map<Integer, Spinner> varietySpinners,
 		Map<Integer, ArrayList<HashMap<String, Object>>> varietyValuesByGroup) {
 
@@ -1238,13 +1302,20 @@ public class Transactioneditactivity extends Activity {
 
 		double purchasePrice = 0;
 
-		try {
+		if (exactPriceOverride != null && exactPriceOverride[0] != null) {
 
-			purchasePrice = Double.parseDouble(
-				etPurchasePrice.getText().toString()
-			);
+			purchasePrice = exactPriceOverride[0];
 
-		} catch (Exception e) {
+		} else {
+
+			try {
+
+				purchasePrice = Double.parseDouble(
+					etPurchasePrice.getText().toString()
+				);
+
+			} catch (Exception e) {
+			}
 		}
 
 		if (purchasePrice < 0) {
@@ -1713,7 +1784,8 @@ public class Transactioneditactivity extends Activity {
 			etQuantity.setText(oldItem.get("quantity").toString());
 			etPurchasePrice.setText(oldItem.get(priceFieldForEdit).toString());
 
-			wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
+			final Double[] exactPriceOverride =
+				wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
 
 			final AlertDialog pendingDialog =
 				new AlertDialog.Builder(this)
@@ -1761,13 +1833,20 @@ public class Transactioneditactivity extends Activity {
 
 						double priceForEdit = 0;
 
-						try {
+						if (exactPriceOverride[0] != null) {
 
-							priceForEdit = Double.parseDouble(
-								etPurchasePrice.getText().toString()
-							);
+							priceForEdit = exactPriceOverride[0];
 
-						} catch (Exception e) {
+						} else {
+
+							try {
+
+								priceForEdit = Double.parseDouble(
+									etPurchasePrice.getText().toString()
+								);
+
+							} catch (Exception e) {
+							}
 						}
 
 						if (priceForEdit < 0) {
@@ -1927,7 +2006,8 @@ public class Transactioneditactivity extends Activity {
 			oldItem.get(priceField).toString()
 		);
 
-		wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
+		final Double[] exactPriceOverride =
+			wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
 
 		final AlertDialog dialog =
 			new AlertDialog.Builder(this)
@@ -1975,13 +2055,20 @@ public class Transactioneditactivity extends Activity {
 
 					double purchasePrice = 0;
 
-					try {
+					if (exactPriceOverride[0] != null) {
 
-						purchasePrice = Double.parseDouble(
-							etPurchasePrice.getText().toString()
-						);
+						purchasePrice = exactPriceOverride[0];
 
-					} catch (Exception e) {
+					} else {
+
+						try {
+
+							purchasePrice = Double.parseDouble(
+								etPurchasePrice.getText().toString()
+							);
+
+						} catch (Exception e) {
+						}
 					}
 
 					if (purchasePrice < 0) {
