@@ -12,14 +12,16 @@
         <!-- Transactions -->
         <activity
             android:name=".Transactionactivity"
-            android:label="Transactions" />
+            android:label="Transactions"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <!-- Launcher: app opens straight to Add Sale > Add Item, so the
              user can start typing an item immediately. -->
         <activity
             android:name=".Transactioneditactivity"
             android:label="Transaction"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -31,86 +33,106 @@
 
         <activity
             android:name=".Transactionviewactivity"
-            android:label="Transaction View" />
+            android:label="Transaction View"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".BulkPurchaseImportActivity"
-            android:label="Bulk Import" />
+            android:label="Bulk Import"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".BulkPurchaseImportErrorsActivity"
-            android:label="Bulk Import Errors" />
+            android:label="Bulk Import Errors"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <!-- Payments -->
         <activity
             android:name=".Paymentactivity"
-            android:label="Payments" />
+            android:label="Payments"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Paymenteditactivity"
-            android:label="Payment" />
+            android:label="Payment"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Paymentviewactivity"
-            android:label="Payment View" />
+            android:label="Payment View"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <!-- Parties -->
         <activity
             android:name=".Partiesactivity"
-            android:label="Parties" />
+            android:label="Parties"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Addpartyactivity"
-            android:label="Add Party" />
+            android:label="Add Party"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Partyviewactivity"
-            android:label="Party" />
+            android:label="Party"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Partieseditactivity"
-            android:label="Edit Party" />
+            android:label="Edit Party"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <!-- Items -->
         <activity
             android:name=".Itemsactivity"
-            android:label="Items" />
+            android:label="Items"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Additemactivity"
-            android:label="Add Item" />
+            android:label="Add Item"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Itemviewactivity"
-            android:label="Item" />
+            android:label="Item"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Itemseditactivity"
-            android:label="Edit Item" />
+            android:label="Edit Item"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Expensesactivity"
-            android:exported="false" />
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Expenseeditactivity"
-            android:exported="false" />
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Expenseviewactivity"
-            android:exported="false" />
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".RecurringExpensesActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".RecurringExpenseEditActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Importexcelactivity"
-            android:label="Importexcel" />
+            android:label="Importexcel"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".ImportVyaparActivity"
@@ -119,70 +141,86 @@
 
         <activity
             android:name=".ExportVyaparActivity"
-            android:label="Export Vyapar Backup" />
+            android:label="Export Vyapar Backup"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".ImportVyaparSkippedRowsActivity"
-            android:label="Rows Not Imported" />
+            android:label="Rows Not Imported"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <!-- Reports -->
         <activity
             android:name=".Reportsactivity"
-            android:label="Reports" />
+            android:label="Reports"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Salesreportactivity"
-            android:label="Total Sales" />
+            android:label="Total Sales"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Partysalesreportactivity"
-            android:label="Sales by Party" />
+            android:label="Sales by Party"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Itemrankingreportactivity"
-            android:label="Item Ranking" />
+            android:label="Item Ranking"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".Partyrankingreportactivity"
-            android:label="Party Ranking" />
+            android:label="Party Ranking"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".NetProfitReportActivity"
-            android:label="Net Profit" />
+            android:label="Net Profit"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".StockWorthReportActivity"
-            android:label="Stock Worth" />
+            android:label="Stock Worth"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".ItemMonthlyRankReportActivity"
-            android:label="Item Monthly Rank" />
+            android:label="Item Monthly Rank"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".AverageCartReportActivity"
-            android:label="Average Cart" />
+            android:label="Average Cart"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".ProfitSplitReportActivity"
-            android:label="Profit: Cash Sale vs Party" />
+            android:label="Profit: Cash Sale vs Party"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <!-- Bulk "generate entries" via calendar taps -->
         <activity
             android:name=".GenerateEntriesActivity"
-            android:label="Generate Entries" />
+            android:label="Generate Entries"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".CashActivity"
-            android:label="Cash" />
+            android:label="Cash"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".WantedItemsActivity"
-            android:label="Wanted Items" />
+            android:label="Wanted Items"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <!-- Main (dashboard) -->
         <activity
             android:name=".MainActivity"
-            android:label="@string/app_name" />
+            android:label="@string/app_name"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
     </application>
 
