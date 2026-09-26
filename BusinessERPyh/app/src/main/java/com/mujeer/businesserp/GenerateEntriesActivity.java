@@ -655,7 +655,43 @@ public class GenerateEntriesActivity extends Activity {
 					int groupId = (Integer) group.get("id");
 					String groupName = (String) group.get("name");
 
-					ArrayList<HashMap<String, Object>> values = db.getVarietyValues(groupId);
+					Integer previouslySelectedValueId = line.varietySelections.get(groupId);
+
+					ArrayList<HashMap<String, Object>> values;
+
+					if (entryType == TYPE_SALE) {
+
+						// A size that's out of stock can't be sold, so
+						// leave it out of the dropdown - except a value
+						// this line already had selected, which stays
+						// visible even at 0 stock.
+						ArrayList<HashMap<String, Object>> valuesWithStock =
+							db.getVarietyValuesWithStock(groupId);
+
+						values = new ArrayList<HashMap<String, Object>>();
+
+						for (HashMap<String, Object> value : valuesWithStock) {
+
+							double stock = (Double) value.get("stock");
+
+							boolean isPreselected =
+								previouslySelectedValueId != null &&
+								previouslySelectedValueId.equals(value.get("id"));
+
+							if (stock > 0.0001 || isPreselected) {
+								values.add(value);
+							}
+						}
+
+						if (values.isEmpty()) {
+							values = valuesWithStock;
+						}
+
+					} else {
+
+						values = db.getVarietyValues(groupId);
+					}
+
 					varietyValuesByGroup.put(groupId, values);
 
 					TextView groupLabel = new TextView(this);
@@ -667,7 +703,6 @@ public class GenerateEntriesActivity extends Activity {
 
 					ArrayList<String> valueLabels = new ArrayList<String>();
 					int selectedIndex = 0;
-					Integer previouslySelectedValueId = line.varietySelections.get(groupId);
 
 					for (int i = 0; i < values.size(); i++) {
 

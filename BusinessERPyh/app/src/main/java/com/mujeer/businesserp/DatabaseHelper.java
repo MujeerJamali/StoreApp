@@ -1331,6 +1331,43 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return list;
 	}
 
+	// Same rows as getVarietyValues(), each with its own "stock" figure -
+	// the summed balance across every combo that pairs this exact
+	// group/value with any selection of the item's other groups. Used to
+	// filter a Sale's size dropdown down to values that can actually be
+	// sold - see Transactioneditactivity.
+	public ArrayList<HashMap<String, Object>> getVarietyValuesWithStock(int groupId) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		ArrayList<HashMap<String, Object>> values = getVarietyValues(db, groupId);
+
+		for (HashMap<String, Object> value : values) {
+
+			int valueId = (Integer) value.get("id");
+
+			Cursor cursor = db.rawQuery(
+				"SELECT COALESCE(SUM(c.balance), 0) FROM " +
+				TABLE_VARIETY_COMBO_VALUES + " cv " +
+				"INNER JOIN " + TABLE_VARIETY_COMBOS + " c ON c.id = cv.combo_id " +
+				"WHERE cv.group_id=? AND cv.value_id=?",
+				new String[]{String.valueOf(groupId), String.valueOf(valueId)}
+			);
+
+			double stock = 0;
+
+			if (cursor.moveToFirst()) {
+				stock = cursor.getDouble(0);
+			}
+
+			cursor.close();
+
+			value.put("stock", stock);
+		}
+
+		return values;
+	}
+
 	// One row per real stock-keeping combination for this item, with a
 	// human-readable "label" (e.g. "Red / M") built by joining its values
 	// in group sort order.

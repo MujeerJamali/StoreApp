@@ -1037,7 +1037,48 @@ public class Transactioneditactivity extends Activity {
 			final int groupId = (Integer) group.get("id");
 			String groupName = (String) group.get("name");
 
-			ArrayList<HashMap<String, Object>> values = db.getVarietyValues(groupId);
+			Integer preselectedValueId =
+				preselectedValues != null ? preselectedValues.get(groupId) : null;
+
+			ArrayList<HashMap<String, Object>> values;
+
+			if (transactionType == TYPE_SALE) {
+
+				// A size that's out of stock can't be sold, so leave it
+				// out of the dropdown entirely - except the value this
+				// line already has (editing an existing sale), which
+				// stays visible even at 0 stock so editing doesn't
+				// silently change what was sold.
+				ArrayList<HashMap<String, Object>> valuesWithStock =
+					db.getVarietyValuesWithStock(groupId);
+
+				values = new ArrayList<HashMap<String, Object>>();
+
+				for (HashMap<String, Object> value : valuesWithStock) {
+
+					double stock = (Double) value.get("stock");
+
+					boolean isPreselected =
+						preselectedValueId != null &&
+						preselectedValueId.equals(value.get("id"));
+
+					if (stock > 0.0001 || isPreselected) {
+						values.add(value);
+					}
+				}
+
+				// Never leave the dropdown empty (would crash on
+				// selection) - checkSaleStockAvailability() still
+				// catches a genuine 0-stock pick when the item is added.
+				if (values.isEmpty()) {
+					values = valuesWithStock;
+				}
+
+			} else {
+
+				values = db.getVarietyValues(groupId);
+			}
+
 			outValuesByGroup.put(groupId, values);
 
 			TextView groupLabel = new TextView(this);
@@ -1049,9 +1090,6 @@ public class Transactioneditactivity extends Activity {
 
 			ArrayList<String> valueLabels = new ArrayList<String>();
 			int selectedIndex = 0;
-
-			Integer preselectedValueId =
-				preselectedValues != null ? preselectedValues.get(groupId) : null;
 
 			for (int i = 0; i < values.size(); i++) {
 
