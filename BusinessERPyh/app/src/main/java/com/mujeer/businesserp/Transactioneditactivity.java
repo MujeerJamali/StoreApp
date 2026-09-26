@@ -959,8 +959,15 @@ public class Transactioneditactivity extends Activity {
 					return;
 				}
 
+				// Deliberately NOT AmountFormat.formatPlain() here: that
+				// rounds to 2 decimals, which would quietly change what
+				// Total actually comes out to once Price is re-multiplied
+				// by Quantity (e.g. 210 / 36 = 5.8333... - rounding that to
+				// "5.83" makes the real total 209.88, not the 210 that was
+				// typed). Keep Price at full precision so the typed Total
+				// is honored exactly, however many decimals that takes.
 				suppress[0] = true;
-				etPurchasePrice.setText(AmountFormat.formatPlain(total / quantity));
+				etPurchasePrice.setText(String.valueOf(total / quantity));
 				suppress[0] = false;
 			}
 		});
