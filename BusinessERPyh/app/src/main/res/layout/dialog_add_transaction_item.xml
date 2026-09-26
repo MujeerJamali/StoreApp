@@ -53,6 +53,16 @@
         android:layout_height="wrap_content"
         android:inputType="numberDecimal" />
 
+    <!-- Editing this recalculates the price above for the current
+         quantity (e.g. 4 @ 50 = 200; changing this to 100 sets price to
+         25) - see Transactioneditactivity#wireQuantityPriceTotalSync. -->
+    <TextView style="@style/FieldLabel" android:text="Total" />
+    <EditText
+        android:id="@+id/et_item_total"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="numberDecimal" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

@@ -29,7 +29,10 @@ BusinessERPyh/                  Gradle project root
   tracking** (e.g. shoe sizes), each variety+size combination keeps its
   own stock balance.
 - **Purchases / Sales** — line-item transactions, size dropdowns on sale
-  items only show sizes with stock, bulk Excel import for purchases.
+  items only show sizes with stock, bulk Excel import for purchases. The
+  Add/Edit Item dialog's Quantity, Price and Total fields are linked live:
+  editing Total back-solves Price at the current Quantity (e.g. 4 @ 50 =
+  200; changing Total to 100 sets Price to 25).
 - **Payments** — payment in/out against a party.
 - **Expenses** — one-off and **recurring** (weekly/monthly/specific dates).
 - **Cash** — a single ledger of all cash movement (sales, purchases,

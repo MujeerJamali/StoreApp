@@ -603,6 +603,11 @@ public class Transactioneditactivity extends Activity {
 		final EditText etPurchasePrice =
 			view.findViewById(R.id.et_purchase_price);
 
+		final EditText etTotal =
+			view.findViewById(R.id.et_item_total);
+
+		wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
+
 		final LinearLayout containerVarieties =
 			view.findViewById(R.id.container_dialog_varieties);
 
@@ -842,6 +847,7 @@ public class Transactioneditactivity extends Activity {
 						actvItem.setText("", false);
 						etQuantity.setText("");
 						etPurchasePrice.setText("");
+						etTotal.setText("");
 
 						containerVarieties.removeAllViews();
 						containerVarieties.setVisibility(View.GONE);
@@ -857,6 +863,125 @@ public class Transactioneditactivity extends Activity {
 		focusAndShowKeyboard(dialog, actvItem);
 
 		dialog.show();
+	}
+
+	// =====================
+	// Links the Add/Edit item dialog's Quantity, Price and Total fields
+	// two ways: editing Quantity or Price recalculates Total as their
+	// product (the normal direction); editing Total instead solves back
+	// for Price at the current Quantity (e.g. 4 @ 50 = 200; changing
+	// Total to 100 sets Price to 25). 'suppress' stops the two directions
+	// from bouncing off each other - each side turns the other's watcher
+	// off while it writes its own programmatic setText().
+	// =====================
+	private void wireQuantityPriceTotalSync(
+		final EditText etQuantity,
+		final EditText etPurchasePrice,
+		final EditText etTotal) {
+
+		final boolean[] suppress = {false};
+
+		android.text.TextWatcher recomputeTotal = new android.text.TextWatcher() {
+
+			@Override
+			public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+			}
+
+			@Override
+			public void onTextChanged(CharSequence s, int start, int before, int count) {
+			}
+
+			@Override
+			public void afterTextChanged(android.text.Editable s) {
+
+				if (suppress[0]) {
+					return;
+				}
+
+				double quantity = 0;
+				double price = 0;
+
+				try {
+					quantity = Double.parseDouble(etQuantity.getText().toString().trim());
+				} catch (Exception e) {
+				}
+
+				try {
+					price = Double.parseDouble(etPurchasePrice.getText().toString().trim());
+				} catch (Exception e) {
+				}
+
+				suppress[0] = true;
+				etTotal.setText(AmountFormat.formatPlain(quantity * price));
+				suppress[0] = false;
+			}
+		};
+
+		etQuantity.addTextChangedListener(recomputeTotal);
+		etPurchasePrice.addTextChangedListener(recomputeTotal);
+
+		etTotal.addTextChangedListener(new android.text.TextWatcher() {
+
+			@Override
+			public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+			}
+
+			@Override
+			public void onTextChanged(CharSequence s, int start, int before, int count) {
+			}
+
+			@Override
+			public void afterTextChanged(android.text.Editable s) {
+
+				if (suppress[0]) {
+					return;
+				}
+
+				double quantity;
+
+				try {
+					quantity = Double.parseDouble(etQuantity.getText().toString().trim());
+				} catch (Exception e) {
+					return;
+				}
+
+				if (quantity <= 0) {
+					return;
+				}
+
+				double total;
+
+				try {
+					total = Double.parseDouble(etTotal.getText().toString().trim());
+				} catch (Exception e) {
+					return;
+				}
+
+				suppress[0] = true;
+				etPurchasePrice.setText(AmountFormat.formatPlain(total / quantity));
+				suppress[0] = false;
+			}
+		});
+
+		// Seed Total from whatever Quantity/Price already hold (e.g. an
+		// existing row being edited) without bouncing that initial write
+		// back into Price.
+		double initialQuantity = 0;
+		double initialPrice = 0;
+
+		try {
+			initialQuantity = Double.parseDouble(etQuantity.getText().toString().trim());
+		} catch (Exception e) {
+		}
+
+		try {
+			initialPrice = Double.parseDouble(etPurchasePrice.getText().toString().trim());
+		} catch (Exception e) {
+		}
+
+		suppress[0] = true;
+		etTotal.setText(AmountFormat.formatPlain(initialQuantity * initialPrice));
+		suppress[0] = false;
 	}
 
 	// =====================
@@ -1370,6 +1495,9 @@ public class Transactioneditactivity extends Activity {
 		final EditText etPurchasePrice =
 			view.findViewById(R.id.et_purchase_price);
 
+		final EditText etTotal =
+			view.findViewById(R.id.et_item_total);
+
 		final LinearLayout containerVarieties =
 			view.findViewById(R.id.container_dialog_varieties);
 
@@ -1413,6 +1541,8 @@ public class Transactioneditactivity extends Activity {
 
 			etQuantity.setText(oldItem.get("quantity").toString());
 			etPurchasePrice.setText(oldItem.get(priceFieldForEdit).toString());
+
+			wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
 
 			final AlertDialog pendingDialog =
 				new AlertDialog.Builder(this)
@@ -1623,6 +1753,8 @@ public class Transactioneditactivity extends Activity {
 		etPurchasePrice.setText(
 			oldItem.get(priceField).toString()
 		);
+
+		wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
 
 		final AlertDialog dialog =
 			new AlertDialog.Builder(this)
