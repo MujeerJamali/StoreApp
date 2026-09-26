@@ -6186,6 +6186,25 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		Integer partyId,
 		String source) {
 
+		return insertExpenseBulk(db, item, date, time, amount, amount, notes, partyId, source);
+	}
+
+	// Vyapar import needs to preserve the historical paid/credit split
+	// (TABLE_EXPENSES.paid_amount) instead of always treating an imported
+	// expense as fully paid - the plain 7-arg overload above still does
+	// that for its one other caller (GenerateEntriesActivity, which has no
+	// paid/credit concept of its own).
+	public long insertExpenseBulk(
+		SQLiteDatabase db,
+		String item,
+		String date,
+		String time,
+		double amount,
+		double paidAmount,
+		String notes,
+		Integer partyId,
+		String source) {
+
 		ContentValues values = new ContentValues();
 
 		values.put("code", generateNextExpenseCode());
@@ -6193,7 +6212,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("date", date);
 		values.put("time", time);
 		values.put("amount", amount);
-		values.put("paid_amount", amount);
+		values.put("paid_amount", paidAmount);
 		values.put("notes", notes);
 		values.put("party_id", partyId);
 		values.put("source", source);
@@ -6221,7 +6240,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		String preferredCode,
 		String name,
 		double purchasePrice,
-		double salePrice) {
+		double salePrice,
+		double extraCostPerUnit) {
 
 		preferredCode = preferredCode == null ? "" : preferredCode.trim();
 		name = name == null || name.trim().length() == 0 ? "Imported Item" : name.trim();
@@ -6236,6 +6256,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("purchase_price", purchasePrice);
 		values.put("sale_price", salePrice);
 		values.put("balance", 0.0);
+		values.put("extra_cost_per_unit", extraCostPerUnit);
 
 		return db.insert(TABLE_ITEMS, null, values);
 	}
@@ -6330,6 +6351,115 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return id;
 	}
 
+	// Bulk-import counterpart of getOrCreateCostItemId() - operates on the
+	// given db (the shared migration connection) instead of
+	// getWritableDatabase(), and is get-or-create by name exactly like the
+	// interactive version, since cost_items.name is UNIQUE and nothing
+	// downstream references a cost item by id (Expenses.item is plain
+	// text), so there's no id to preserve or remap here - only the name
+	// needs to exist again.
+	public long insertCostItemBulk(SQLiteDatabase db, String name) {
+
+		if (name == null || name.trim().length() == 0) {
+			return -1;
+		}
+
+		name = name.trim();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id FROM " + TABLE_COST_ITEMS + " WHERE name=?",
+			new String[]{name}
+		);
+
+		if (cursor.moveToFirst()) {
+
+			long id = cursor.getLong(0);
+			cursor.close();
+			return id;
+		}
+
+		cursor.close();
+
+		ContentValues values = new ContentValues();
+		values.put("name", name);
+
+		return db.insertWithOnConflict(
+			TABLE_COST_ITEMS, null, values, SQLiteDatabase.CONFLICT_IGNORE
+		);
+	}
+
+	// Bulk-import counterpart used only by the Vyapar importer - a raw
+	// insert with none of applySingleExpensePurchaseLink()'s side effects
+	// (it never blends into extra_cost_per_unit or touches cash), since a
+	// Vyapar restore already gets each item's current extra_cost_per_unit
+	// back verbatim via insertItemBulk() above. This only needs to restore
+	// the link record itself, so the linked expense stays excluded from
+	// plain expense totals and the Purchase screen still shows it.
+	public long insertPurchaseExpenseLinkBulk(
+		SQLiteDatabase db, int expenseId, int purchaseId, double sharePercent, double allocatedAmount) {
+
+		ContentValues values = new ContentValues();
+		values.put("expense_id", expenseId);
+		values.put("purchase_id", purchaseId);
+		values.put("share_percent", sharePercent);
+		values.put("allocated_amount", allocatedAmount);
+
+		return db.insert(TABLE_PURCHASE_EXPENSE_LINKS, null, values);
+	}
+
+	// Bulk-import counterpart of insertRecurringExpense() - operates on the
+	// given db and additionally preserves last_generated_date/active
+	// exactly as the backup had them, unlike the interactive version
+	// (always called for a brand-new rule that hasn't generated anything
+	// yet, so it has no last_generated_date and is always active).
+	public long insertRecurringExpenseBulk(
+		SQLiteDatabase db,
+		String item,
+		double amount,
+		String notes,
+		Integer partyId,
+		int frequency,
+		Integer dayOfWeek,
+		Integer dayOfMonth,
+		String specificDates,
+		String startDate,
+		String lastGeneratedDate,
+		boolean active) {
+
+		ContentValues values = new ContentValues();
+		values.put("item", item);
+		values.put("amount", amount);
+		values.put("notes", notes);
+		values.put("party_id", partyId);
+		values.put("frequency", frequency);
+		values.put("day_of_week", dayOfWeek);
+		values.put("day_of_month", dayOfMonth);
+		values.put("specific_dates", specificDates);
+		values.put("start_date", startDate);
+		values.put("last_generated_date", lastGeneratedDate);
+		values.put("active", active ? 1 : 0);
+
+		return db.insert(TABLE_RECURRING_EXPENSES, null, values);
+	}
+
+	// Bulk-import counterpart of insertDraft() - operates on the given db
+	// instead of getWritableDatabase(). The "data" blob's own embedded ids
+	// (party/item/combo/expense) are remapped by the caller (see
+	// ImportVyaparActivity.importDrafts()) before this is called - this
+	// method itself is just a plain insert.
+	public long insertDraftBulk(
+		SQLiteDatabase db, String type, String label, String data, String date, String time) {
+
+		ContentValues values = new ContentValues();
+		values.put("type", type);
+		values.put("label", label);
+		values.put("data", data);
+		values.put("date", date);
+		values.put("time", time);
+
+		return db.insert(TABLE_DRAFTS, null, values);
+	}
+
 	// Looks up the local row id a previously-imported source record
 	// created, or null if that source record hasn't been imported yet.
 	public Long getVybLocalId(SQLiteDatabase db, String vybType, long vybId) {
@@ -6389,6 +6519,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// =====================
 	public void clearAllDataBulk(SQLiteDatabase db) {
 
+		db.delete(TABLE_PURCHASE_EXPENSE_LINKS, null, null);
 		db.delete(TABLE_PURCHASE_ITEMS, null, null);
 		db.delete(TABLE_PURCHASES, null, null);
 		db.delete("sale_items", null, null);
@@ -6402,6 +6533,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		db.delete(TABLE_VARIETY_GROUPS, null, null);
 		db.delete(TABLE_CASH_ADJUSTMENTS, null, null);
 		db.delete(TABLE_WANTED_ITEMS, null, null);
+		db.delete(TABLE_COST_ITEMS, null, null);
+		db.delete(TABLE_RECURRING_EXPENSES, null, null);
+		db.delete(TABLE_DRAFTS, null, null);
 		db.delete(TABLE_ITEMS, null, null);
 		db.delete(TABLE_PARTIES, null, null);
 		db.delete(TABLE_IMPORT_LOG, null, null);

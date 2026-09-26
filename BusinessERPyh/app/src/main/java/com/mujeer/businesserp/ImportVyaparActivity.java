@@ -46,15 +46,20 @@ import java.util.zip.ZipInputStream;
 // Import order (matches the relationships in Vyapar's own schema):
 // Clear -> Parties -> Items -> [Item Varieties] -> Purchases -> Purchase
 // Line Items -> Sales -> Sale Line Items -> Payment In -> Payment Out ->
-// Party to Party transfers -> Expenses.
+// Party to Party transfers -> Expenses -> [Cash Adjustments] -> [Cost
+// Items] -> [Linked Expenses] -> [Recurring Expense Rules] -> [Drafts].
 //
-// Item Varieties (groups/values/combos, and each line item's combo_id) is
-// this app's own extension - see ExportVyaparActivity's businesserp_
-// variety_* tables. It's entirely optional: a real Vyapar backup, or an
-// export made before this app had varieties, simply won't have those
-// tables/columns, which hasVarietyTables/lineItemsHaveComboId below detect
-// up front so that whole step (and combo_id resolution on line items) is
-// just skipped rather than failing the import.
+// Everything in [brackets] is this app's own extension with no equivalent
+// in Vyapar's own schema - see ExportVyaparActivity's businesserp_* tables
+// (and kb_items.item_extra_cost_per_unit/kb_lineitems.combo_id, two extra
+// columns on otherwise Vyapar-shaped tables). Every one of them is entirely
+// optional: a real Vyapar backup, or an export made before this app had
+// that feature, simply won't have the table/column, which
+// hasVarietyTables/lineItemsHaveComboId/itemsHaveExtraCost/
+// hasCostItemsTable/hasPurchaseExpenseLinksTable/hasRecurringExpensesTable/
+// hasDraftsTable below detect up front so that whole step is just skipped
+// (or, for the two extra columns, defaults to 0/null) rather than failing
+// the import.
 // =====================
 public class ImportVyaparActivity extends Activity {
 
@@ -110,6 +115,10 @@ public class ImportVyaparActivity extends Activity {
         int transfersImported, transfersDuplicate;
         int expensesImported, expensesDuplicate;
         int cashAdjustmentsImported, cashAdjustmentsDuplicate;
+        int costItemsImported, costItemsDuplicate;
+        int purchaseExpenseLinksImported, purchaseExpenseLinksDuplicate;
+        int recurringExpensesImported, recurringExpensesDuplicate;
+        int draftsImported, draftsDuplicate;
     }
 
     @Override
@@ -280,6 +289,16 @@ public class ImportVyaparActivity extends Activity {
             // simply skipped below rather than failing the whole restore.
             boolean hasCashAdjustmentsTable = tableExists(vyaparDb, "businesserp_cash_adjustments");
 
+            // More of this app's own extensions, all following the exact
+            // same "detect, then skip the whole step if absent" pattern as
+            // hasVarietyTables/hasCashAdjustmentsTable above, for a backup
+            // exported before each one existed.
+            boolean itemsHaveExtraCost = columnExists(vyaparDb, "kb_items", "item_extra_cost_per_unit");
+            boolean hasCostItemsTable = tableExists(vyaparDb, "businesserp_cost_items");
+            boolean hasPurchaseExpenseLinksTable = tableExists(vyaparDb, "businesserp_purchase_expense_links");
+            boolean hasRecurringExpensesTable = tableExists(vyaparDb, "businesserp_recurring_expenses");
+            boolean hasDraftsTable = tableExists(vyaparDb, "businesserp_drafts");
+
             helper = new DatabaseHelper(this);
             helper.beginTransaction();
             SQLiteDatabase db = helper.getMigrationDatabase();
@@ -299,12 +318,13 @@ public class ImportVyaparActivity extends Activity {
             HashMap<Long, Integer> varietyComboIdMap = new HashMap<Long, Integer>();
             HashMap<Long, Long> purchaseIdMap = new HashMap<Long, Long>();
             HashMap<Long, Long> saleIdMap = new HashMap<Long, Long>();
+            HashMap<Long, Integer> expenseIdMap = new HashMap<Long, Integer>();
 
             setStatus("Importing parties...");
             importParties(vyaparDb, helper, db, partyIdMap, skipped, counts);
 
             setStatus("Importing items...");
-            importItems(vyaparDb, helper, db, itemIdMap, skipped, counts);
+            importItems(vyaparDb, helper, db, itemIdMap, itemsHaveExtraCost, skipped, counts);
 
             if (hasVarietyTables) {
 
@@ -350,12 +370,39 @@ public class ImportVyaparActivity extends Activity {
             importPartyTransfers(vyaparDb, helper, db, partyIdMap, skipped, counts);
 
             setStatus("Importing expenses...");
-            importExpenses(vyaparDb, helper, db, partyIdMap, skipped, counts);
+            importExpenses(vyaparDb, helper, db, partyIdMap, expenseIdMap, skipped, counts);
 
             if (hasCashAdjustmentsTable) {
 
                 setStatus("Importing cash adjustments...");
                 importCashAdjustments(vyaparDb, helper, db, skipped, counts);
+            }
+
+            if (hasCostItemsTable) {
+
+                setStatus("Importing cost items...");
+                importCostItems(vyaparDb, helper, db, skipped, counts);
+            }
+
+            if (hasPurchaseExpenseLinksTable) {
+
+                setStatus("Importing linked expenses...");
+                importPurchaseExpenseLinks(
+                    vyaparDb, helper, db, purchaseIdMap, expenseIdMap, skipped, counts);
+            }
+
+            if (hasRecurringExpensesTable) {
+
+                setStatus("Importing recurring expenses...");
+                importRecurringExpenses(vyaparDb, helper, db, partyIdMap, skipped, counts);
+            }
+
+            if (hasDraftsTable) {
+
+                setStatus("Importing drafts...");
+                importDrafts(
+                    vyaparDb, helper, db, partyIdMap, itemIdMap, varietyComboIdMap,
+                    expenseIdMap, skipped, counts);
             }
 
             setStatus("Logging unsupported transaction types...");
@@ -443,6 +490,22 @@ public class ImportVyaparActivity extends Activity {
                     if (finalCounts.cashAdjustmentsImported > 0 || finalCounts.cashAdjustmentsDuplicate > 0) {
                         summary.append("Cash adjustments: " + finalCounts.cashAdjustmentsImported
 									   + " imported, " + finalCounts.cashAdjustmentsDuplicate + " already imported\n");
+                    }
+                    if (finalCounts.costItemsImported > 0 || finalCounts.costItemsDuplicate > 0) {
+                        summary.append("Cost items: " + finalCounts.costItemsImported
+									   + " imported, " + finalCounts.costItemsDuplicate + " already imported\n");
+                    }
+                    if (finalCounts.purchaseExpenseLinksImported > 0 || finalCounts.purchaseExpenseLinksDuplicate > 0) {
+                        summary.append("Linked expenses: " + finalCounts.purchaseExpenseLinksImported
+									   + " imported, " + finalCounts.purchaseExpenseLinksDuplicate + " already imported\n");
+                    }
+                    if (finalCounts.recurringExpensesImported > 0 || finalCounts.recurringExpensesDuplicate > 0) {
+                        summary.append("Recurring expense rules: " + finalCounts.recurringExpensesImported
+									   + " imported, " + finalCounts.recurringExpensesDuplicate + " already imported\n");
+                    }
+                    if (finalCounts.draftsImported > 0 || finalCounts.draftsDuplicate > 0) {
+                        summary.append("Drafts: " + finalCounts.draftsImported
+									   + " imported, " + finalCounts.draftsDuplicate + " already imported\n");
                     }
 
                     summary.append("\nRows not imported: " + finalSkippedCount);
@@ -687,11 +750,17 @@ public class ImportVyaparActivity extends Activity {
         DatabaseHelper helper,
         SQLiteDatabase db,
         HashMap<Long, Integer> itemIdMap,
+        boolean itemsHaveExtraCost,
         ArrayList<SkippedRow> skipped,
         Counts counts) {
 
+        // item_extra_cost_per_unit is this app's own extension (see
+        // itemsHaveExtraCost in runImport()) - only selected when the
+        // backup's kb_items actually has that column, since a real Vyapar
+        // backup or an export made before landed cost existed won't.
         Cursor c = vyaparDb.rawQuery(
-            "SELECT item_id, item_code, item_name, item_purchase_unit_price, item_sale_unit_price " +
+            "SELECT item_id, item_code, item_name, item_purchase_unit_price, item_sale_unit_price" +
+            (itemsHaveExtraCost ? ", item_extra_cost_per_unit" : "") + " " +
             "FROM kb_items " +
             "WHERE item_type != 2 " +
             "   OR item_id IN (" +
@@ -708,6 +777,7 @@ public class ImportVyaparActivity extends Activity {
             String name = c.getString(2);
             double purchasePrice = c.getDouble(3);
             double salePrice = c.getDouble(4);
+            double extraCostPerUnit = (itemsHaveExtraCost && !c.isNull(5)) ? c.getDouble(5) : 0.0;
             String importKey = "vyb_item_" + itemId;
 
             if (helper.isImportKeyUsedBulk(db, importKey)) {
@@ -722,7 +792,7 @@ public class ImportVyaparActivity extends Activity {
                 continue;
             }
 
-            long localId = helper.insertItemBulk(db, code, name, purchasePrice, salePrice);
+            long localId = helper.insertItemBulk(db, code, name, purchasePrice, salePrice, extraCostPerUnit);
 
             helper.markImportKeyUsedBulk(db, importKey);
             helper.saveVybLocalId(db, "item", itemId, localId);
@@ -831,6 +901,53 @@ public class ImportVyaparActivity extends Activity {
 
         if (fromMap != null) {
             comboIdMap.put(comboId, fromMap.intValue());
+            return fromMap.intValue();
+        }
+
+        return null;
+    }
+
+    // vybPurchaseId is the same OFFSET_PURCHASE_TXN-based value already
+    // used as kb_transactions.txn_id for a purchase (see importPurchases())
+    // - callers with a raw, un-offset local purchase id (none currently)
+    // would need to add ExportVyaparActivity.OFFSET_PURCHASE_TXN first.
+    private Long resolvePurchase(
+        DatabaseHelper helper, SQLiteDatabase db, HashMap<Long, Long> purchaseIdMap, long vybPurchaseId) {
+
+        Long id = purchaseIdMap.get(vybPurchaseId);
+
+        if (id != null) {
+            return id;
+        }
+
+        Long fromMap = helper.getVybLocalId(db, "purchase", vybPurchaseId);
+
+        if (fromMap != null) {
+            purchaseIdMap.put(vybPurchaseId, fromMap);
+            return fromMap;
+        }
+
+        return null;
+    }
+
+    // vybExpenseId is the same OFFSET_EXPENSE_TXN-based value already used
+    // as kb_transactions.txn_id for an expense (see importExpenses()) - a
+    // caller with a raw, un-offset local expense id (a Purchase draft's
+    // pending_linked_expenses - see importDrafts()) must add
+    // ExportVyaparActivity.OFFSET_EXPENSE_TXN to it first.
+    private Integer resolveExpense(
+        DatabaseHelper helper, SQLiteDatabase db, HashMap<Long, Integer> expenseIdMap, long vybExpenseId) {
+
+        Integer id = expenseIdMap.get(vybExpenseId);
+
+        if (id != null) {
+            return id;
+        }
+
+        Long fromMap = helper.getVybLocalId(db, "expense", vybExpenseId);
+
+        if (fromMap != null) {
+            expenseIdMap.put(vybExpenseId, fromMap.intValue());
             return fromMap.intValue();
         }
 
@@ -1625,11 +1742,17 @@ public class ImportVyaparActivity extends Activity {
         DatabaseHelper helper,
         SQLiteDatabase db,
         HashMap<Long, Integer> partyIdMap,
+        HashMap<Long, Integer> expenseIdMap,
         ArrayList<SkippedRow> skipped,
         Counts counts) {
 
+        // amount = txn_cash_amount + txn_balance_amount and paid_amount =
+        // txn_cash_amount, exactly mirroring how importPurchases()/
+        // importSales() reconstruct grand_total/amount_paid - see
+        // ExportVyaparActivity.exportExpenses()'s comment for why.
         Cursor c = vyaparDb.rawQuery(
-            "SELECT t.txn_id, t.txn_date, t.txn_time, t.txn_cash_amount, t.txn_description, n.full_name, " +
+            "SELECT t.txn_id, t.txn_date, t.txn_time, t.txn_cash_amount, t.txn_balance_amount, " +
+            "  t.txn_description, n.full_name, " +
             "  (SELECT GROUP_CONCAT(item_name, ', ') FROM (" +
             "      SELECT ki.item_name AS item_name " +
             "      FROM kb_lineitems li JOIN kb_items ki ON li.item_id = ki.item_id " +
@@ -1645,10 +1768,11 @@ public class ImportVyaparActivity extends Activity {
             long txnId = c.getLong(0);
             String txnDate = c.getString(1);
             int txnTime = c.getInt(2);
-            double amount = c.getDouble(3);
-            String description = c.getString(4);
-            String categoryName = c.getString(5);
-            String lineItemNames = c.getString(6);
+            double cash = c.getDouble(3);
+            double balance = c.getDouble(4);
+            String description = c.getString(5);
+            String categoryName = c.getString(6);
+            String lineItemNames = c.getString(7);
 
             // Optional - most expenses have no party. When present, it's
             // resolved the same way a purchase/sale/payment's party is;
@@ -1656,13 +1780,20 @@ public class ImportVyaparActivity extends Activity {
             // the expense imports without one rather than being skipped,
             // since a party was never required for an expense in the
             // first place (see Expenseeditactivity.saveExpense()).
-            Integer partyId = c.isNull(7)
+            Integer partyId = c.isNull(8)
                 ? null
-                : resolveParty(helper, db, partyIdMap, c.getLong(7));
+                : resolveParty(helper, db, partyIdMap, c.getLong(8));
 
             String importKey = "vyb_expense_" + txnId;
 
             if (helper.isImportKeyUsedBulk(db, importKey)) {
+
+                Long localId = helper.getVybLocalId(db, "expense", txnId);
+
+                if (localId != null) {
+                    expenseIdMap.put(txnId, localId.intValue());
+                }
+
                 counts.expensesDuplicate++;
                 continue;
             }
@@ -1680,18 +1811,25 @@ public class ImportVyaparActivity extends Activity {
                 item = "Uncategorized";
             }
 
-            helper.insertExpenseBulk(
+            double amount = cash + balance;
+            double paidAmount = cash;
+
+            long localId = helper.insertExpenseBulk(
                 db,
                 item,
                 formatDate(txnDate),
                 formatTime(txnTime),
                 amount,
+                paidAmount,
                 description == null ? "" : description,
                 partyId,
                 "Vyapar Import"
             );
 
             helper.markImportKeyUsedBulk(db, importKey);
+            helper.saveVybLocalId(db, "expense", txnId, localId);
+            expenseIdMap.put(txnId, (int) localId);
+
             counts.expensesImported++;
         }
 
@@ -1741,5 +1879,331 @@ public class ImportVyaparActivity extends Activity {
         }
 
         c.close();
+    }
+
+    // =====================
+    // STEP 12 - COST ITEMS (businesserp_cost_items) - this app's own
+    // extension, only present when hasCostItemsTable was true. Nothing
+    // references a cost item by id, so this is a get-or-create-by-name
+    // (see insertCostItemBulk()) rather than a proper id-remapped import -
+    // there is no id to remap anything else through.
+    // =====================
+    private void importCostItems(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery("SELECT id, name FROM businesserp_cost_items", null);
+
+        while (c.moveToNext()) {
+
+            long id = c.getLong(0);
+            String name = c.getString(1);
+
+            String importKey = "vyb_cost_item_" + id;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.costItemsDuplicate++;
+                continue;
+            }
+
+            if (name == null || name.trim().length() == 0) {
+                continue;
+            }
+
+            helper.insertCostItemBulk(db, name);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.costItemsImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // STEP 13 - LINKED EXPENSES (businesserp_purchase_expense_links) -
+    // this app's own extension, only present when
+    // hasPurchaseExpenseLinksTable was true. Run after both importPurchases
+    // and importExpenses, since it needs both maps those steps build.
+    // Restoring each item's extra_cost_per_unit verbatim via importItems()
+    // already restores the actual landed-cost EFFECT of every past link -
+    // this step only restores the link ROW itself, so the linked expense
+    // stays excluded from plain expense totals and the Purchase screen
+    // still shows what it's linked to.
+    // =====================
+    private void importPurchaseExpenseLinks(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Long> purchaseIdMap,
+        HashMap<Long, Integer> expenseIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT id, expense_id, purchase_id, share_percent, allocated_amount " +
+            "FROM businesserp_purchase_expense_links", null);
+
+        while (c.moveToNext()) {
+
+            long id = c.getLong(0);
+            long vybExpenseId = c.getLong(1);
+            long vybPurchaseId = c.getLong(2);
+            double sharePercent = c.getDouble(3);
+            double allocatedAmount = c.getDouble(4);
+
+            String importKey = "vyb_purchase_expense_link_" + id;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.purchaseExpenseLinksDuplicate++;
+                continue;
+            }
+
+            Integer localExpenseId = resolveExpense(helper, db, expenseIdMap, vybExpenseId);
+            Long localPurchaseId = resolvePurchase(helper, db, purchaseIdMap, vybPurchaseId);
+
+            if (localExpenseId == null || localPurchaseId == null) {
+                addSkipped(skipped, "purchase_expense_link", id,
+                    "Expense or purchase for this landed-cost link was not found/imported");
+                continue;
+            }
+
+            helper.insertPurchaseExpenseLinkBulk(
+                db, localExpenseId, localPurchaseId.intValue(), sharePercent, allocatedAmount);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.purchaseExpenseLinksImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // STEP 14 - RECURRING EXPENSE RULES (businesserp_recurring_expenses) -
+    // this app's own extension, only present when hasRecurringExpensesTable
+    // was true. Only the rule itself; the concrete expense rows it has
+    // already generated came back separately as ordinary expenses via
+    // importExpenses() above.
+    // =====================
+    private void importRecurringExpenses(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> partyIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT id, item, amount, notes, party_id, frequency, day_of_week, day_of_month, " +
+            "specific_dates, start_date, last_generated_date, active " +
+            "FROM businesserp_recurring_expenses", null);
+
+        while (c.moveToNext()) {
+
+            long id = c.getLong(0);
+            String item = c.getString(1);
+            double amount = c.getDouble(2);
+            String notes = c.getString(3);
+            Long vybPartyId = c.isNull(4) ? null : c.getLong(4);
+            int frequency = c.getInt(5);
+            Integer dayOfWeek = c.isNull(6) ? null : c.getInt(6);
+            Integer dayOfMonth = c.isNull(7) ? null : c.getInt(7);
+            String specificDates = c.getString(8);
+            String startDate = c.getString(9);
+            String lastGeneratedDate = c.getString(10);
+            boolean active = c.getInt(11) != 0;
+
+            String importKey = "vyb_recurring_expense_" + id;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.recurringExpensesDuplicate++;
+                continue;
+            }
+
+            Integer partyId = resolveParty(helper, db, partyIdMap, vybPartyId);
+
+            helper.insertRecurringExpenseBulk(
+                db, item == null ? "" : item, amount, notes, partyId, frequency,
+                dayOfWeek, dayOfMonth, specificDates, startDate, lastGeneratedDate, active);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.recurringExpensesImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // STEP 15 - DRAFTS (businesserp_drafts) - this app's own extension,
+    // only present when hasDraftsTable was true, and run last, since a
+    // Purchase/Sale draft's remap below needs every map every earlier step
+    // built. Payment and Expense drafts carry no ids at all (see
+    // Paymenteditactivity/Expenseeditactivity saveDraft(), which store
+    // party_name/item as plain text) so they're copied straight through
+    // unchanged; only a Purchase/Sale draft's party_id, each line's item_id/
+    // combo_id, and a Purchase draft's pending_linked_expenses' expense_id
+    // need remapping - see remapPurchaseOrSaleDraftIds().
+    // =====================
+    private void importDrafts(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> partyIdMap,
+        HashMap<Long, Integer> itemIdMap,
+        HashMap<Long, Integer> comboIdMap,
+        HashMap<Long, Integer> expenseIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT id, type, label, data, date, time FROM businesserp_drafts", null);
+
+        while (c.moveToNext()) {
+
+            long id = c.getLong(0);
+            String type = c.getString(1);
+            String label = c.getString(2);
+            String rawData = c.getString(3);
+            String date = c.getString(4);
+            String time = c.getString(5);
+
+            String importKey = "vyb_draft_" + id;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.draftsDuplicate++;
+                continue;
+            }
+
+            HashMap<String, Object> data = DraftCodec.decode(rawData);
+
+            if (DatabaseHelper.DRAFT_TYPE_PURCHASE.equals(type)
+                || DatabaseHelper.DRAFT_TYPE_SALE.equals(type)) {
+
+                remapPurchaseOrSaleDraftIds(
+                    helper, db, data, partyIdMap, itemIdMap, comboIdMap, expenseIdMap);
+            }
+
+            String encoded = DraftCodec.encode(data);
+
+            if (encoded == null) {
+                addSkipped(skipped, "draft", id, "Could not re-encode this draft's data after import");
+                continue;
+            }
+
+            helper.insertDraftBulk(
+                db, type, label == null ? "" : label, encoded,
+                date == null ? "" : date, time == null ? "" : time);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.draftsImported++;
+        }
+
+        c.close();
+    }
+
+    // Rewrites a Purchase/Sale draft's embedded ids (party_id, each line's
+    // item_id/combo_id, and a Purchase draft's pending_linked_expenses'
+    // expense_id) from the original device's local ids to this restore's
+    // newly-assigned ones, using the exact same maps already built for the
+    // real (committed) rows above. A line/party/pending-expense whose id
+    // can't be resolved (e.g. it referenced something not present in this
+    // backup) is dropped rather than left pointing at the wrong thing -
+    // consistent with a draft being allowed to stay incomplete.
+    @SuppressWarnings("unchecked")
+    private void remapPurchaseOrSaleDraftIds(
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<String, Object> data,
+        HashMap<Long, Integer> partyIdMap,
+        HashMap<Long, Integer> itemIdMap,
+        HashMap<Long, Integer> comboIdMap,
+        HashMap<Long, Integer> expenseIdMap) {
+
+        Object oldPartyIdObj = data.get("party_id");
+
+        if (oldPartyIdObj != null) {
+
+            Integer newPartyId = resolveParty(
+                helper, db, partyIdMap, ((Integer) oldPartyIdObj).longValue());
+
+            if (newPartyId != null) {
+                data.put("party_id", newPartyId);
+            } else {
+                data.remove("party_id");
+            }
+        }
+
+        ArrayList<HashMap<String, Object>> items =
+            (ArrayList<HashMap<String, Object>>) data.get("items");
+
+        if (items != null) {
+
+            ArrayList<HashMap<String, Object>> remapped = new ArrayList<HashMap<String, Object>>();
+
+            for (HashMap<String, Object> line : items) {
+
+                Object oldItemIdObj = line.get("item_id");
+
+                if (oldItemIdObj == null) {
+                    remapped.add(line);
+                    continue;
+                }
+
+                Integer newItemId = resolveItem(
+                    helper, db, itemIdMap, ((Integer) oldItemIdObj).longValue());
+
+                if (newItemId == null) {
+                    continue;
+                }
+
+                line.put("item_id", newItemId);
+
+                Object oldComboIdObj = line.get("combo_id");
+
+                if (oldComboIdObj != null) {
+
+                    Integer newComboId = resolveVarietyCombo(
+                        helper, db, comboIdMap, ((Integer) oldComboIdObj).longValue());
+
+                    line.put("combo_id", newComboId);
+                }
+
+                remapped.add(line);
+            }
+
+            data.put("items", remapped);
+        }
+
+        ArrayList<HashMap<String, Object>> pending =
+            (ArrayList<HashMap<String, Object>>) data.get("pending_linked_expenses");
+
+        if (pending != null) {
+
+            ArrayList<HashMap<String, Object>> remappedPending = new ArrayList<HashMap<String, Object>>();
+
+            for (HashMap<String, Object> entry : pending) {
+
+                Object oldExpenseIdObj = entry.get("expense_id");
+
+                if (oldExpenseIdObj == null) {
+                    continue;
+                }
+
+                Integer newExpenseId = resolveExpense(
+                    helper, db, expenseIdMap,
+                    ExportVyaparActivity.OFFSET_EXPENSE_TXN + ((Integer) oldExpenseIdObj).longValue());
+
+                if (newExpenseId == null) {
+                    continue;
+                }
+
+                entry.put("expense_id", newExpenseId);
+                remappedPending.add(entry);
+            }
+
+            data.put("pending_linked_expenses", remappedPending);
+        }
     }
 }

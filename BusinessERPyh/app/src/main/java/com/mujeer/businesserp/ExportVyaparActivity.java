@@ -30,10 +30,13 @@ import java.util.zip.ZipOutputStream;
 // ImportVyaparActivity reads (kb_names, kb_items, kb_transactions,
 // kb_lineitems, party_to_party_transfer - see that class's comments for
 // the exact fields each one carries; every column written here is one the
-// importer actually reads, nothing more), plus this app's own item
-// varieties (groups/values/combos, and each line item's chosen combo_id)
-// in four extra businesserp_variety_* tables that have no equivalent in
-// Vyapar's own schema - see createVyaparShapedTables() below.
+// importer actually reads, nothing more), plus a set of this app's own
+// extensions that have no equivalent in Vyapar's own schema - item
+// varieties (groups/values/combos, and each line item's chosen combo_id),
+// cash adjustments, cost items, purchase-linked expenses (landed cost),
+// recurring expense rules, and drafts - each in its own businesserp_*
+// table (or, for combo_id/extra_cost_per_unit, an extra column on a
+// Vyapar-shaped table) - see createVyaparShapedTables() below.
 //
 // This is NOT a claim that a real Vyapar app can restore from this file -
 // Vyapar's actual schema is closed source and almost certainly has many
@@ -64,7 +67,13 @@ public class ExportVyaparActivity extends Activity {
 	private static final long OFFSET_PURCHASE_TXN = 10_000_000L;
 	private static final long OFFSET_SALE_TXN = 20_000_000L;
 	private static final long OFFSET_PAYMENT_TXN = 30_000_000L;
-	private static final long OFFSET_EXPENSE_TXN = 40_000_000L;
+	// Package-private (not private) - ImportVyaparActivity.importDrafts()
+	// also needs this exact value, to translate a Purchase draft's raw,
+	// un-offset embedded expense_id (see Transactioneditactivity's
+	// pendingLinkedExpenses) into the same offset kb_transactions-style key
+	// exportExpenses()/importExpenses() already use for every real
+	// (committed) expense, rather than duplicating this constant.
+	static final long OFFSET_EXPENSE_TXN = 40_000_000L;
 	private static final long OFFSET_TRANSFER_PAID_TXN = 50_000_000L;
 	private static final long OFFSET_TRANSFER_RECEIVED_TXN = 60_000_000L;
 	private static final long OFFSET_SALE_LINEITEM = 5_000_000L;
@@ -158,6 +167,10 @@ public class ExportVyaparActivity extends Activity {
 			exportPayments(local, vyb);
 			exportExpenses(local, vyb, expenseCategoryNameId);
 			exportPartyTransfers(local, vyb);
+			exportCostItems(local, vyb);
+			exportPurchaseExpenseLinks(local, vyb);
+			exportRecurringExpenses(local, vyb);
+			exportDrafts(local, vyb);
 
 			vyb.setTransactionSuccessful();
 			vyb.endTransaction();
@@ -350,7 +363,13 @@ public class ExportVyaparActivity extends Activity {
 			"item_name TEXT, " +
 			"item_purchase_unit_price REAL, " +
 			"item_sale_unit_price REAL, " +
-			"item_type INTEGER" +
+			"item_type INTEGER, " +
+			// This app's own extension, same reasoning as
+			// kb_lineitems.combo_id below - absent from a real Vyapar
+			// backup or an export made before landed cost existed, which
+			// ImportVyaparActivity's itemsHaveExtraCost detects up front
+			// so it defaults to 0 instead of failing.
+			"item_extra_cost_per_unit REAL" +
 			")"
 		);
 
@@ -452,6 +471,70 @@ public class ExportVyaparActivity extends Activity {
 			"source TEXT" +
 			")"
 		);
+
+		// The reusable cost-item category list (Petrol, Shipping, ...) -
+		// another of this app's own extensions. Nothing else references a
+		// cost item by id (Expenses.item is plain text), so id is not even
+		// preserved on the way back in - see importCostItems().
+		vyb.execSQL(
+			"CREATE TABLE businesserp_cost_items (" +
+			"id INTEGER PRIMARY KEY, " +
+			"name TEXT" +
+			")"
+		);
+
+		// Which Expense is linked to which Purchase as landed cost, and for
+		// how much - see TABLE_PURCHASE_EXPENSE_LINKS. expense_id/
+		// purchase_id are written in the SAME offset id-space as
+		// kb_transactions.txn_id (OFFSET_EXPENSE_TXN/OFFSET_PURCHASE_TXN)
+		// rather than the raw local id, purely so the importer can resolve
+		// them through the exact same purchaseIdMap/"expense" vyb-local-id
+		// map it already builds while importing purchases/expenses above,
+		// with no separate id space of its own to track.
+		vyb.execSQL(
+			"CREATE TABLE businesserp_purchase_expense_links (" +
+			"id INTEGER PRIMARY KEY, " +
+			"expense_id INTEGER, " +
+			"purchase_id INTEGER, " +
+			"share_percent REAL, " +
+			"allocated_amount REAL" +
+			")"
+		);
+
+		// Recurring expense rules (weekly/monthly/specific dates) - only
+		// the rule itself; the concrete expense rows it has already
+		// generated travel as ordinary expenses via exportExpenses().
+		vyb.execSQL(
+			"CREATE TABLE businesserp_recurring_expenses (" +
+			"id INTEGER PRIMARY KEY, " +
+			"item TEXT, " +
+			"amount REAL, " +
+			"notes TEXT, " +
+			"party_id INTEGER, " +
+			"frequency INTEGER, " +
+			"day_of_week INTEGER, " +
+			"day_of_month INTEGER, " +
+			"specific_dates TEXT, " +
+			"start_date TEXT, " +
+			"last_generated_date TEXT, " +
+			"active INTEGER" +
+			")"
+		);
+
+		// Parked mid-entry Sale/Purchase/Payment/Expense drafts - "data" is
+		// that screen's own opaque blob (see DraftCodec), which a Purchase
+		// or Sale draft's ids inside get remapped before being written back
+		// in - see ImportVyaparActivity.importDrafts().
+		vyb.execSQL(
+			"CREATE TABLE businesserp_drafts (" +
+			"id INTEGER PRIMARY KEY, " +
+			"type TEXT, " +
+			"label TEXT, " +
+			"data TEXT, " +
+			"date TEXT, " +
+			"time TEXT" +
+			")"
+		);
 	}
 
 	// =====================
@@ -481,7 +564,7 @@ public class ExportVyaparActivity extends Activity {
 	private void exportItems(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
-			"SELECT id, code, name, purchase_price, sale_price FROM items", null);
+			"SELECT id, code, name, purchase_price, sale_price, extra_cost_per_unit FROM items", null);
 
 		while (c.moveToNext()) {
 
@@ -492,6 +575,7 @@ public class ExportVyaparActivity extends Activity {
 			values.put("item_purchase_unit_price", c.getDouble(3));
 			values.put("item_sale_unit_price", c.getDouble(4));
 			values.put("item_type", 1);
+			values.put("item_extra_cost_per_unit", c.getDouble(5));
 
 			vyb.insert("kb_items", null, values);
 		}
@@ -848,12 +932,20 @@ public class ExportVyaparActivity extends Activity {
 	// uses those for a more specific "what was this for" than the
 	// category, and this app doesn't track anything more specific than
 	// the description already captured as the category itself.
+	//
+	// txn_cash_amount/txn_balance_amount split paid_amount from the
+	// unpaid/credit remainder (amount - paid_amount), exactly mirroring
+	// how exportPurchases()/exportSales() already split cash vs balance -
+	// so importExpenses() can reconstruct both amount (cash+balance) and
+	// paid_amount (cash) the same way importPurchases() reconstructs
+	// grand_total, instead of every imported expense coming back fully
+	// paid regardless of its original paid/credit split.
 	// =====================
 	private void exportExpenses(
 		SQLiteDatabase local, SQLiteDatabase vyb, HashMap<String, Long> categoryNameId) {
 
 		Cursor c = local.rawQuery(
-			"SELECT id, item, date, time, amount, notes, party_id FROM expenses", null);
+			"SELECT id, item, date, time, amount, paid_amount, notes, party_id FROM expenses", null);
 
 		while (c.moveToNext()) {
 
@@ -862,8 +954,9 @@ public class ExportVyaparActivity extends Activity {
 			String date = c.getString(2);
 			String time = c.getString(3);
 			double amount = c.getDouble(4);
-			String notes = c.getString(5);
-			Integer partyId = c.isNull(6) ? null : c.getInt(6);
+			double paidAmount = c.getDouble(5);
+			String notes = c.getString(6);
+			Integer partyId = c.isNull(7) ? null : c.getInt(7);
 
 			Long categoryId = item == null ? null : categoryNameId.get(item);
 
@@ -872,8 +965,8 @@ public class ExportVyaparActivity extends Activity {
 			values.put("txn_type", 7);
 			values.put("txn_date", toVyaparDate(date));
 			values.put("txn_time", toVyaparTime(time));
-			values.put("txn_cash_amount", amount);
-			values.put("txn_balance_amount", 0.0);
+			values.put("txn_cash_amount", paidAmount);
+			values.put("txn_balance_amount", amount - paidAmount);
 			values.put("txn_description", notes == null ? "" : notes);
 
 			if (categoryId != null) {
@@ -888,6 +981,128 @@ public class ExportVyaparActivity extends Activity {
 			}
 
 			vyb.insert("kb_transactions", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// COST ITEMS -> businesserp_cost_items (1:1 copy). Nothing else
+	// references a cost item by id (Expenses.item is plain text), so id is
+	// carried across purely for readability, not because anything resolves
+	// through it on the way back in.
+	// =====================
+	private void exportCostItems(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery("SELECT id, name FROM cost_items", null);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("id", c.getLong(0));
+			values.put("name", c.getString(1));
+
+			vyb.insert("businesserp_cost_items", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// LINKED EXPENSES -> businesserp_purchase_expense_links. expense_id/
+	// purchase_id are written in the same offset id-space as
+	// kb_transactions.txn_id (see exportExpenses()/exportPurchases()) so
+	// ImportVyaparActivity.importPurchaseExpenseLinks() can resolve them
+	// through the exact same maps those two steps already build.
+	// =====================
+	private void exportPurchaseExpenseLinks(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery(
+			"SELECT id, expense_id, purchase_id, share_percent, allocated_amount " +
+			"FROM purchase_expense_links", null);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("id", c.getLong(0));
+			values.put("expense_id", OFFSET_EXPENSE_TXN + c.getLong(1));
+			values.put("purchase_id", OFFSET_PURCHASE_TXN + c.getLong(2));
+			values.put("share_percent", c.getDouble(3));
+			values.put("allocated_amount", c.getDouble(4));
+
+			vyb.insert("businesserp_purchase_expense_links", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// RECURRING EXPENSE RULES -> businesserp_recurring_expenses (1:1
+	// copy). party_id is a raw local party id - the same id space
+	// kb_names.name_id already copies parties into with no offset, so
+	// ImportVyaparActivity.importRecurringExpenses() resolves it through
+	// the same partyIdMap purchases/sales/expenses already use.
+	// =====================
+	private void exportRecurringExpenses(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery(
+			"SELECT id, item, amount, notes, party_id, frequency, day_of_week, day_of_month, " +
+			"specific_dates, start_date, last_generated_date, active FROM recurring_expenses", null);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("id", c.getLong(0));
+			values.put("item", c.getString(1));
+			values.put("amount", c.getDouble(2));
+			values.put("notes", c.getString(3));
+
+			if (!c.isNull(4)) {
+				values.put("party_id", c.getLong(4));
+			}
+
+			values.put("frequency", c.getInt(5));
+
+			if (!c.isNull(6)) {
+				values.put("day_of_week", c.getInt(6));
+			}
+
+			if (!c.isNull(7)) {
+				values.put("day_of_month", c.getInt(7));
+			}
+
+			values.put("specific_dates", c.getString(8));
+			values.put("start_date", c.getString(9));
+			values.put("last_generated_date", c.getString(10));
+			values.put("active", c.getInt(11));
+
+			vyb.insert("businesserp_recurring_expenses", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// DRAFTS -> businesserp_drafts (1:1 copy of the row; the "data" blob's
+	// own embedded ids are remapped on the way back IN, not out - see
+	// ImportVyaparActivity.importDrafts() - since export doesn't yet know
+	// what ids this backup will be restored into).
+	// =====================
+	private void exportDrafts(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery("SELECT id, type, label, data, date, time FROM drafts", null);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("id", c.getLong(0));
+			values.put("type", c.getString(1));
+			values.put("label", c.getString(2));
+			values.put("data", c.getString(3));
+			values.put("date", c.getString(4));
+			values.put("time", c.getString(5));
+
+			vyb.insert("businesserp_drafts", null, values);
 		}
 
 		c.close();

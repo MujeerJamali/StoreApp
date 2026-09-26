@@ -88,8 +88,15 @@ BusinessERPyh/                  Gradle project root
 - **Generate Entries** — bulk-create sale/purchase/payment/expense entries
   across a date range via a calendar tap UI.
 - **Data tools** — bulk Excel import for purchases and items; full backup
-  export/import in Vyapar's `.vyb` format (round-trips this app's own
-  variety/combo and cash-adjustment data alongside standard Vyapar data).
+  export/import in Vyapar's `.vyb` format. Alongside standard Vyapar data
+  (parties, items, purchases, sales, payments, expenses, party transfers),
+  it round-trips every one of this app's own extensions: item variety/
+  combo tracking, cash adjustments, each item's Extra Cost/Unit, each
+  expense's paid/credit split, Cost Items, Expense-to-Purchase landed-cost
+  links, recurring expense rules, and Drafts (a Purchase/Sale draft's
+  party/item/size/linked-expense selections are re-mapped to the restored
+  device's new ids; a Payment/Expense draft has none to remap). Restoring
+  is a full replace, not a merge, for every one of these too.
 
 ## Landed cost (Extra Cost/Unit)
 
