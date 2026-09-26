@@ -30,7 +30,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // again when this number goes up, so without the bump an existing
     // install never gets the new table and generateDueRecurringExpenses()
     // (called every app open) crashes with "no such table".
-    public static final int DATABASE_VERSION = 16;
+    // Bumped 16 -> 17 to add "drafts" (a Sale/Purchase/Payment/Expense
+    // saved mid-entry, to be finished later from the Drafts screen).
+    public static final int DATABASE_VERSION = 17;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -94,6 +96,20 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// far it's already caught up to, so a rule never double-generates
 	// even across many days the app wasn't opened.
 	public static final String TABLE_RECURRING_EXPENSES = "recurring_expenses";
+
+	// A Sale/Purchase/Payment/Expense saved mid-entry instead of being
+	// committed as a real transaction - "type" is which editor it came
+	// from and "data" is that screen's fields (and item list, for a
+	// Sale/Purchase) serialized as JSON. Nothing here ever affects cash,
+	// stock, or party balances until it's opened from the Drafts screen
+	// and actually saved for real, at which point the draft row is
+	// deleted.
+	public static final String TABLE_DRAFTS = "drafts";
+
+	public static final String DRAFT_TYPE_SALE = "sale";
+	public static final String DRAFT_TYPE_PURCHASE = "purchase";
+	public static final String DRAFT_TYPE_PAYMENT = "payment";
+	public static final String DRAFT_TYPE_EXPENSE = "expense";
 
 	public static final int RECURRING_DAILY = 1;
 	public static final int RECURRING_WEEKLY = 2;
@@ -323,6 +339,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"start_date TEXT NOT NULL, " +
 			"last_generated_date TEXT, " +
 			"active INTEGER NOT NULL DEFAULT 1" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_DRAFTS + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"type TEXT NOT NULL, " +
+			"label TEXT NOT NULL, " +
+			"data TEXT NOT NULL, " +
+			"date TEXT NOT NULL, " +
+			"time TEXT NOT NULL" +
 			")"
 		);
 
@@ -6113,6 +6140,88 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		SQLiteDatabase db = this.getWritableDatabase();
 
 		db.delete(TABLE_CASH_ADJUSTMENTS, "id=?", new String[]{String.valueOf(id)});
+	}
+
+	// =====================
+	// DRAFTS - a Sale/Purchase/Payment/Expense saved mid-entry instead of
+	// committed for real. "data" is that screen's own JSON, opaque to
+	// everything except the editor that wrote it.
+	// =====================
+	public long insertDraft(String type, String label, String data, String date, String time) {
+
+		ContentValues values = new ContentValues();
+		values.put("type", type);
+		values.put("label", label);
+		values.put("data", data);
+		values.put("date", date);
+		values.put("time", time);
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		return db.insert(TABLE_DRAFTS, null, values);
+	}
+
+	public ArrayList<HashMap<String, Object>> getAllDrafts() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, type, label, date, time FROM " + TABLE_DRAFTS +
+			" ORDER BY date DESC, time DESC, id DESC",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+			row.put("id", cursor.getInt(0));
+			row.put("type", cursor.getString(1));
+			row.put("label", cursor.getString(2));
+			row.put("date", cursor.getString(3));
+			row.put("time", cursor.getString(4));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	public HashMap<String, Object> getDraftById(int id) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, type, label, data, date, time FROM " + TABLE_DRAFTS + " WHERE id=?",
+			new String[]{String.valueOf(id)}
+		);
+
+		HashMap<String, Object> row = null;
+
+		if (cursor.moveToFirst()) {
+
+			row = new HashMap<String, Object>();
+			row.put("id", cursor.getInt(0));
+			row.put("type", cursor.getString(1));
+			row.put("label", cursor.getString(2));
+			row.put("data", cursor.getString(3));
+			row.put("date", cursor.getString(4));
+			row.put("time", cursor.getString(5));
+		}
+
+		cursor.close();
+
+		return row;
+	}
+
+	public void deleteDraft(int id) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.delete(TABLE_DRAFTS, "id=?", new String[]{String.valueOf(id)});
 	}
 
 	// =====================

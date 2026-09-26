@@ -37,10 +37,14 @@ public class Paymenteditactivity extends Activity {
 	private TextView tv_cash_after;
 
 	private Button btn_save;
+	private Button btn_save_draft;
 
 	private DatabaseHelper db;
 
 	private int paymentId = 0;
+
+	// Set when opened from the Drafts list - see saveDraft()/loadDraft().
+	private int draftId = -1;
 
 	// See loadCashBaseline()/updateCashPreview() - the cash balance with
 	// this payment's own (original, on-disk) cash effect excluded, so
@@ -98,6 +102,7 @@ public class Paymenteditactivity extends Activity {
 		tv_cash_before = findViewById(R.id.tv_cash_before);
 		tv_cash_after = findViewById(R.id.tv_cash_after);
 		btn_save = findViewById(R.id.btn_save);
+		btn_save_draft = findViewById(R.id.btn_save_draft);
 
 		et_amount.addTextChangedListener(
 			new android.text.TextWatcher() {
@@ -127,7 +132,24 @@ public class Paymenteditactivity extends Activity {
 			DatabaseHelper.PAYMENT_IN
 		);
 
+		draftId = getIntent().getIntExtra(
+			"draft_id",
+			-1
+		);
+
 		setSelectedType(selectedType);
+
+		btn_save_draft.setVisibility(paymentId == 0 ? View.VISIBLE : View.GONE);
+
+		btn_save_draft.setOnClickListener(
+			new View.OnClickListener() {
+
+				@Override
+				public void onClick(View v) {
+					saveDraft();
+				}
+			}
+		);
 
 		btn_type_in.setOnClickListener(
 			new View.OnClickListener() {
@@ -224,6 +246,10 @@ public class Paymenteditactivity extends Activity {
 			);
 
 			focusAndShowKeyboard(et_party);
+
+			if (draftId != -1) {
+				loadDraft(draftId);
+			}
 
 			loadCashBaseline(0);
 
@@ -432,6 +458,92 @@ public class Paymenteditactivity extends Activity {
 		return "Balance: 0 (Settled)";
 	}
 
+	// =====================
+	// Restores whatever was on screen when this payment was parked as a
+	// draft - see saveDraft() for what gets written.
+	// =====================
+	private void loadDraft(int id) {
+
+		HashMap<String, Object> draftRow = db.getDraftById(id);
+
+		if (draftRow == null) {
+			return;
+		}
+
+		HashMap<String, Object> data = DraftCodec.decode((String) draftRow.get("data"));
+
+		if (data.get("type") != null) {
+			setSelectedType((Integer) data.get("type"));
+		}
+
+		if (data.get("party_name") != null) {
+			et_party.setText((String) data.get("party_name"));
+		}
+
+		if (data.get("date") != null) {
+			et_date.setText((String) data.get("date"));
+		}
+
+		if (data.get("time") != null) {
+			et_time.setText((String) data.get("time"));
+		}
+
+		if (data.get("amount") != null) {
+			et_amount.setText((String) data.get("amount"));
+		}
+
+		if (data.get("notes") != null) {
+			et_notes.setText((String) data.get("notes"));
+		}
+	}
+
+	// =====================
+	// Parks whatever is currently on screen as a draft - none of
+	// savePayment()'s validation applies here, a draft is allowed to be
+	// incomplete until it's actually saved for real.
+	// =====================
+	private void saveDraft() {
+
+		HashMap<String, Object> data = new HashMap<String, Object>();
+
+		data.put("type", selectedType);
+		data.put("party_name", et_party.getText().toString().trim());
+		data.put("date", et_date.getText().toString());
+		data.put("time", et_time.getText().toString());
+		data.put("amount", et_amount.getText().toString());
+		data.put("notes", et_notes.getText().toString());
+
+		String encoded = DraftCodec.encode(data);
+
+		if (encoded == null) {
+
+			Toast.makeText(this, "Could not save draft", Toast.LENGTH_SHORT).show();
+			return;
+		}
+
+		String partyLabel = et_party.getText().toString().trim();
+
+		if (partyLabel.isEmpty()) {
+			partyLabel = "No party";
+		}
+
+		String label =
+			(selectedType == DatabaseHelper.PAYMENT_IN ? "Payment In" : "Payment Out") +
+			" - " + partyLabel;
+
+		db.insertDraft(
+			DatabaseHelper.DRAFT_TYPE_PAYMENT,
+			label,
+			encoded,
+			et_date.getText().toString(),
+			et_time.getText().toString()
+		);
+
+		Toast.makeText(this, "Saved as draft", Toast.LENGTH_SHORT).show();
+
+		finish();
+	}
+
 	private void savePayment() {
 
 		int partyId = getSelectedPartyId();
@@ -544,6 +656,11 @@ public class Paymenteditactivity extends Activity {
 		}
 
 		if (success) {
+
+			if (paymentId == 0 && draftId != -1) {
+				db.deleteDraft(draftId);
+				draftId = -1;
+			}
 
 			Toast.makeText(
 				this,

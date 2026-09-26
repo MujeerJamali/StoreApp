@@ -216,6 +216,11 @@
             android:label="Wanted Items"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
+        <activity
+            android:name=".DraftsActivity"
+            android:label="Drafts"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
         <!-- Main (dashboard) -->
         <activity
             android:name=".MainActivity"

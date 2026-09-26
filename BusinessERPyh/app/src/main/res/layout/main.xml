@@ -287,6 +287,16 @@
                     style="@style/ToolRow"
                     android:text="Recurring Expenses" />
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <Button
+                    android:id="@+id/btn_drafts"
+                    style="@style/ToolRow"
+                    android:text="Drafts" />
+
             </LinearLayout>
 
         </LinearLayout>

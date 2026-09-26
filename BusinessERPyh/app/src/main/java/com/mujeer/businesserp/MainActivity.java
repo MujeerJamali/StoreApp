@@ -33,6 +33,7 @@ public class MainActivity extends Activity {
 	Button btn_cash;
 	Button btn_wanted_items;
 	Button btn_recurring_expenses;
+	Button btn_drafts;
 
 	Button btn_quick_add;
 
@@ -66,6 +67,7 @@ public class MainActivity extends Activity {
 		btn_cash = findViewById(R.id.btn_cash);
 		btn_wanted_items = findViewById(R.id.btn_wanted_items);
 		btn_recurring_expenses = findViewById(R.id.btn_recurring_expenses);
+		btn_drafts = findViewById(R.id.btn_drafts);
 
 		btn_quick_add = findViewById(R.id.btn_quick_add);
 
@@ -235,6 +237,19 @@ public class MainActivity extends Activity {
 					Intent intent = new Intent(
 						MainActivity.this,
 						RecurringExpensesActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_drafts.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						DraftsActivity.class
 					);
 
 					startActivity(intent);

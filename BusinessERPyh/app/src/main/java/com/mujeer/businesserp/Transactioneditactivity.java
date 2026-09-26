@@ -42,6 +42,11 @@ public class Transactioneditactivity extends Activity {
 	private int transactionType = TYPE_PURCHASE;
 	private boolean isEditMode = false;
 	private int transactionId = -1;
+
+	// Set when this screen was opened from the Drafts list to finish a
+	// parked Sale/Purchase - once the real save succeeds, this draft row
+	// is deleted so it doesn't linger alongside the now-real transaction.
+	private int draftId = -1;
 	
 	AutoCompleteTextView actv_party;
     EditText et_date, et_time, et_invoice_number, et_amount_paid, et_notes;
@@ -53,6 +58,7 @@ public class Transactioneditactivity extends Activity {
     TextView tv_page_title;
     Button btn_add_item, btn_save_transaction, btn_go_dashboard;
     Button btn_cancel_transaction, btn_save_and_new_transaction;
+    Button btn_save_draft;
     ListView lv_transaction_items;
     ScrollView scroll_transaction_edit;
     View items_section_container;
@@ -123,6 +129,11 @@ public class Transactioneditactivity extends Activity {
 
 		transactionId = getIntent().getIntExtra(
 			"transaction_id",
+			-1
+		);
+
+		draftId = getIntent().getIntExtra(
+			"draft_id",
 			-1
 		);
 
@@ -197,6 +208,18 @@ public class Transactioneditactivity extends Activity {
         btn_cancel_transaction = findViewById(R.id.btn_cancel_transaction);
         btn_save_and_new_transaction = findViewById(R.id.btn_save_and_new_transaction);
         btn_go_dashboard = findViewById(R.id.btn_go_dashboard);
+        btn_save_draft = findViewById(R.id.btn_save_draft);
+
+        // Only makes sense for a not-yet-real transaction - editing one
+        // that already exists in the database has nothing to "park".
+        btn_save_draft.setVisibility(isEditMode ? View.GONE : View.VISIBLE);
+
+        btn_save_draft.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					saveDraft();
+				}
+			});
 
 		btn_go_dashboard.setOnClickListener(new View.OnClickListener() {
 				@Override
@@ -301,6 +324,10 @@ public class Transactioneditactivity extends Activity {
 
 			if (transactionType == TYPE_PURCHASE) {
 				loadPrefilledItemsFromIntent();
+			}
+
+			if (draftId != -1) {
+				loadDraft(draftId);
 			}
 		}
 
@@ -1029,6 +1056,146 @@ public class Transactioneditactivity extends Activity {
 		setListViewHeightBasedOnChildren(lv_transaction_items);
 
 		updateGrandTotal();
+	}
+
+	// =====================
+	// Restores every field this screen can hold from a draft saved
+	// earlier via saveDraft() - whatever was there when it was parked,
+	// complete or not, since a draft is explicitly allowed to be
+	// incomplete until the user actually hits Save/Update.
+	// =====================
+	@SuppressWarnings("unchecked")
+	private void loadDraft(int id) {
+
+		HashMap<String, Object> draftRow = db.getDraftById(id);
+
+		if (draftRow == null) {
+			return;
+		}
+
+		HashMap<String, Object> data = DraftCodec.decode((String) draftRow.get("data"));
+
+		Integer partyId = (Integer) data.get("party_id");
+
+		if (partyId != null) {
+
+			for (int i = 0; i < parties.size(); i++) {
+
+				if (((Integer) parties.get(i).get("id")).intValue() == partyId.intValue()) {
+
+					actv_party.setText((String) parties.get(i).get("name"), false);
+					break;
+				}
+			}
+		}
+
+		if (data.get("date") != null) {
+			et_date.setText((String) data.get("date"));
+		}
+
+		if (data.get("time") != null) {
+			timeManuallySet = true;
+			et_time.setText((String) data.get("time"));
+		}
+
+		if (data.get("invoice_number") != null) {
+			et_invoice_number.setText((String) data.get("invoice_number"));
+		}
+
+		if (data.get("notes") != null && ((String) data.get("notes")).length() > 0) {
+
+			et_notes.setText((String) data.get("notes"));
+			et_notes.setVisibility(View.VISIBLE);
+			tv_add_note.setVisibility(View.GONE);
+		}
+
+		if (data.get("amount_paid") != null) {
+
+			amountPaidEditedByUser = true;
+			et_amount_paid.setText((String) data.get("amount_paid"));
+		}
+
+		ArrayList<HashMap<String, Object>> items =
+			(ArrayList<HashMap<String, Object>>) data.get("items");
+
+		if (items != null && !items.isEmpty()) {
+
+			transactionItemList.clear();
+			transactionItemList.addAll(items);
+
+			transactionItemAdapter.notifyDataSetChanged();
+
+			setListViewHeightBasedOnChildren(lv_transaction_items);
+
+			updateGrandTotal();
+		}
+	}
+
+	// =====================
+	// Parks whatever is currently on screen as a draft, without any of
+	// the validation a real save requires (missing party, no items, an
+	// amount that doesn't parse - all fine here, since finishing the
+	// entry later is exactly what a draft is for). Deliberately mirrors
+	// only the fields this screen has, generically enough that both
+	// Purchase and Sale use the same method.
+	// =====================
+	private void saveDraft() {
+
+		HashMap<String, Object> data = new HashMap<String, Object>();
+
+		int partyPosition = getSelectedPartyPosition();
+
+		if (partyPosition != -1) {
+			data.put("party_id", parties.get(partyPosition).get("id"));
+		}
+
+		data.put("date", et_date.getText().toString());
+		data.put("time", et_time.getText().toString());
+		data.put("invoice_number", et_invoice_number.getText().toString());
+		data.put("notes", et_notes.getText().toString());
+		data.put("amount_paid", et_amount_paid.getText().toString());
+		data.put("items", new ArrayList<HashMap<String, Object>>(transactionItemList));
+
+		String encoded = DraftCodec.encode(data);
+
+		if (encoded == null) {
+
+			android.widget.Toast.makeText(
+				this,
+				"Could not save draft",
+				android.widget.Toast.LENGTH_SHORT
+			).show();
+
+			return;
+		}
+
+		String partyLabel = "No party";
+
+		if (partyPosition != -1) {
+			partyLabel = (String) parties.get(partyPosition).get("name");
+		}
+
+		String label =
+			(transactionType == TYPE_PURCHASE ? "Purchase" : "Sale") +
+			" - " + partyLabel + " - " + transactionItemList.size() +
+			(transactionItemList.size() == 1 ? " item" : " items");
+
+		db.insertDraft(
+			transactionType == TYPE_PURCHASE ?
+				DatabaseHelper.DRAFT_TYPE_PURCHASE : DatabaseHelper.DRAFT_TYPE_SALE,
+			label,
+			encoded,
+			et_date.getText().toString(),
+			et_time.getText().toString()
+		);
+
+		android.widget.Toast.makeText(
+			this,
+			"Saved as draft",
+			android.widget.Toast.LENGTH_SHORT
+		).show();
+
+		finish();
 	}
 
 	// =====================
@@ -2280,6 +2447,11 @@ public class Transactioneditactivity extends Activity {
 			);
 			}
 
+		if (draftId != -1) {
+			db.deleteDraft(draftId);
+			draftId = -1;
+		}
+
 		android.widget.Toast.makeText(
 		this,
 		isEditMode ? "Purchase updated" : "Purchase saved",
@@ -2917,6 +3089,11 @@ public class Transactioneditactivity extends Activity {
 			itemData.put("combo_id", item.get("combo_id"));
 
 			db.insertSaleItem(itemData);
+		}
+
+		if (draftId != -1) {
+			db.deleteDraft(draftId);
+			draftId = -1;
 		}
 
 		android.widget.Toast.makeText(

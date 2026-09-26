@@ -37,7 +37,16 @@ BusinessERPyh/                  Gradle project root
 - **Expenses** — one-off and **recurring** (weekly/monthly/specific dates).
 - **Cash** — a single ledger of all cash movement (sales, purchases,
   payments, expenses, manual adjustments); tapping a row opens its real
-  source transaction.
+  source transaction. **A transaction is rejected if it would take the
+  cash balance below 0** — Purchase/Payment Out/Expense amounts and a
+  negative Cash Adjustment are all checked before saving; a Sale,
+  Payment In, or positive adjustment is never blocked, since it only
+  ever adds cash.
+- **Drafts** — a Sale, Purchase, Payment or Expense can be parked
+  mid-entry via a "Save as Draft" button on its editor, skipping that
+  screen's normal validation. The Drafts screen lists every parked
+  entry; tapping one reopens the right editor prefilled from it, and
+  the draft is deleted once it's actually saved for real.
 - **Generate Entries** — bulk-create sale/purchase/payment/expense entries
   across a date range via a calendar tap UI.
 - **Data tools** — bulk Excel import for purchases and items; full backup

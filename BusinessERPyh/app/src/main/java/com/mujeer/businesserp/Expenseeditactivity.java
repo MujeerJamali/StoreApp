@@ -39,10 +39,14 @@ public class Expenseeditactivity extends Activity {
 	private TextView tv_cash_after;
 
 	private Button btn_save;
+	private Button btn_save_draft;
 
 	private DatabaseHelper db;
 
 	private int expenseId = 0;
+
+	// Set when opened from the Drafts list - see saveDraft()/loadDraft().
+	private int draftId = -1;
 
 	// See loadCashBaseline()/updateCashPreview() - the cash balance with
 	// this expense's own (original, on-disk) cash effect excluded.
@@ -87,6 +91,7 @@ public class Expenseeditactivity extends Activity {
 		tv_cash_after = findViewById(R.id.tv_cash_after);
 
 		btn_save = findViewById(R.id.btn_save);
+		btn_save_draft = findViewById(R.id.btn_save_draft);
 
 		db = new DatabaseHelper(this);
 
@@ -156,6 +161,23 @@ public class Expenseeditactivity extends Activity {
 			0
 		);
 
+		draftId = getIntent().getIntExtra(
+			"draft_id",
+			-1
+		);
+
+		btn_save_draft.setVisibility(expenseId == 0 ? View.VISIBLE : View.GONE);
+
+		btn_save_draft.setOnClickListener(
+			new View.OnClickListener() {
+
+				@Override
+				public void onClick(View v) {
+					saveDraft();
+				}
+			}
+		);
+
 		if (expenseId == 0) {
 
 			tv_code.setText(
@@ -179,6 +201,10 @@ public class Expenseeditactivity extends Activity {
 			et_amount_paid.setText("0");
 
 			focusAndShowKeyboard(et_item);
+
+			if (draftId != -1) {
+				loadDraft(draftId);
+			}
 
 			loadCashBaseline(0);
 
@@ -392,6 +418,95 @@ public class Expenseeditactivity extends Activity {
 		);
 	}
 
+	// =====================
+	// Restores whatever was on screen when this expense was parked as a
+	// draft - see saveDraft() for what gets written.
+	// =====================
+	private void loadDraft(int id) {
+
+		HashMap<String, Object> draftRow = db.getDraftById(id);
+
+		if (draftRow == null) {
+			return;
+		}
+
+		HashMap<String, Object> data = DraftCodec.decode((String) draftRow.get("data"));
+
+		if (data.get("item") != null) {
+			et_item.setText((String) data.get("item"));
+		}
+
+		if (data.get("party_name") != null) {
+			actv_party.setText((String) data.get("party_name"));
+		}
+
+		if (data.get("date") != null) {
+			et_date.setText((String) data.get("date"));
+		}
+
+		if (data.get("time") != null) {
+			et_time.setText((String) data.get("time"));
+		}
+
+		if (data.get("amount") != null) {
+			et_amount.setText((String) data.get("amount"));
+		}
+
+		if (data.get("amount_paid") != null) {
+			et_amount_paid.setText((String) data.get("amount_paid"));
+		}
+
+		if (data.get("notes") != null) {
+			et_notes.setText((String) data.get("notes"));
+		}
+	}
+
+	// =====================
+	// Parks whatever is currently on screen as a draft - none of
+	// saveExpense()'s validation applies here, a draft is allowed to be
+	// incomplete until it's actually saved for real.
+	// =====================
+	private void saveDraft() {
+
+		HashMap<String, Object> data = new HashMap<String, Object>();
+
+		data.put("item", et_item.getText().toString().trim());
+		data.put("party_name", actv_party.getText().toString().trim());
+		data.put("date", et_date.getText().toString());
+		data.put("time", et_time.getText().toString());
+		data.put("amount", et_amount.getText().toString());
+		data.put("amount_paid", et_amount_paid.getText().toString());
+		data.put("notes", et_notes.getText().toString());
+
+		String encoded = DraftCodec.encode(data);
+
+		if (encoded == null) {
+
+			Toast.makeText(this, "Could not save draft", Toast.LENGTH_SHORT).show();
+			return;
+		}
+
+		String itemLabel = et_item.getText().toString().trim();
+
+		if (itemLabel.isEmpty()) {
+			itemLabel = "Untitled";
+		}
+
+		String label = "Expense - " + itemLabel;
+
+		db.insertDraft(
+			DatabaseHelper.DRAFT_TYPE_EXPENSE,
+			label,
+			encoded,
+			et_date.getText().toString(),
+			et_time.getText().toString()
+		);
+
+		Toast.makeText(this, "Saved as draft", Toast.LENGTH_SHORT).show();
+
+		finish();
+	}
+
 	private void saveExpense() {
 
 		String item =
@@ -536,6 +651,11 @@ public class Expenseeditactivity extends Activity {
 		}
 
 		if (success) {
+
+			if (expenseId == 0 && draftId != -1) {
+				db.deleteDraft(draftId);
+				draftId = -1;
+			}
 
 			Toast.makeText(
 				this,
