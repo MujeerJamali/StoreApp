@@ -68,6 +68,31 @@ public class Paymenteditactivity extends Activity {
 		et_party = findViewById(R.id.et_party);
 		et_date = findViewById(R.id.et_date);
 		et_time = findViewById(R.id.et_time);
+		et_date.setFocusable(false);
+		et_date.setClickable(true);
+		et_time.setFocusable(false);
+		et_time.setClickable(true);
+
+		et_date.setOnClickListener(
+			new View.OnClickListener() {
+
+				@Override
+				public void onClick(View v) {
+					showDatePicker();
+				}
+			}
+		);
+
+		et_time.setOnClickListener(
+			new View.OnClickListener() {
+
+				@Override
+				public void onClick(View v) {
+					showTimePicker();
+				}
+			}
+		);
+
 		et_amount = findViewById(R.id.et_amount);
 		et_notes = findViewById(R.id.et_notes);
 		tv_cash_before = findViewById(R.id.tv_cash_before);
@@ -496,8 +521,70 @@ public class Paymenteditactivity extends Activity {
 			).show();
 		}
 	}
-	
-	
-	
-	
+
+	private void showDatePicker() {
+
+		java.util.Calendar calendar = java.util.Calendar.getInstance();
+
+		try {
+			calendar.setTime(
+				new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+				.parse(et_date.getText().toString())
+			);
+		} catch (Exception e) {
+		}
+
+		new android.app.DatePickerDialog(
+			this,
+			R.style.AppAlertDialogTheme,
+			new android.app.DatePickerDialog.OnDateSetListener() {
+
+				@Override
+				public void onDateSet(
+					android.widget.DatePicker view, int year, int month, int dayOfMonth) {
+
+					et_date.setText(
+						String.format(
+							Locale.getDefault(), "%04d-%02d-%02d", year, month + 1, dayOfMonth
+						)
+					);
+				}
+			},
+			calendar.get(java.util.Calendar.YEAR),
+			calendar.get(java.util.Calendar.MONTH),
+			calendar.get(java.util.Calendar.DAY_OF_MONTH)
+		).show();
+	}
+
+	private void showTimePicker() {
+
+		java.util.Calendar calendar = java.util.Calendar.getInstance();
+
+		try {
+			calendar.setTime(
+				new SimpleDateFormat("HH:mm", Locale.getDefault())
+				.parse(et_time.getText().toString())
+			);
+		} catch (Exception e) {
+		}
+
+		new android.app.TimePickerDialog(
+			this,
+			R.style.AppAlertDialogTheme,
+			new android.app.TimePickerDialog.OnTimeSetListener() {
+
+				@Override
+				public void onTimeSet(
+					android.widget.TimePicker view, int hourOfDay, int minute) {
+
+					et_time.setText(
+						String.format(Locale.getDefault(), "%02d:%02d", hourOfDay, minute)
+					);
+				}
+			},
+			calendar.get(java.util.Calendar.HOUR_OF_DAY),
+			calendar.get(java.util.Calendar.MINUTE),
+			true
+		).show();
+	}
 }
