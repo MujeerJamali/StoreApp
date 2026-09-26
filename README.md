@@ -32,14 +32,32 @@ BusinessERPyh/                  Gradle project root
   items only show sizes with stock, bulk Excel import for purchases. The
   Add/Edit Item dialog's Quantity, Price and Total fields are linked live:
   editing Total back-solves Price at the current Quantity (e.g. 4 @ 50 =
-  200; changing Total to 100 sets Price to 25). A Purchase can carry an
-  **Other Charges** amount (transport/shipping/etc.), with a checkbox for
-  whether it's added to the supplier's owed balance or tracked purely as
-  a cost. It's split across that purchase's line items by value and
-  blended into each item's **Extra Cost/Unit** by weighted average
-  against current stock (see "Landed cost" below).
+  200; changing Total to 100 sets Price to 25). A Purchase's "+ Add
+  Purchase Cost" button attaches one or more **Purchase Costs** to it
+  (see below) — works even before the purchase itself is saved.
+- **Cost Items / Purchase Costs** — a reusable category list (Petrol,
+  Shipping, Packaging, ...), shared between Purchase Costs and the
+  Expense screen's Item field. A Purchase Cost is one cost event (a Cost
+  Item + a total amount + when it happened) that splits proportionally
+  by value across one or more purchases, each with its own choice of
+  whether that share adds to the supplier's owed balance or is a cash
+  outflow now — either way it's blended into that purchase's line
+  items' **Extra Cost/Unit** by weighted average against current stock
+  (see "Landed cost" below). Replaces the older single-purchase "Other
+  Charges" field (still present on old purchases, just unused by new
+  ones) with something reusable and splittable across purchases, and
+  one that actually reaches the Cash screen when tracked purely as a
+  cost — the old field's gap was that a "tracked purely as cost" charge
+  never appeared anywhere in cash tracking. Once created, a Purchase
+  Cost's amount and purchase split aren't retroactively editable or
+  reversible (same simplification as Extra Cost/Unit and Purchase Price
+  themselves) — only its category/date/notes can be changed afterward,
+  and deleting one removes the record without undoing its already-
+  applied cash/balance/landed-cost effects.
 - **Payments** — payment in/out against a party.
-- **Expenses** — one-off and **recurring** (weekly/monthly/specific dates).
+- **Expenses** — one-off and **recurring** (weekly/monthly/specific
+  dates); the Item field is a Cost Item autocomplete (typing a new name
+  simply adds it to the list) rather than free text.
 - **Cash** — a single ledger of all cash movement (sales, purchases,
   payments, expenses, manual adjustments); tapping a row opens its real
   source transaction. **A transaction is rejected if it would take the
@@ -62,7 +80,8 @@ BusinessERPyh/                  Gradle project root
 
 Every item can carry an **Extra Cost/Unit** (transport, shipping, etc.)
 alongside its Purchase Price, maintained automatically as a running
-weighted average — a Purchase's Other Charges are split across its line
+weighted average — a Purchase Cost's share of a purchase (see "Cost
+Items / Purchase Costs" above) is split across that purchase's line
 items by value and blended in against the item's stock at the time.
 **Net Profit, the Cash Sale vs Party profit split, and Item Monthly Rank
 by Profit all use Purchase Price + Extra Cost/Unit as the cost basis.

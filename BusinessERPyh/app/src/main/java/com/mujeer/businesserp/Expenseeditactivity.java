@@ -26,7 +26,7 @@ public class Expenseeditactivity extends Activity {
 
 	private TextView tv_code;
 
-	private EditText et_item;
+	private AutoCompleteTextView et_item;
 	private AutoCompleteTextView actv_party;
 	private EditText et_date;
 	private EditText et_time;
@@ -101,6 +101,7 @@ public class Expenseeditactivity extends Activity {
 		db.getOrCreatePartyId("Cash Expenses");
 
 		loadPartyAutoComplete();
+		loadCostItemAutoComplete();
 
 		cb_full_paid.setOnCheckedChangeListener(fullPaidCheckedChangeListener);
 
@@ -225,7 +226,8 @@ public class Expenseeditactivity extends Activity {
 			);
 
 			et_item.setText(
-				expense.get("item").toString()
+				expense.get("item").toString(),
+				false
 			);
 
 			et_date.setText(
@@ -313,6 +315,33 @@ public class Expenseeditactivity extends Activity {
 
 		actv_party.setAdapter(adapter);
 		actv_party.setThreshold(1);
+	}
+
+	// Item is a reusable Cost Item (Petrol, Shipping, Packaging, ...) -
+	// same list Purchase Costs draws from. Unlike the Party field above,
+	// typing a name that doesn't exist yet is fine: saveExpense() calls
+	// getOrCreateCostItemId() so a brand-new category is simply added,
+	// there's no "select a valid one" requirement.
+	private void loadCostItemAutoComplete() {
+
+		ArrayList<HashMap<String, Object>> costItems = db.getCostItems();
+
+		ArrayList<String> costItemNames = new ArrayList<String>();
+		HashMap<String, String> costItemSubtitles = new HashMap<String, String>();
+
+		for (HashMap<String, Object> costItem : costItems) {
+
+			String name = (String) costItem.get("name");
+
+			costItemNames.add(name);
+			costItemSubtitles.put(name, "");
+		}
+
+		TwoLineAutoCompleteAdapter adapter =
+			new TwoLineAutoCompleteAdapter(this, costItemNames, costItemSubtitles);
+
+		et_item.setAdapter(adapter);
+		et_item.setThreshold(1);
 	}
 
 	private final CompoundButton.OnCheckedChangeListener fullPaidCheckedChangeListener =
@@ -440,7 +469,7 @@ public class Expenseeditactivity extends Activity {
 		HashMap<String, Object> data = DraftCodec.decode((String) draftRow.get("data"));
 
 		if (data.get("item") != null) {
-			et_item.setText((String) data.get("item"));
+			et_item.setText((String) data.get("item"), false);
 		}
 
 		if (data.get("party_name") != null) {
@@ -529,6 +558,11 @@ public class Expenseeditactivity extends Activity {
 
 			return;
 		}
+
+		// Keeps the Cost Items list (also used by Purchase Costs) in sync
+		// with whatever's typed here - a name not seen before is simply
+		// added, same "reusable list" treatment Parties/Items already get.
+		db.getOrCreateCostItemId(item);
 
 		if (et_amount.getText().toString().trim().isEmpty()) {
 

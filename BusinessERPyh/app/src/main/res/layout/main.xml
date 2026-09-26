@@ -297,6 +297,26 @@
                     style="@style/ToolRow"
                     android:text="Drafts" />
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <Button
+                    android:id="@+id/btn_cost_items"
+                    style="@style/ToolRow"
+                    android:text="Cost Items" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <Button
+                    android:id="@+id/btn_purchase_costs"
+                    style="@style/ToolRow"
+                    android:text="Purchase Costs" />
+
             </LinearLayout>
 
         </LinearLayout>

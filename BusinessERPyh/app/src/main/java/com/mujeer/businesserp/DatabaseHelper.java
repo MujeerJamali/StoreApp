@@ -38,7 +38,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // carrying one is saved) and purchases.other_charges_to_party
     // (whether that charge was added to the supplier's owed amount, or
     // tracked purely for cost purposes).
-    public static final int DATABASE_VERSION = 18;
+    // Bumped 18 -> 19 for Purchase Costs, which replaces the single
+    // per-purchase "Other Charges" field (purchases.other_charges is
+    // left in place, just unused by new entries) with reusable cost
+    // entries (Petrol, Shipping, Packaging, ...) that can each split
+    // across one or more purchases: cost_items (the reusable category
+    // list - also now used by Expenses' Item field instead of free
+    // text), purchase_costs (one cost event: category + total amount +
+    // date), purchase_cost_links (how one purchase_costs row splits
+    // across purchases, and per-purchase whether that share is a cash
+    // outflow now or added to that purchase's supplier balance).
+    public static final int DATABASE_VERSION = 19;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -116,6 +126,31 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	public static final String DRAFT_TYPE_PURCHASE = "purchase";
 	public static final String DRAFT_TYPE_PAYMENT = "payment";
 	public static final String DRAFT_TYPE_EXPENSE = "expense";
+
+	// A reusable cost/expense category (Petrol, Shipping, Packaging,
+	// food, ...) - shared between Purchase Costs and Expenses' Item
+	// field, the same way one Parties list serves every screen that
+	// picks a party.
+	public static final String TABLE_COST_ITEMS = "cost_items";
+
+	// One cost event (a cost_item + a total amount + when it happened),
+	// e.g. "Petrol, 500, 2026-09-26". See TABLE_PURCHASE_COST_LINKS for
+	// how its amount is actually attributed to purchases.
+	public static final String TABLE_PURCHASE_COSTS = "purchase_costs";
+
+	// How one purchase_costs row's total splits across the purchase(s)
+	// it applies to - share_percent is that purchase's proportional
+	// slice (by purchase value) of the total, allocated_amount is the
+	// resulting rupee amount for this link, and to_party controls what
+	// happens with it: false blends it straight into cash-in-hand right
+	// now (see DatabaseHelper#getCashBalance()/getCashLedger()); true
+	// adds it to that purchase's party's owed balance instead, same as
+	// a manual balance adjustment, leaving cash untouched until that
+	// balance is actually paid off. Either way the item(s) on that
+	// purchase still get this share blended into their extra_cost_per_
+	// unit (see applyExtraCostToItem()) - a cost's effect on cash and
+	// its effect on landed cost are tracked independently.
+	public static final String TABLE_PURCHASE_COST_LINKS = "purchase_cost_links";
 
 	public static final int RECURRING_DAILY = 1;
 	public static final int RECURRING_WEEKLY = 2;
@@ -359,6 +394,35 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"data TEXT NOT NULL, " +
 			"date TEXT NOT NULL, " +
 			"time TEXT NOT NULL" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_COST_ITEMS + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"name TEXT NOT NULL UNIQUE" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_PURCHASE_COSTS + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"cost_item_id INTEGER NOT NULL, " +
+			"amount REAL NOT NULL DEFAULT 0, " +
+			"date TEXT NOT NULL, " +
+			"time TEXT NOT NULL, " +
+			"notes TEXT" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_PURCHASE_COST_LINKS + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"purchase_cost_id INTEGER NOT NULL, " +
+			"purchase_id INTEGER NOT NULL, " +
+			"share_percent REAL NOT NULL DEFAULT 0, " +
+			"allocated_amount REAL NOT NULL DEFAULT 0, " +
+			"to_party INTEGER NOT NULL DEFAULT 0" +
 			")"
 		);
 
@@ -2249,6 +2313,412 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("extra_cost_per_unit", newExtraCostPerUnit);
 
 		db.update(TABLE_ITEMS, values, "id=?", new String[]{String.valueOf(itemId)});
+	}
+
+	// =====================
+	// Creates one purchase_costs row (a cost event: Petrol/Shipping/etc.
+	// + a total amount + when it happened) and returns its id. This id
+	// is then passed to applyPurchaseCostLinks() to attribute that total
+	// across whichever purchase(s) it applies to.
+	// =====================
+	public long insertPurchaseCost(
+		int costItemId, double amount, String date, String time, String notes) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		ContentValues values = new ContentValues();
+		values.put("cost_item_id", costItemId);
+		values.put("amount", amount);
+		values.put("date", date);
+		values.put("time", time);
+		values.put("notes", notes);
+
+		return db.insert(TABLE_PURCHASE_COSTS, null, values);
+	}
+
+	// =====================
+	// Splits one purchase_costs row's totalAmount across the purchase(s)
+	// it applies to, proportionally by each purchase's own grand_total
+	// (rounded to the nearest rupee; the last selection absorbs whatever
+	// rounding remainder is left so the parts sum exactly to totalAmount).
+	//
+	// selections is one map per selected purchase:
+	//   "purchase_id" -> Integer, "to_party" -> Boolean
+	//
+	// For each selection this inserts a purchase_cost_links row, then
+	// either folds the allocated amount into that purchase's party
+	// balance (to_party=true, same as any other purchase due) or leaves
+	// it to be picked up directly by getCashBalance()/getCashLedger()
+	// (to_party=false). Either way, the allocated amount is also blended
+	// into that purchase's line items' extra_cost_per_unit, since a
+	// cost's effect on cash/party balance and its effect on landed cost
+	// are tracked independently (see TABLE_PURCHASE_COST_LINKS).
+	// =====================
+	public void applyPurchaseCostLinks(
+		int purchaseCostId, double totalAmount, ArrayList<HashMap<String, Object>> selections) {
+
+		if (selections == null || selections.isEmpty()) {
+			return;
+		}
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		double[] purchaseTotals = new double[selections.size()];
+		double totalsSum = 0;
+
+		for (int i = 0; i < selections.size(); i++) {
+
+			int purchaseId = (Integer) selections.get(i).get("purchase_id");
+
+			double purchaseTotal = sumColumn(
+				db,
+				"SELECT grand_total FROM " + TABLE_PURCHASES + " WHERE id=?",
+				new String[]{String.valueOf(purchaseId)}
+			);
+
+			purchaseTotals[i] = purchaseTotal;
+			totalsSum += purchaseTotal;
+		}
+
+		double allocatedSoFar = 0;
+
+		for (int i = 0; i < selections.size(); i++) {
+
+			HashMap<String, Object> selection = selections.get(i);
+			int purchaseId = (Integer) selection.get("purchase_id");
+			boolean toParty = Boolean.TRUE.equals(selection.get("to_party"));
+
+			double sharePercent;
+			double allocatedAmount;
+
+			boolean isLast = (i == selections.size() - 1);
+
+			if (isLast) {
+				// Absorb rounding remainder so the parts sum exactly.
+				allocatedAmount = totalAmount - allocatedSoFar;
+				sharePercent = totalsSum > 0 ? (purchaseTotals[i] / totalsSum) * 100 : 0;
+			} else if (totalsSum > 0) {
+				sharePercent = (purchaseTotals[i] / totalsSum) * 100;
+				allocatedAmount = Math.round(totalAmount * (purchaseTotals[i] / totalsSum));
+			} else {
+				// No purchase values to weight by (e.g. all zero) - split evenly.
+				sharePercent = 100.0 / selections.size();
+				allocatedAmount = Math.round(totalAmount / selections.size());
+			}
+
+			allocatedSoFar += allocatedAmount;
+
+			recordPurchaseCostLinkRow(
+				db, purchaseCostId, purchaseId, sharePercent, allocatedAmount, toParty
+			);
+
+			blendCostIntoPurchaseItems(db, purchaseId, allocatedAmount);
+		}
+	}
+
+	// =====================
+	// Inserts one purchase_cost_links row and, if toParty, folds its
+	// allocatedAmount into that purchase's party balance - the metadata/
+	// cash-and-party-balance half of applying a cost link, factored out
+	// so applySinglePurchaseCostLink() (which must NOT also blend - see
+	// its own comment) can share it with applyPurchaseCostLinks().
+	// =====================
+	private void recordPurchaseCostLinkRow(
+		SQLiteDatabase db, int purchaseCostId, int purchaseId,
+		double sharePercent, double allocatedAmount, boolean toParty) {
+
+		ContentValues values = new ContentValues();
+		values.put("purchase_cost_id", purchaseCostId);
+		values.put("purchase_id", purchaseId);
+		values.put("share_percent", sharePercent);
+		values.put("allocated_amount", allocatedAmount);
+		values.put("to_party", toParty ? 1 : 0);
+
+		db.insert(TABLE_PURCHASE_COST_LINKS, null, values);
+
+		if (toParty) {
+
+			int partyId = -1;
+			Cursor cursor = db.rawQuery(
+				"SELECT party_id FROM " + TABLE_PURCHASES + " WHERE id=?",
+				new String[]{String.valueOf(purchaseId)}
+			);
+			if (cursor.moveToFirst()) {
+				partyId = cursor.getInt(0);
+			}
+			cursor.close();
+
+			if (partyId != -1) {
+				adjustPartyBalance(db, partyId, -allocatedAmount);
+			}
+		}
+	}
+
+	// =====================
+	// Records a 100%-share purchase_cost_links row for a purchase being
+	// saved for the very first time, WITHOUT blending allocatedAmount
+	// into that purchase's line items - unlike applyPurchaseCostLinks()
+	// (used for already-saved purchases, whose purchase_items rows
+	// already exist), a brand-new purchase's items haven't been written
+	// yet when its pending Purchase Cost is applied, and blending must
+	// happen per-line BEFORE insertPurchaseItem() runs (see
+	// applyExtraCostToItem()'s own ordering note) - so the caller
+	// (Transactioneditactivity#savePurchase()) does that part manually,
+	// ahead of calling this.
+	// =====================
+	public void applySinglePurchaseCostLink(
+		int purchaseCostId, int purchaseId, double allocatedAmount, boolean toParty) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		recordPurchaseCostLinkRow(db, purchaseCostId, purchaseId, 100.0, allocatedAmount, toParty);
+	}
+
+	// =====================
+	// Every purchase_cost_links row applied to one purchase, with its
+	// cost item's name - for Transactioneditactivity's "Purchase Costs"
+	// section when editing an already-saved purchase (a brand-new one
+	// still being entered shows its own in-memory pending list instead).
+	// =====================
+	public ArrayList<HashMap<String, Object>> getPurchaseCostLinksForPurchase(int purchaseId) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT pcl.id, ci.name, pcl.allocated_amount, pcl.to_party " +
+			"FROM " + TABLE_PURCHASE_COST_LINKS + " pcl " +
+			"INNER JOIN " + TABLE_PURCHASE_COSTS + " pc ON pc.id = pcl.purchase_cost_id " +
+			"INNER JOIN " + TABLE_COST_ITEMS + " ci ON ci.id = pc.cost_item_id " +
+			"WHERE pcl.purchase_id=?",
+			new String[]{String.valueOf(purchaseId)}
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> map = new HashMap<>();
+
+			map.put("id", cursor.getInt(0));
+			map.put("cost_item_name", cursor.getString(1));
+			map.put("allocated_amount", cursor.getDouble(2));
+			map.put("to_party", cursor.getInt(3) != 0);
+
+			list.add(map);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// =====================
+	// Blends one purchase cost's allocatedAmount into that purchase's own
+	// line items' extra_cost_per_unit, splitting it across those lines
+	// proportionally by each line's own total (same "by value" approach
+	// applyPurchaseCostLinks() uses to split across purchases). Called
+	// regardless of to_party - see TABLE_PURCHASE_COST_LINKS.
+	// =====================
+	private void blendCostIntoPurchaseItems(
+		SQLiteDatabase db, int purchaseId, double allocatedAmount) {
+
+		if (allocatedAmount == 0) {
+			return;
+		}
+
+		Cursor cursor = db.rawQuery(
+			"SELECT item_id, quantity, total FROM " + TABLE_PURCHASE_ITEMS + " WHERE purchase_id=?",
+			new String[]{String.valueOf(purchaseId)}
+		);
+
+		ArrayList<Integer> itemIds = new ArrayList<>();
+		ArrayList<Double> quantities = new ArrayList<>();
+		ArrayList<Double> totals = new ArrayList<>();
+		double subtotal = 0;
+
+		while (cursor.moveToNext()) {
+			itemIds.add(cursor.getInt(0));
+			quantities.add(cursor.getDouble(1));
+			double lineTotal = cursor.getDouble(2);
+			totals.add(lineTotal);
+			subtotal += lineTotal;
+		}
+		cursor.close();
+
+		if (subtotal <= 0) {
+			return;
+		}
+
+		for (int i = 0; i < itemIds.size(); i++) {
+
+			double lineShare = totals.get(i) / subtotal;
+			applyExtraCostToItem(itemIds.get(i), quantities.get(i), allocatedAmount * lineShare);
+		}
+	}
+
+	// =====================
+	// Lists purchase_costs entries (newest first) for the Purchase Costs
+	// screen, each with its cost item's name and how many purchases it's
+	// currently split across.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getPurchaseCosts() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT pc.id, ci.name, pc.amount, pc.date, pc.time, pc.notes, " +
+			"(SELECT COUNT(*) FROM " + TABLE_PURCHASE_COST_LINKS + " WHERE purchase_cost_id=pc.id) " +
+			"FROM " + TABLE_PURCHASE_COSTS + " pc " +
+			"INNER JOIN " + TABLE_COST_ITEMS + " ci ON ci.id = pc.cost_item_id " +
+			"ORDER BY pc.date DESC, pc.time DESC, pc.id DESC",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> map = new HashMap<>();
+
+			map.put("id", cursor.getInt(0));
+			map.put("cost_item_name", cursor.getString(1));
+			map.put("amount", cursor.getDouble(2));
+			map.put("date", cursor.getString(3));
+			map.put("time", cursor.getString(4));
+			map.put("notes", cursor.getString(5));
+			map.put("purchase_count", cursor.getInt(6));
+
+			list.add(map);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// =====================
+	// One purchase_costs row's own fields (cost_item_id/amount/date/time/
+	// notes), for the edit screen's prefill.
+	// =====================
+	public HashMap<String, Object> getPurchaseCostById(int purchaseCostId) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, cost_item_id, amount, date, time, notes FROM " +
+			TABLE_PURCHASE_COSTS + " WHERE id=?",
+			new String[]{String.valueOf(purchaseCostId)}
+		);
+
+		HashMap<String, Object> map = null;
+
+		if (cursor.moveToFirst()) {
+
+			map = new HashMap<>();
+			map.put("id", cursor.getInt(0));
+			map.put("cost_item_id", cursor.getInt(1));
+			map.put("amount", cursor.getDouble(2));
+			map.put("date", cursor.getString(3));
+			map.put("time", cursor.getString(4));
+			map.put("notes", cursor.getString(5));
+		}
+
+		cursor.close();
+
+		return map;
+	}
+
+	// =====================
+	// Updates only a purchase_costs entry's non-financial fields (which
+	// cost item it's categorized under, when it happened, its notes) -
+	// the amount and its purchase split are fixed once created, same
+	// simplification as deletePurchaseCost() and applyExtraCostToItem().
+	// =====================
+	public boolean updatePurchaseCostFields(
+		int purchaseCostId, int costItemId, String date, String time, String notes) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		ContentValues values = new ContentValues();
+		values.put("cost_item_id", costItemId);
+		values.put("date", date);
+		values.put("time", time);
+		values.put("notes", notes);
+
+		int rows = db.update(
+			TABLE_PURCHASE_COSTS, values, "id=?", new String[]{String.valueOf(purchaseCostId)}
+		);
+
+		return rows > 0;
+	}
+
+	// =====================
+	// The individual purchase_cost_links rows for one purchase_costs entry
+	// - which purchases it's split across, each one's party/invoice for
+	// display, its allocated_amount/share_percent, and its to_party flag.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getPurchaseCostLinks(int purchaseCostId) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT pcl.id, pcl.purchase_id, pa.name, p.invoice_number, p.date, " +
+			"pcl.share_percent, pcl.allocated_amount, pcl.to_party " +
+			"FROM " + TABLE_PURCHASE_COST_LINKS + " pcl " +
+			"INNER JOIN " + TABLE_PURCHASES + " p ON p.id = pcl.purchase_id " +
+			"INNER JOIN " + TABLE_PARTIES + " pa ON pa.id = p.party_id " +
+			"WHERE pcl.purchase_cost_id=?",
+			new String[]{String.valueOf(purchaseCostId)}
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> map = new HashMap<>();
+
+			map.put("id", cursor.getInt(0));
+			map.put("purchase_id", cursor.getInt(1));
+			map.put("party_name", cursor.getString(2));
+			map.put("invoice_no", cursor.getString(3));
+			map.put("date", cursor.getString(4));
+			map.put("share_percent", cursor.getDouble(5));
+			map.put("allocated_amount", cursor.getDouble(6));
+			map.put("to_party", cursor.getInt(7) != 0);
+
+			list.add(map);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// =====================
+	// Deletes a purchase_costs entry and its links. Same simplification
+	// deletePurchase() already takes with a purchase's own due/landed
+	// cost: the party-balance and extra_cost_per_unit effects this entry
+	// already applied are NOT reversed, only the records themselves are
+	// removed, so this is for correcting a mistaken entry, not for
+	// "undoing" its financial effect after the fact.
+	// =====================
+	public boolean deletePurchaseCost(int purchaseCostId) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.delete(
+			TABLE_PURCHASE_COST_LINKS,
+			"purchase_cost_id=?",
+			new String[]{String.valueOf(purchaseCostId)}
+		);
+
+		int rows = db.delete(
+			TABLE_PURCHASE_COSTS,
+			"id=?",
+			new String[]{String.valueOf(purchaseCostId)}
+		);
+
+		return rows > 0;
 	}
 
 	// =====================
@@ -5404,6 +5874,128 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return getOrCreatePartyIdBulk(db, name);
 	}
 
+	// =====================
+	// COST ITEMS - the reusable category list (Petrol, Shipping,
+	// Packaging, food, ...) shared by Purchase Costs and by Expenses'
+	// Item field.
+	// =====================
+	public int getOrCreateCostItemId(String name) {
+
+		if (name == null || name.trim().length() == 0) {
+			return -1;
+		}
+
+		name = name.trim();
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id FROM " + TABLE_COST_ITEMS + " WHERE name=?",
+			new String[]{name}
+		);
+
+		if (cursor.moveToFirst()) {
+
+			int id = cursor.getInt(0);
+			cursor.close();
+			return id;
+		}
+
+		cursor.close();
+
+		ContentValues values = new ContentValues();
+		values.put("name", name);
+
+		long id = db.insertWithOnConflict(
+			TABLE_COST_ITEMS,
+			null,
+			values,
+			SQLiteDatabase.CONFLICT_IGNORE
+		);
+
+		if (id != -1) {
+			return (int) id;
+		}
+
+		Cursor again = db.rawQuery(
+			"SELECT id FROM " + TABLE_COST_ITEMS + " WHERE name=?",
+			new String[]{name}
+		);
+
+		int existingId = again.moveToFirst() ? again.getInt(0) : -1;
+		again.close();
+
+		return existingId;
+	}
+
+	public ArrayList<HashMap<String, Object>> getCostItems() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, name FROM " + TABLE_COST_ITEMS + " ORDER BY name",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+			row.put("id", cursor.getInt(0));
+			row.put("name", cursor.getString(1));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	public HashMap<String, Object> getCostItemById(int id) {
+
+		HashMap<String, Object> map = new HashMap<String, Object>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, name FROM " + TABLE_COST_ITEMS + " WHERE id=?",
+			new String[]{String.valueOf(id)}
+		);
+
+		if (cursor.moveToFirst()) {
+
+			map.put("id", cursor.getInt(0));
+			map.put("name", cursor.getString(1));
+		}
+
+		cursor.close();
+
+		return map;
+	}
+
+	public boolean updateCostItem(int id, String name) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		ContentValues values = new ContentValues();
+		values.put("name", name.trim());
+
+		int rows = db.update(
+			TABLE_COST_ITEMS, values, "id=?", new String[]{String.valueOf(id)}
+		);
+
+		return rows > 0;
+	}
+
+	public void deleteCostItem(int id) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.delete(TABLE_COST_ITEMS, "id=?", new String[]{String.valueOf(id)});
+	}
+
 	// Finds an existing catalog item by code (preferred) or name, or
 	// creates one if neither matches. Used when importing sale/purchase
 	// line items from Excel, where the item may or may not already exist
@@ -6132,6 +6724,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"SELECT SUM(amount) FROM " + TABLE_PAYMENTS + " WHERE type=?",
 			new String[]{String.valueOf(PAYMENT_OUT)});
 		balance -= sumColumn(db, "SELECT SUM(paid_amount) FROM " + TABLE_EXPENSES, null);
+		balance -= sumColumn(db,
+			"SELECT SUM(allocated_amount) FROM " + TABLE_PURCHASE_COST_LINKS + " WHERE to_party=0",
+			null);
 
 		return balance;
 	}
@@ -6187,6 +6782,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"('Adjustment' || CASE WHEN notes IS NOT NULL AND notes != '' " +
 			"THEN ' - ' || notes ELSE '' END), source, id, notes, 'adjustment', id " +
 			"FROM " + TABLE_CASH_ADJUSTMENTS +
+
+			" UNION ALL " +
+
+			"SELECT pc.date, pc.time, -pcl.allocated_amount, " +
+			"('Purchase Cost - ' || ci.name), 'Manual', 0, NULL, 'purchase_cost', pc.id " +
+			"FROM " + TABLE_PURCHASE_COST_LINKS + " pcl " +
+			"INNER JOIN " + TABLE_PURCHASE_COSTS + " pc ON pc.id = pcl.purchase_cost_id " +
+			"INNER JOIN " + TABLE_COST_ITEMS + " ci ON ci.id = pc.cost_item_id " +
+			"WHERE pcl.to_party = 0 " +
 
 			" ORDER BY date DESC, time DESC",
 

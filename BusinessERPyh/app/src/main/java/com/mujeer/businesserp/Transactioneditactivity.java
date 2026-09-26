@@ -39,6 +39,9 @@ public class Transactioneditactivity extends Activity {
 	// add-item dialog pre-filled with whatever item came back.
 	private static final int REQUEST_ADD_NEW_ITEM = 5001;
 
+	// "+ Add Purchase Cost" - see openAddPurchaseCost()/onActivityResult().
+	private static final int REQUEST_ADD_PURCHASE_COST = 5002;
+
 	private int transactionType = TYPE_PURCHASE;
 	private boolean isEditMode = false;
 	private int transactionId = -1;
@@ -51,10 +54,10 @@ public class Transactioneditactivity extends Activity {
 	AutoCompleteTextView actv_party;
     EditText et_date, et_time, et_invoice_number, et_amount_paid, et_notes;
     EditText et_search_transaction_items;
-    EditText et_other_charges;
     CheckBox cb_full_paid;
-    CheckBox cb_other_charges_to_party;
-    View container_other_charges;
+    View container_purchase_costs;
+    LinearLayout container_pending_purchase_costs_list;
+    Button btn_add_purchase_cost;
     View tv_add_note;
     TextView tv_grand_total;
     TextView tv_cash_before, tv_cash_after;
@@ -71,6 +74,31 @@ public class Transactioneditactivity extends Activity {
     ArrayList<HashMap<String,Object>> transactionItemList;
     TransactionItemAdapter transactionItemAdapter;
 	HashMap<String, Object> saleMap = new HashMap<>();
+
+	// Purchase Costs (Petrol/Shipping/Packaging/...) added via "+ Add
+	// Purchase Cost" while this purchase isn't saved yet - see
+	// openAddPurchaseCost()/onActivityResult(). Each map holds
+	// cost_item_name/amount/to_party/date/time/notes. Only written for
+	// real (getOrCreateCostItemId + insertPurchaseCost +
+	// applySinglePurchaseCostLink) once savePurchase() actually succeeds,
+	// same "nothing touches the database until Save" pattern
+	// transactionItemList already follows. Always empty in edit mode,
+	// where "+ Add Purchase Cost" instead writes straight to the database
+	// (see openAddPurchaseCost()) since the purchase already has a real
+	// id to link against.
+	ArrayList<HashMap<String, Object>> pendingCostLinks = new ArrayList<>();
+
+	// A purchase created before the Purchase Costs feature may still
+	// carry its old single "Other Charges" amount in these two DB
+	// columns (see DatabaseHelper's other_charges/other_charges_to_party)
+	// - loadPurchase() reads them in so savePurchase() can pass them
+	// through to updatePurchase() unchanged, preserving that purchase's
+	// existing grand_total/party balance instead of silently dropping
+	// this now-retired field's contribution. A brand new purchase never
+	// sets these (they stay 0/false, per the field's own retirement
+	// comment: "left in place, just unused by new entries").
+	double legacyOtherCharges = 0;
+	boolean legacyOtherChargesToParty = false;
 
     ArrayList<String> partyNames;
 
@@ -195,44 +223,24 @@ public class Transactioneditactivity extends Activity {
         et_notes = findViewById(R.id.et_notes);
         tv_add_note = findViewById(R.id.tv_add_note);
 
-        container_other_charges = findViewById(R.id.container_other_charges);
-        et_other_charges = findViewById(R.id.et_other_charges);
-        cb_other_charges_to_party = findViewById(R.id.cb_other_charges_to_party);
+        container_purchase_costs = findViewById(R.id.container_purchase_costs);
+        container_pending_purchase_costs_list =
+            findViewById(R.id.container_pending_purchase_costs_list);
+        btn_add_purchase_cost = findViewById(R.id.btn_add_purchase_cost);
 
-        // Only a Purchase has a supplier bill to add transport/shipping
-        // to - a Sale has no equivalent concept.
-        container_other_charges.setVisibility(
+        // Only a Purchase has a supplier bill to add costs to - a Sale
+        // has no equivalent concept.
+        container_purchase_costs.setVisibility(
             transactionType == TYPE_PURCHASE ? View.VISIBLE : View.GONE
         );
 
-        et_other_charges.addTextChangedListener(
-            new android.text.TextWatcher() {
-
+        btn_add_purchase_cost.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                public void onClick(View v) {
+                    openAddPurchaseCost();
                 }
+            });
 
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-                }
-
-                @Override
-                public void afterTextChanged(android.text.Editable s) {
-                    updateGrandTotal();
-                }
-            }
-        );
-
-        cb_other_charges_to_party.setOnCheckedChangeListener(
-            new android.widget.CompoundButton.OnCheckedChangeListener() {
-
-                @Override
-                public void onCheckedChanged(
-                    android.widget.CompoundButton buttonView, boolean isChecked) {
-                    updateGrandTotal();
-                }
-            }
-        );
 		tv_add_note.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
@@ -339,8 +347,6 @@ public class Transactioneditactivity extends Activity {
 			et_invoice_number.setText(
 				db.getNextPurchaseInvoiceNo()
 			);
-
-			et_other_charges.setText("0");
 		}
 		
 		if (isEditMode) {
@@ -548,6 +554,145 @@ public class Transactioneditactivity extends Activity {
 			if (newItemId != -1) {
 
 				showAddTransactionItemDialog(newItemId);
+			}
+		}
+
+		if (requestCode == REQUEST_ADD_PURCHASE_COST
+			&& resultCode == RESULT_OK
+			&& data != null) {
+
+			if (isEditMode) {
+
+				// This purchase already has a real id - PurchaseCostEditActivity
+				// wrote the purchase_cost_links row(s) straight to the
+				// database itself (see openAddPurchaseCost()), so just
+				// re-read what's now applied.
+				refreshPurchaseCostsDisplay();
+
+			} else {
+
+				HashMap<String, Object> pending = new HashMap<String, Object>();
+				pending.put("cost_item_name", data.getStringExtra("cost_item_name"));
+				pending.put("amount", data.getDoubleExtra("amount", 0));
+				pending.put("to_party", data.getBooleanExtra("to_party", false));
+				pending.put("date", data.getStringExtra("date"));
+				pending.put("time", data.getStringExtra("time"));
+				pending.put("notes", data.getStringExtra("notes"));
+
+				pendingCostLinks.add(pending);
+
+				refreshPurchaseCostsDisplay();
+				updateGrandTotal();
+			}
+		}
+	}
+
+	// =====================
+	// Opens PurchaseCostEditActivity to add a Purchase Cost against this
+	// purchase. An already-saved purchase (editing an existing one) has a
+	// real id to link against, so the multi-select-purchases screen there
+	// writes straight to the database and can also split across OTHER
+	// purchases; a purchase still being entered has no id yet, so it's
+	// opened in single-purchase mode instead, which just hands the
+	// entered amount/cost item/to_party back as a pending entry (see
+	// onActivityResult()) applied for real once savePurchase() succeeds.
+	// =====================
+	private void openAddPurchaseCost() {
+
+		Intent intent = new Intent(
+			Transactioneditactivity.this, PurchaseCostEditActivity.class
+		);
+
+		intent.putExtra("purchase_cost_id", 0);
+
+		if (isEditMode) {
+			intent.putExtra("preselect_purchase_id", transactionId);
+		} else {
+			intent.putExtra("single_purchase_mode", true);
+		}
+
+		startActivityForResult(intent, REQUEST_ADD_PURCHASE_COST);
+	}
+
+	// =====================
+	// Rebuilds container_pending_purchase_costs_list from whichever
+	// source currently holds the truth: an already-saved purchase reads
+	// straight from the database (getPurchaseCostLinksForPurchase - "+
+	// Add Purchase Cost" already wrote there directly), a not-yet-saved
+	// one reads the in-memory pendingCostLinks (nothing written to the
+	// database until Save succeeds). A saved purchase's rows aren't
+	// removable here - same "not retroactively corrected" simplification
+	// as the rest of Purchase Costs (manage/undo those from the Purchase
+	// Costs screen instead); a pending one's rows are, since nothing's
+	// committed yet.
+	// =====================
+	private void refreshPurchaseCostsDisplay() {
+
+		container_pending_purchase_costs_list.removeAllViews();
+
+		if (isEditMode && transactionId != -1) {
+
+			ArrayList<HashMap<String, Object>> links =
+				db.getPurchaseCostLinksForPurchase(transactionId);
+
+			for (HashMap<String, Object> link : links) {
+
+				boolean toParty = (Boolean) link.get("to_party");
+
+				View row = getLayoutInflater().inflate(
+					R.layout.transaction_purchase_cost_row,
+					container_pending_purchase_costs_list,
+					false
+				);
+
+				TextView tvLabel = row.findViewById(R.id.tv_tpc_label);
+
+				tvLabel.setText(
+					link.get("cost_item_name") + " - " +
+					AmountFormat.format((Double) link.get("allocated_amount")) +
+					" (" + (toParty ? "added to supplier balance" : "cash outflow") + ")"
+				);
+
+				container_pending_purchase_costs_list.addView(row);
+			}
+
+		} else {
+
+			for (int i = 0; i < pendingCostLinks.size(); i++) {
+
+				final int index = i;
+				HashMap<String, Object> pending = pendingCostLinks.get(i);
+
+				boolean toParty = Boolean.TRUE.equals(pending.get("to_party"));
+
+				View row = getLayoutInflater().inflate(
+					R.layout.transaction_purchase_cost_row,
+					container_pending_purchase_costs_list,
+					false
+				);
+
+				TextView tvLabel = row.findViewById(R.id.tv_tpc_label);
+				Button btnRemove = row.findViewById(R.id.btn_tpc_remove);
+
+				tvLabel.setText(
+					pending.get("cost_item_name") + " - " +
+					AmountFormat.format((Double) pending.get("amount")) +
+					" (" + (toParty ? "added to supplier balance" : "cash outflow") + ")"
+				);
+
+				btnRemove.setVisibility(View.VISIBLE);
+
+				btnRemove.setOnClickListener(new View.OnClickListener() {
+						@Override
+						public void onClick(View v) {
+
+							pendingCostLinks.remove(index);
+							refreshPurchaseCostsDisplay();
+							updateGrandTotal();
+						}
+					});
+
+				container_pending_purchase_costs_list.addView(row);
 			}
 		}
 	}
@@ -1282,14 +1427,15 @@ public class Transactioneditactivity extends Activity {
 			et_amount_paid.setText((String) data.get("amount_paid"));
 		}
 
-		if (data.get("other_charges") != null) {
-			et_other_charges.setText((String) data.get("other_charges"));
-		}
+		ArrayList<HashMap<String, Object>> pendingFromDraft =
+			(ArrayList<HashMap<String, Object>>) data.get("pending_cost_links");
 
-		if (data.get("other_charges_to_party") != null) {
-			cb_other_charges_to_party.setChecked(
-				Boolean.TRUE.equals(data.get("other_charges_to_party"))
-			);
+		if (pendingFromDraft != null) {
+
+			pendingCostLinks.clear();
+			pendingCostLinks.addAll(pendingFromDraft);
+
+			refreshPurchaseCostsDisplay();
 		}
 
 		ArrayList<HashMap<String, Object>> items =
@@ -1334,8 +1480,7 @@ public class Transactioneditactivity extends Activity {
 		data.put("items", new ArrayList<HashMap<String, Object>>(transactionItemList));
 
 		if (transactionType == TYPE_PURCHASE) {
-			data.put("other_charges", et_other_charges.getText().toString());
-			data.put("other_charges_to_party", cb_other_charges_to_party.isChecked());
+			data.put("pending_cost_links", new ArrayList<HashMap<String, Object>>(pendingCostLinks));
 		}
 
 		String encoded = DraftCodec.encode(data);
@@ -2300,14 +2445,10 @@ public class Transactioneditactivity extends Activity {
 			total += (Double) map.get("total");
 		}
 
-		if (transactionType == TYPE_PURCHASE && cb_other_charges_to_party.isChecked()) {
+		if (transactionType == TYPE_PURCHASE) {
 
-			try {
-
-				total += Double.parseDouble(et_other_charges.getText().toString());
-
-			} catch (Exception e) {
-			}
+			total += sumPendingCostLinksToParty();
+			total += (legacyOtherChargesToParty ? legacyOtherCharges : 0);
 		}
 
 		tv_grand_total.setText(
@@ -2315,6 +2456,26 @@ public class Transactioneditactivity extends Activity {
 		);
 
 		updateDefaultAmountPaid(total);
+	}
+
+	// Sum of pendingCostLinks marked "add to supplier balance" - the
+	// portion of a not-yet-saved purchase's Purchase Costs that
+	// contributes to its grand_total/party balance, same as
+	// legacyOtherChargesToParty does for a pre-existing purchase's old
+	// Other Charges field. Always 0 in edit mode, where pendingCostLinks
+	// stays empty (see its own field comment).
+	private double sumPendingCostLinksToParty() {
+
+		double sum = 0;
+
+		for (HashMap<String, Object> pending : pendingCostLinks) {
+
+			if (Boolean.TRUE.equals(pending.get("to_party"))) {
+				sum += (Double) pending.get("amount");
+			}
+		}
+
+		return sum;
 	}
 
 	// =====================
@@ -2505,20 +2666,16 @@ public class Transactioneditactivity extends Activity {
 			itemsSubtotal += (Double) item.get("total");
 		}
 
-		double otherCharges = 0;
-
-		try {
-
-			otherCharges = Double.parseDouble(
-				et_other_charges.getText().toString()
-			);
-
-		} catch (Exception e) {
-		}
-
-		boolean otherChargesToParty = cb_other_charges_to_party.isChecked();
-
-		double grandTotal = itemsSubtotal + (otherChargesToParty ? otherCharges : 0);
+		// pendingCostLinks only ever holds entries while this purchase is
+		// still being entered (isEditMode == false) - once saved, "+ Add
+		// Purchase Cost" writes straight to the database instead (see
+		// openAddPurchaseCost()) and doesn't touch grand_total at all.
+		// legacyOtherCharges/legacyOtherChargesToParty carry forward a
+		// pre-Purchase-Costs purchase's old Other Charges contribution
+		// unchanged (see loadPurchase()) so editing such a purchase here
+		// doesn't silently drop it from grand_total/party balance.
+		double grandTotal = itemsSubtotal + sumPendingCostLinksToParty() +
+			(legacyOtherChargesToParty ? legacyOtherCharges : 0);
 
 		if (amountPaid > grandTotal) {
 
@@ -2618,8 +2775,8 @@ public class Transactioneditactivity extends Activity {
 			grandTotal,
 			amountPaid,
 				et_notes.getText().toString(),
-				otherCharges,
-				otherChargesToParty
+				legacyOtherCharges,
+				legacyOtherChargesToParty
 				);
 
 					if (!success) {
@@ -2644,9 +2801,7 @@ public class Transactioneditactivity extends Activity {
 			et_invoice_number.getText().toString(),
 		grandTotal,
 			amountPaid,
-			et_notes.getText().toString(),
-			otherCharges,
-			otherChargesToParty
+			et_notes.getText().toString()
 				);
 
 				if (newPurchaseId <= 0) {
@@ -2666,21 +2821,37 @@ public class Transactioneditactivity extends Activity {
 		// Save all purchase items
 		for (HashMap<String, Object> item : transactionItemList) {
 
-			// Blend this line's share of Other Charges into the item's
-			// running extra_cost_per_unit BEFORE this purchase's stock is
-			// added in (see applyExtraCostToItem()'s own ordering note).
-			// Only for a brand-new purchase - editing one doesn't try to
-			// undo/redo an already-blended average.
+			// Blend this line's share of every pending Purchase Cost into
+			// the item's running extra_cost_per_unit BEFORE this
+			// purchase's stock is added in (see applyExtraCostToItem()'s
+			// own ordering note) - combined into one call per item rather
+			// than one call per pending cost, since calling it more than
+			// once here would blend this same incoming quantity into the
+			// weighted average multiple times over. Only for a brand-new
+			// purchase - editing one doesn't try to undo/redo an
+			// already-blended average, and its Purchase Costs (added via
+			// "+ Add Purchase Cost", which writes straight to the
+			// database for an already-saved purchase) blend themselves
+			// individually at the time each one is added instead.
 			if (!isEditMode && itemsSubtotal > 0) {
 
 				double lineShare =
 					((Double) item.get("total")).doubleValue() / itemsSubtotal;
 
-				db.applyExtraCostToItem(
-					((Integer) item.get("item_id")).intValue(),
-					((Double) item.get("quantity")).doubleValue(),
-					otherCharges * lineShare
-				);
+				double combinedPendingCost = 0;
+
+				for (HashMap<String, Object> pending : pendingCostLinks) {
+					combinedPendingCost += ((Double) pending.get("amount")) * lineShare;
+				}
+
+				if (combinedPendingCost != 0) {
+
+					db.applyExtraCostToItem(
+						((Integer) item.get("item_id")).intValue(),
+						((Double) item.get("quantity")).doubleValue(),
+						combinedPendingCost
+					);
+				}
 			}
 
 			db.insertPurchaseItem(
@@ -2698,6 +2869,40 @@ public class Transactioneditactivity extends Activity {
 			(Integer) item.get("combo_id")
 			);
 			}
+
+		// Write each pending Purchase Cost through to real purchase_costs/
+		// purchase_cost_links rows now that purchaseId (and this
+		// purchase's own purchase_items rows, just inserted above) exist
+		// for real - landed-cost blending already happened per-line above
+		// (see the ordering note there), so applySinglePurchaseCostLink()
+		// only needs to record the link itself and its cash/party-balance
+		// effect. Only relevant for a brand-new purchase - pendingCostLinks
+		// stays empty in edit mode (see its own field comment).
+		if (!isEditMode) {
+
+			for (HashMap<String, Object> pending : pendingCostLinks) {
+
+				int costItemId =
+					db.getOrCreateCostItemId((String) pending.get("cost_item_name"));
+
+				double pendingAmount = (Double) pending.get("amount");
+
+				long newCostId = db.insertPurchaseCost(
+					costItemId,
+					pendingAmount,
+					(String) pending.get("date"),
+					(String) pending.get("time"),
+					(String) pending.get("notes")
+				);
+
+				db.applySinglePurchaseCostLink(
+					(int) newCostId,
+					purchaseId,
+					pendingAmount,
+					Boolean.TRUE.equals(pending.get("to_party"))
+				);
+			}
+		}
 
 		if (draftId != -1) {
 			db.deleteDraft(draftId);
@@ -2969,6 +3174,14 @@ public class Transactioneditactivity extends Activity {
 		isEditMode = false;
 		transactionId = -1;
 
+		pendingCostLinks.clear();
+		legacyOtherCharges = 0;
+		legacyOtherChargesToParty = false;
+
+		if (transactionType == TYPE_PURCHASE) {
+			refreshPurchaseCostsDisplay();
+		}
+
 		transactionItemList.clear();
 		transactionItemAdapter.notifyDataSetChanged();
 
@@ -3066,13 +3279,10 @@ public class Transactioneditactivity extends Activity {
 			purchase.get("amount_paid").toString()
 		);
 
-		et_other_charges.setText(
-			AmountFormat.formatPlain((Double) purchase.get("other_charges"))
-		);
+		legacyOtherCharges = (Double) purchase.get("other_charges");
+		legacyOtherChargesToParty = Boolean.TRUE.equals(purchase.get("other_charges_to_party"));
 
-		cb_other_charges_to_party.setChecked(
-			Boolean.TRUE.equals(purchase.get("other_charges_to_party"))
-		);
+		refreshPurchaseCostsDisplay();
 
 		setFullPaidCheckboxSilently(
 			(Double) purchase.get("amount_paid"),

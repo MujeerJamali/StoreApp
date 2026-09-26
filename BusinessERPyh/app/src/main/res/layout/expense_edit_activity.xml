@@ -31,13 +31,20 @@
             android:padding="18dp">
 
             <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Expense Item" />
-            <EditText
+            <AutoCompleteTextView
                 android:id="@+id/et_item"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Expense Item"
-        android:inputType="text|textNoSuggestions"
-        />
+                android:background="@drawable/bg_input"
+                android:hint="e.g. Petrol, Shipping, Packaging"
+                android:inputType="text|textNoSuggestions"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="13dp"
+                android:paddingBottom="13dp"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint"
+                android:textSize="15sp" />
 
             <TextView style="@style/FieldLabel" android:text="Party (optional)" />
             <AutoCompleteTextView
