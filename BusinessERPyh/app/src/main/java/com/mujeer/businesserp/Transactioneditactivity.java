@@ -456,18 +456,7 @@ public class Transactioneditactivity extends Activity {
 
 				@Override
 				public void onClick(View v) {
-
-					// Same reasoning as onBackPressed() - plain finish()
-					// would exit the app entirely when this screen is the
-					// launcher (task root) with nothing behind it.
-					if (isTaskRoot()) {
-
-						goToDashboard();
-
-					} else {
-
-						finish();
-					}
+					finishOrGoToDashboard();
 				}
 			});
 			
@@ -1194,6 +1183,26 @@ public class Transactioneditactivity extends Activity {
 	}
 
 	// =====================
+	// The finish() every "I'm done with this screen" path (a successful
+	// Save, Save & New's plain-Save case, Save as Draft, Cancel, an
+	// edit-mode row that turned out missing) should actually call - a
+	// bare finish() exits the whole app instead when this screen is the
+	// launcher (task root, nothing behind it in the back stack), same
+	// reasoning as onBackPressed().
+	// =====================
+	private void finishOrGoToDashboard() {
+
+		if (isTaskRoot()) {
+
+			goToDashboard();
+
+		} else {
+
+			finish();
+		}
+	}
+
+	// =====================
 	// This screen is the app's launcher (opens straight to Add Sale),
 	// so when there's nothing else in the back stack, plain Back would
 	// otherwise exit the app entirely - go to the Dashboard instead,
@@ -1368,7 +1377,7 @@ public class Transactioneditactivity extends Activity {
 			android.widget.Toast.LENGTH_SHORT
 		).show();
 
-		finish();
+		finishOrGoToDashboard();
 	}
 
 	// =====================
@@ -2707,7 +2716,7 @@ public class Transactioneditactivity extends Activity {
 
 		} else {
 
-			finish();
+			finishOrGoToDashboard();
 		}
 		}
 	private void setListViewHeightBasedOnChildren(ListView listView) {
@@ -3037,7 +3046,7 @@ public class Transactioneditactivity extends Activity {
 				android.widget.Toast.LENGTH_SHORT
 			).show();
 
-			finish();
+			finishOrGoToDashboard();
 			return;
 		}
 
@@ -3117,7 +3126,7 @@ public class Transactioneditactivity extends Activity {
 
 		if (transactionId == -1) {
 
-			finish();
+			finishOrGoToDashboard();
 			return;
 		}
 
@@ -3132,7 +3141,7 @@ public class Transactioneditactivity extends Activity {
 				android.widget.Toast.LENGTH_SHORT
 			).show();
 
-			finish();
+			finishOrGoToDashboard();
 			return;
 		}
 
@@ -3362,7 +3371,7 @@ public class Transactioneditactivity extends Activity {
 
 		} else {
 
-			finish();
+			finishOrGoToDashboard();
 		}
 		
 	}
@@ -3494,7 +3503,7 @@ public class Transactioneditactivity extends Activity {
 
 		} else {
 
-			finish();
+			finishOrGoToDashboard();
 		}
 	}
 	
