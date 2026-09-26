@@ -477,6 +477,32 @@ public class Paymenteditactivity extends Activity {
 			return;
 		}
 
+		if (selectedType == DatabaseHelper.PAYMENT_OUT) {
+
+			if (!cashBaselineLoaded) {
+
+				android.widget.Toast.makeText(
+					this,
+					"Still checking cash balance - try again in a moment",
+					android.widget.Toast.LENGTH_SHORT
+				).show();
+
+				return;
+			}
+
+			if (amount > 0 && cashBaseline - amount < 0) {
+
+				android.widget.Toast.makeText(
+					this,
+					"This would take cash balance below 0 - reduce the " +
+					"amount or add cash first",
+					android.widget.Toast.LENGTH_LONG
+				).show();
+
+				return;
+			}
+		}
+
 		boolean success;
 
 		if (paymentId == 0) {

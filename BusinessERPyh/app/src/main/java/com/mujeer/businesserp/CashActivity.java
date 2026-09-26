@@ -211,6 +211,7 @@ public class CashActivity extends Activity {
 
         final String date = String.valueOf(row.get("date"));
         final String time = String.valueOf(row.get("time"));
+        final double oldAmount = (Double) row.get("amount");
 
         new AlertDialog.Builder(this)
             .setTitle("Edit Cash Adjustment")
@@ -218,7 +219,7 @@ public class CashActivity extends Activity {
             .setPositiveButton("Save", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
-                    updateAdjustment(adjustmentId, date, time, etAmount, etNotes);
+                    updateAdjustment(adjustmentId, date, time, oldAmount, etAmount, etNotes);
                 }
             })
             .setNeutralButton("Delete", new DialogInterface.OnClickListener() {
@@ -232,9 +233,10 @@ public class CashActivity extends Activity {
     }
 
     private void updateAdjustment(
-        int adjustmentId, String date, String time, EditText etAmount, EditText etNotes) {
+        final int adjustmentId, final String date, final String time,
+        final double oldAmount, EditText etAmount, EditText etNotes) {
 
-        double amount;
+        final double amount;
 
         try {
 
@@ -252,13 +254,41 @@ public class CashActivity extends Activity {
             return;
         }
 
-        db.updateCashAdjustment(
-            adjustmentId, date, time, amount, etNotes.getText().toString().trim()
-        );
+        final String notes = etNotes.getText().toString().trim();
 
-        Toast.makeText(this, "Adjustment updated", Toast.LENGTH_SHORT).show();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
 
-        loadCash();
+                // Exclude this adjustment's own current effect, same as
+                // the other screens' loadCashBaseline(), so re-saving the
+                // same amount never falsely trips the below-zero check.
+                final double baseline = db.getCashBalance() - oldAmount;
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+
+                        if (amount < 0 && baseline + amount < 0) {
+
+                            Toast.makeText(
+                                CashActivity.this,
+                                "This would take cash balance below 0",
+                                Toast.LENGTH_LONG
+                            ).show();
+
+                            return;
+                        }
+
+                        db.updateCashAdjustment(adjustmentId, date, time, amount, notes);
+
+                        Toast.makeText(CashActivity.this, "Adjustment updated", Toast.LENGTH_SHORT).show();
+
+                        loadCash();
+                    }
+                });
+            }
+        }).start();
     }
 
     private void confirmDeleteAdjustment(final int adjustmentId) {
@@ -283,7 +313,7 @@ public class CashActivity extends Activity {
 
     private void saveAdjustment(EditText etAmount, EditText etNotes) {
 
-        double amount;
+        final double amount;
 
         try {
 
@@ -301,13 +331,40 @@ public class CashActivity extends Activity {
             return;
         }
 
-        String date = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
-        String time = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+        final String notes = etNotes.getText().toString().trim();
 
-        db.insertCashAdjustment(date, time, amount, etNotes.getText().toString().trim());
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
 
-        Toast.makeText(this, "Adjustment saved", Toast.LENGTH_SHORT).show();
+                final double balance = db.getCashBalance();
 
-        loadCash();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+
+                        if (amount < 0 && balance + amount < 0) {
+
+                            Toast.makeText(
+                                CashActivity.this,
+                                "This would take cash balance below 0",
+                                Toast.LENGTH_LONG
+                            ).show();
+
+                            return;
+                        }
+
+                        String date = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+                        String time = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+
+                        db.insertCashAdjustment(date, time, amount, notes);
+
+                        Toast.makeText(CashActivity.this, "Adjustment saved", Toast.LENGTH_SHORT).show();
+
+                        loadCash();
+                    }
+                });
+            }
+        }).start();
     }
 }

@@ -468,6 +468,29 @@ public class Expenseeditactivity extends Activity {
 			}
 		}
 
+		if (!cashBaselineLoaded) {
+
+			android.widget.Toast.makeText(
+				this,
+				"Still checking cash balance - try again in a moment",
+				android.widget.Toast.LENGTH_SHORT
+			).show();
+
+			return;
+		}
+
+		if (paidAmount > 0 && cashBaseline - paidAmount < 0) {
+
+			android.widget.Toast.makeText(
+				this,
+				"This would take cash balance below 0 - reduce Amount " +
+				"Paid or add cash first",
+				android.widget.Toast.LENGTH_LONG
+			).show();
+
+			return;
+		}
+
 		boolean success;
 
 		if (expenseId == 0) {

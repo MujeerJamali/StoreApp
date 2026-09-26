@@ -2133,6 +2133,29 @@ public class Transactioneditactivity extends Activity {
 			return;
 		}
 
+		if (!cashBaselineLoaded) {
+
+			android.widget.Toast.makeText(
+				this,
+				"Still checking cash balance - try again in a moment",
+				android.widget.Toast.LENGTH_SHORT
+			).show();
+
+			return;
+		}
+
+		if (amountPaid > 0 && cashBaseline - amountPaid < 0) {
+
+			android.widget.Toast.makeText(
+				this,
+				"This would take cash balance below 0 - reduce Amount Paid " +
+				"or add cash first",
+				android.widget.Toast.LENGTH_LONG
+			).show();
+
+			return;
+		}
+
 
 
 		// Any row carried over from Bulk Purchase Import doesn't have a
