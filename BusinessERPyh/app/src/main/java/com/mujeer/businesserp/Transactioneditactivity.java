@@ -680,6 +680,12 @@ public class Transactioneditactivity extends Activity {
 		final EditText etTotal =
 			view.findViewById(R.id.et_item_total);
 
+		// Defaults Quantity to 1 rather than leaving it blank, so Total
+		// already shows a real quantity*price figure as soon as an item
+		// (and its price) is picked, instead of reading as 0 until the
+		// user manually types a quantity.
+		etQuantity.setText("1");
+
 		final Double[] exactPriceOverride =
 			wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
 
@@ -924,7 +930,7 @@ public class Transactioneditactivity extends Activity {
 						selectedPosition[0] = -1;
 
 						actvItem.setText("", false);
-						etQuantity.setText("");
+						etQuantity.setText("1");
 						etPurchasePrice.setText("");
 						etTotal.setText("");
 
