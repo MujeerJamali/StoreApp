@@ -266,24 +266,10 @@ public class Transactioneditactivity extends Activity {
 		btn_go_dashboard.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
-
-					Intent intent = new Intent(
-						Transactioneditactivity.this,
-						MainActivity.class
-					);
-
-					// This activity may now be the task root (app
-					// launcher), so clear back to a fresh Dashboard
-					// instead of stacking on top of it.
-					intent.setFlags(
-						Intent.FLAG_ACTIVITY_CLEAR_TOP |
-						Intent.FLAG_ACTIVITY_NEW_TASK
-					);
-
-					startActivity(intent);
-					finish();
+					goToDashboard();
 				}
 			});
+
         lv_transaction_items = findViewById(R.id.lv_purchase_items);
         scroll_transaction_edit = findViewById(R.id.scroll_transaction_edit);
         items_section_container = findViewById(R.id.items_section_container);
@@ -459,7 +445,17 @@ public class Transactioneditactivity extends Activity {
 				@Override
 				public void onClick(View v) {
 
-					finish();
+					// Same reasoning as onBackPressed() - plain finish()
+					// would exit the app entirely when this screen is the
+					// launcher (task root) with nothing behind it.
+					if (isTaskRoot()) {
+
+						goToDashboard();
+
+					} else {
+
+						finish();
+					}
 				}
 			});
 			
@@ -1158,6 +1154,48 @@ public class Transactioneditactivity extends Activity {
 		setListViewHeightBasedOnChildren(lv_transaction_items);
 
 		updateGrandTotal();
+	}
+
+	private void goToDashboard() {
+
+		Intent intent = new Intent(
+			Transactioneditactivity.this,
+			MainActivity.class
+		);
+
+		// This activity may now be the task root (app launcher), so
+		// clear back to a fresh Dashboard instead of stacking on top
+		// of it.
+		intent.setFlags(
+			Intent.FLAG_ACTIVITY_CLEAR_TOP |
+			Intent.FLAG_ACTIVITY_NEW_TASK
+		);
+
+		startActivity(intent);
+		finish();
+	}
+
+	// =====================
+	// This screen is the app's launcher (opens straight to Add Sale),
+	// so when there's nothing else in the back stack, plain Back would
+	// otherwise exit the app entirely - go to the Dashboard instead,
+	// same as tapping btn_go_dashboard. isTaskRoot() is what tells the
+	// two cases apart: when this screen was instead opened from
+	// somewhere else in the app (Add Sale from a party's page, editing
+	// an existing sale, a Drafts entry, etc.), it isn't the task root,
+	// so Back keeps its normal behavior of returning to that screen.
+	// =====================
+	@Override
+	public void onBackPressed() {
+
+		if (isTaskRoot()) {
+
+			goToDashboard();
+
+		} else {
+
+			super.onBackPressed();
+		}
 	}
 
 	// =====================
