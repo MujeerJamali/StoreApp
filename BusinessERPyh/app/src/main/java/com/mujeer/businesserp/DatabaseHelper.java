@@ -3240,6 +3240,40 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return ranks;
 	}
 
+	// Every "yyyy-MM" month from startMonth to endMonth, inclusive.
+	private ArrayList<String> enumerateMonthRange(String startMonth, String endMonth) {
+
+		ArrayList<String> months = new ArrayList<String>();
+
+		SimpleDateFormat monthFormat = new SimpleDateFormat("yyyy-MM", Locale.US);
+
+		Calendar cal = Calendar.getInstance();
+
+		try {
+			cal.setTime(monthFormat.parse(startMonth));
+		} catch (Exception e) {
+			months.add(startMonth);
+			return months;
+		}
+
+		cal.set(Calendar.DAY_OF_MONTH, 1);
+
+		for (int i = 0; i < 1200; i++) {
+
+			String month = monthFormat.format(cal.getTime());
+
+			months.add(month);
+
+			if (month.equals(endMonth)) {
+				break;
+			}
+
+			cal.add(Calendar.MONTH, 1);
+		}
+
+		return months;
+	}
+
 	// =====================
 	// REPORT: NET PROFIT (sale total - item cost - expenses) FOR A DATE
 	// RANGE. fromDate/toDate null means All Time (no date bound). Item
@@ -3407,11 +3441,40 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		cursor.close();
 
-		HashMap<Integer, Integer> rankSumById = new HashMap<Integer, Integer>();
+		if (byMonth.isEmpty()) {
+			return new ArrayList<HashMap<String, Object>>();
+		}
+
+		// The item universe is everyone who sold at least once somewhere
+		// in the range - the same set the old code implicitly used. The
+		// month span is every calendar month between the first and last
+		// month that had ANY sale in range (not the raw fromDate/toDate,
+		// which for "All Time" starts at year 0000 and would enumerate
+		// millennia of empty months for nothing).
 		HashMap<Integer, String> nameById = new HashMap<Integer, String>();
-		HashMap<Integer, Integer> monthsCountedById = new HashMap<Integer, Integer>();
 
 		for (ArrayList<Object[]> monthRows : byMonth.values()) {
+			for (Object[] row : monthRows) {
+				nameById.put((Integer) row[0], (String) row[1]);
+			}
+		}
+
+		ArrayList<String> months = new ArrayList<String>(byMonth.keySet());
+		java.util.Collections.sort(months);
+
+		ArrayList<String> allMonths = enumerateMonthRange(
+			months.get(0), months.get(months.size() - 1));
+
+		HashMap<Integer, Integer> rankSumById = new HashMap<Integer, Integer>();
+		HashMap<Integer, Integer> monthsCountedById = new HashMap<Integer, Integer>();
+
+		for (String month : allMonths) {
+
+			ArrayList<Object[]> monthRows = byMonth.get(month);
+
+			if (monthRows == null) {
+				monthRows = new ArrayList<Object[]>();
+			}
 
 			double[] values = new double[monthRows.size()];
 
@@ -3421,15 +3484,29 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 			int[] ranks = computeDescendingRanks(values);
 
+			// A product absent this month, or with zero sales, ranks
+			// worse than every seller that did have one - one past the
+			// lowest (worst) rank actually handed out.
+			int lastPlaceRank = monthRows.size() + 1;
+
+			java.util.HashSet<Integer> soldThisMonth = new java.util.HashSet<Integer>();
+
 			for (int i = 0; i < monthRows.size(); i++) {
 
 				int itemId = (Integer) monthRows.get(i)[0];
-				String itemName = (String) monthRows.get(i)[1];
-
-				nameById.put(itemId, itemName);
+				soldThisMonth.add(itemId);
 
 				Integer existingSum = rankSumById.get(itemId);
 				rankSumById.put(itemId, (existingSum == null ? 0 : existingSum) + ranks[i]);
+			}
+
+			for (Integer itemId : nameById.keySet()) {
+
+				if (!soldThisMonth.contains(itemId)) {
+
+					Integer existingSum = rankSumById.get(itemId);
+					rankSumById.put(itemId, (existingSum == null ? 0 : existingSum) + lastPlaceRank);
+				}
 
 				Integer existingCount = monthsCountedById.get(itemId);
 				monthsCountedById.put(itemId, (existingCount == null ? 0 : existingCount) + 1);
