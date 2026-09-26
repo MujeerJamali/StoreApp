@@ -3,6 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/bg_card"
+    android:descendantFocusability="blocksDescendants"
     android:elevation="@dimen/elevation_card"
     android:orientation="horizontal"
     android:padding="14dp">
