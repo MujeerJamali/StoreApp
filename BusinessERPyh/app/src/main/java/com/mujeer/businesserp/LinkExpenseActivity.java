@@ -90,9 +90,22 @@ public class LinkExpenseActivity extends Activity {
 			@Override
 			public void onTextChanged(CharSequence s, int start, int before, int count) {
 
+				// Both adapters can genuinely be null here, not just
+				// transiently during setup: expensePickerAdapter is null
+				// until resetToPickExpense()'s first call, and
+				// purchaseSelectionAdapter is null until step 2 is reached
+				// - which never happens at all in singlePurchaseMode, where
+				// onExpensePicked() clears et_search (see its own comment)
+				// while selectedExpense is already non-null. Guard both
+				// rather than relying on call-site ordering elsewhere.
 				if (selectedExpense == null) {
-					expensePickerAdapter.getFilter().filter(s);
-				} else {
+
+					if (expensePickerAdapter != null) {
+						expensePickerAdapter.getFilter().filter(s);
+					}
+
+				} else if (purchaseSelectionAdapter != null) {
+
 					purchaseSelectionAdapter.getFilter().filter(s);
 				}
 			}
@@ -150,13 +163,19 @@ public class LinkExpenseActivity extends Activity {
 		btn_link.setVisibility(View.GONE);
 
 		tv_step_label.setText("Step 1: Pick an Expense");
-		et_search.setText("");
-		et_search.setHint("Search expenses...");
 
+		// Build and attach the adapter BEFORE clearing et_search below -
+		// its TextWatcher (see onCreate()) fires on setText() and reads
+		// expensePickerAdapter, which is null until this assignment. On
+		// the very first call (from onCreate()) that order would otherwise
+		// NPE before the adapter ever exists.
 		ArrayList<HashMap<String, Object>> expenses = db.getUnlinkedExpenses(null);
 
 		expensePickerAdapter = new ExpensePickerAdapter(this, expenses);
 		lv_picker.setAdapter(expensePickerAdapter);
+
+		et_search.setText("");
+		et_search.setHint("Search expenses...");
 	}
 
 	private void openAddExpense() {
@@ -192,6 +211,10 @@ public class LinkExpenseActivity extends Activity {
 			" - " + selectedExpense.get("date")
 		);
 
+		// selectedExpense is already non-null by this point, so the
+		// TextWatcher's else-branch would run here - purchaseSelectionAdapter
+		// isn't created yet (and in singlePurchaseMode never will be), which
+		// is exactly why that branch is null-guarded (see onCreate()).
 		et_search.setText("");
 
 		if (singlePurchaseMode) {
