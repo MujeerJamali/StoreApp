@@ -140,12 +140,7 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
-            android:name=".PurchaseCostsActivity"
-            android:exported="false"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
-
-        <activity
-            android:name=".PurchaseCostEditActivity"
+            android:name=".LinkExpenseActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 

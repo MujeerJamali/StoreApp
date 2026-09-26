@@ -36,42 +36,43 @@ BusinessERPyh/                  Gradle project root
   item dropdown always carries a "+ Add New Item" row at the bottom,
   even when what's typed already has (wrong) matches — tapping it jumps
   straight to creating the item and returns with it selected, no need
-  to first type something that fails to match. A Purchase's "+ Add
-  Purchase Cost" button attaches one or more **Purchase Costs** to it
-  (see below) — works even before the purchase itself is saved.
-- **Cost Items / Purchase Costs** — a reusable category list (Petrol,
-  Shipping, Packaging, ...), shared between Purchase Costs and the
-  Expense screen's Item field. Both those fields require picking an
-  existing Cost Item — like the Item dropdown above, they always carry
+  to first type something that fails to match. A Purchase's "+ Select
+  Expenses" button links one or more existing **Expenses** to it as
+  landed cost (see below) — works even before the purchase itself is
+  saved.
+- **Cost Items / Linking Expenses to Purchases** — Expenses double as the
+  source of a purchase's landed costs (petrol, shipping, packaging, ...);
+  there's no separate "Purchase Cost" record to create. Cost Items is
+  just the reusable category list (Petrol, Shipping, Packaging, ...) the
+  Expense screen's Item field picks from — it must resolve to an
+  existing Cost Item, and, like the Item dropdown above, always carries
   a "+ Add New Cost Item" row at the bottom to create one on the spot
-  and come back with it selected; typing an unrecognized name and
-  saving anyway is rejected rather than silently creating one. A
-  Purchase Cost is one cost event (a Cost
-  Item + a total amount + when it happened) that splits proportionally
-  by value across one or more purchases, each with its own choice of
-  whether that share adds to the supplier's owed balance or is a cash
-  outflow now — either way it's blended into that purchase's line
-  items' **Extra Cost/Unit** by weighted average against current stock
-  (see "Landed cost" below). Replaces the older single-purchase "Other
-  Charges" field (still present on old purchases, just unused by new
-  ones) with something reusable and splittable across purchases, and
-  one that actually reaches the Cash screen when tracked purely as a
-  cost — the old field's gap was that a "tracked purely as cost" charge
-  never appeared anywhere in cash tracking. Once created, a Purchase
-  Cost's amount and purchase split aren't retroactively editable or
-  reversible (same simplification as Extra Cost/Unit and Purchase Price
-  themselves) — only its category/date/notes can be changed afterward,
-  and deleting one removes the record without undoing its already-
-  applied cash/balance/landed-cost effects. Upgrading to this version
-  seeds a Cost Item for every distinct item text already used by an
-  existing Expense or Recurring Expense rule, one-time, so the Item
-  autocomplete starts already populated instead of empty.
+  rather than silently creating one from an unrecognized typed name.
+  From a Purchase's "+ Select Expenses" button, pick an existing,
+  not-yet-linked Expense (or create a new one there and then) and choose
+  which purchase(s) to split its amount across, proportionally by value
+  — that share blends into each linked purchase's line items' **Extra
+  Cost/Unit** by weighted average against current stock (see "Landed
+  cost" below). A linked Expense keeps its own cash/party-balance effect
+  entirely unchanged (its own amount/paid_amount/party fields, exactly
+  as a standalone expense) — linking only decides how much of it counts
+  as a purchase's landed cost, and once linked it drops out of the plain
+  Expenses list and Net Profit/dashboard expense totals so it isn't
+  double counted. Once linked, an Expense's split across purchase(s)
+  isn't retroactively editable (same simplification as Extra Cost/Unit
+  and Purchase Price themselves) — "Remove" on a linked-expense row
+  deletes the link without undoing its already-applied landed-cost
+  effect, and the expense becomes linkable again. Upgrading to this
+  version seeds a Cost Item for every distinct item text already used
+  by an existing Expense or Recurring Expense rule, one-time, so the
+  Item autocomplete starts already populated instead of empty.
 - **Payments** — payment in/out against a party.
 - **Expenses** — one-off and **recurring** (weekly/monthly/specific
   dates); the Item field is a Cost Item autocomplete rather than free
   text — it must resolve to an existing Cost Item, typing an
   unrecognized name and saving anyway is rejected (see "+ Add New" row
-  below).
+  above). Any Expense can later be linked to a Purchase as its landed
+  cost (see above).
 - **Cash** — a single ledger of all cash movement (sales, purchases,
   payments, expenses, manual adjustments); tapping a row opens its real
   source transaction. **A transaction is rejected if it would take the
@@ -94,9 +95,10 @@ BusinessERPyh/                  Gradle project root
 
 Every item can carry an **Extra Cost/Unit** (transport, shipping, etc.)
 alongside its Purchase Price, maintained automatically as a running
-weighted average — a Purchase Cost's share of a purchase (see "Cost
-Items / Purchase Costs" above) is split across that purchase's line
-items by value and blended in against the item's stock at the time.
+weighted average — a linked Expense's share of a purchase (see "Cost
+Items / Linking Expenses to Purchases" above) is split across that
+purchase's line items by value and blended in against the item's stock
+at the time.
 **Net Profit, the Cash Sale vs Party profit split, and Item Monthly Rank
 by Profit all use Purchase Price + Extra Cost/Unit as the cost basis.
 Stock Worth deliberately does not** — it's quantity × Purchase Price

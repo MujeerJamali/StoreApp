@@ -245,22 +245,24 @@
                 android:inputType="textMultiLine|textNoSuggestions" />
 
             <!-- Purchase only - see Transactioneditactivity#toggling this
-                 GONE for a Sale. Petrol/shipping/packaging/etc. costs for
-                 this purchase (see PurchaseCostsActivity) - blended into
-                 the purchased items' cost (DatabaseHelper#
+                 GONE for a Sale. Existing Expenses (Petrol/shipping/
+                 packaging/etc.) linked to this purchase as its landed
+                 cost (see LinkExpenseActivity) - blended into the
+                 purchased items' cost (DatabaseHelper#
                  applyExtraCostToItem) for profit calculations, Stock
-                 Worth never counts it. A not-yet-saved purchase shows
-                 its own pending list here (container_pending_purchase_costs_list),
-                 written for real once Save succeeds; an already-saved
-                 one shows what's already applied, straight from the
-                 database. -->
+                 Worth never counts it, and a linked Expense drops out of
+                 the plain Expenses list/totals (no double counting). A
+                 not-yet-saved purchase shows its own pending list here
+                 (container_pending_purchase_costs_list), written for
+                 real once Save succeeds; an already-saved one shows
+                 what's already linked, straight from the database. -->
             <LinearLayout
                 android:id="@+id/container_purchase_costs"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <TextView style="@style/FieldLabel" android:text="Purchase Costs" />
+                <TextView style="@style/FieldLabel" android:text="Linked Expenses" />
 
                 <LinearLayout
                     android:id="@+id/container_pending_purchase_costs_list"
@@ -269,14 +271,14 @@
                     android:orientation="vertical" />
 
                 <Button
-                    android:id="@+id/btn_add_purchase_cost"
+                    android:id="@+id/btn_select_expenses"
                     style="@style/AppButton.Outline.Small"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:paddingStart="16dp"
                     android:paddingEnd="16dp"
-                    android:text="+ Add Purchase Cost" />
+                    android:text="+ Select Expenses" />
 
             </LinearLayout>
 

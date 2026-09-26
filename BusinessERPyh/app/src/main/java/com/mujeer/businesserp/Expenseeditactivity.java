@@ -716,10 +716,11 @@ public class Expenseeditactivity extends Activity {
 		}
 
 		boolean success;
+		long savedExpenseId = expenseId;
 
 		if (expenseId == 0) {
 
-			success = db.insertExpense(
+			savedExpenseId = db.insertExpense(
 
 				item,
 
@@ -735,7 +736,9 @@ public class Expenseeditactivity extends Activity {
 
 				partyId
 
-			) != -1;
+			);
+
+			success = savedExpenseId != -1;
 
 		} else {
 
@@ -771,6 +774,15 @@ public class Expenseeditactivity extends Activity {
 				"Expense saved successfully.",
 				Toast.LENGTH_SHORT
 			).show();
+
+			// Harmless when opened via plain startActivity() - nothing is
+			// waiting on a result then. A caller that opened this via
+			// startActivityForResult (e.g. LinkExpenseActivity's "+ Add
+			// New Expense") uses this to pick up the expense it just
+			// created.
+			Intent result = new Intent();
+			result.putExtra("expense_id", (int) savedExpenseId);
+			setResult(RESULT_OK, result);
 
 			finish();
 

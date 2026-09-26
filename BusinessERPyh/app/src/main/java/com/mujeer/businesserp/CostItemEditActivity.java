@@ -129,8 +129,8 @@ public class CostItemEditActivity extends Activity {
 		new AlertDialog.Builder(this)
 			.setTitle("Delete Cost Item")
 			.setMessage(
-				"Delete this cost item? Purchase costs and expenses already " +
-				"recorded against it keep their own data."
+				"Delete this cost item? Expenses already recorded against " +
+				"it keep their own data."
 			)
 			.setPositiveButton("Delete", new DialogInterface.OnClickListener() {
 				@Override
