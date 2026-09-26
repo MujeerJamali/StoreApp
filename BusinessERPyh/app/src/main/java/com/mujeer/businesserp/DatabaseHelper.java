@@ -32,7 +32,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // (called every app open) crashes with "no such table".
     // Bumped 16 -> 17 to add "drafts" (a Sale/Purchase/Payment/Expense
     // saved mid-entry, to be finished later from the Drafts screen).
-    public static final int DATABASE_VERSION = 17;
+    // Bumped 17 -> 18 to add landed-cost tracking: items.extra_cost_
+    // per_unit (a weighted-average transport/shipping cost per unit,
+    // blended in from purchases.other_charges each time a Purchase
+    // carrying one is saved) and purchases.other_charges_to_party
+    // (whether that charge was added to the supplier's owed amount, or
+    // tracked purely for cost purposes).
+    public static final int DATABASE_VERSION = 18;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -147,7 +153,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"name TEXT NOT NULL, " +
 			"purchase_price REAL NOT NULL DEFAULT 0, " +
 			"sale_price REAL NOT NULL DEFAULT 0, " +
-			"balance REAL NOT NULL DEFAULT 0" +
+			"balance REAL NOT NULL DEFAULT 0, " +
+			"extra_cost_per_unit REAL NOT NULL DEFAULT 0" +
 			");"
 		);
 
@@ -161,7 +168,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"grand_total REAL NOT NULL DEFAULT 0, " +
 			"amount_paid REAL NOT NULL DEFAULT 0, " +
 			"notes TEXT, " +
-			"source TEXT" +
+			"source TEXT, " +
+			"other_charges REAL NOT NULL DEFAULT 0, " +
+			"other_charges_to_party INTEGER NOT NULL DEFAULT 1" +
 			");"
 		);
 
@@ -391,6 +400,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 			db.execSQL("UPDATE " + TABLE_EXPENSES + " SET paid_amount = amount");
 		}
+
+		addColumnIfMissing(db, TABLE_ITEMS, "extra_cost_per_unit", "REAL NOT NULL DEFAULT 0");
+		addColumnIfMissing(db, TABLE_PURCHASES, "other_charges", "REAL NOT NULL DEFAULT 0");
+		addColumnIfMissing(db, TABLE_PURCHASES, "other_charges_to_party", "INTEGER NOT NULL DEFAULT 1");
 
 		dropPurchaseCodeColumnIfPresent(db);
 	}
@@ -874,7 +887,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		SQLiteDatabase db = this.getReadableDatabase();
 
 		Cursor cursor = db.rawQuery(
-			"SELECT code, name, purchase_price, sale_price, balance FROM " +
+			"SELECT code, name, purchase_price, sale_price, balance, extra_cost_per_unit FROM " +
 			TABLE_ITEMS +
 			" WHERE id=?",
 			new String[]{String.valueOf(id)}
@@ -887,6 +900,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("purchase_price", cursor.getDouble(2));
 			map.put("sale_price", cursor.getDouble(3));
 			map.put("balance", cursor.getDouble(4));
+			map.put("extra_cost_per_unit", cursor.getDouble(5));
 		}
 
 		cursor.close();
@@ -1884,6 +1898,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         String notes
 	) {
 
+		return insertPurchase(
+			partyId, date, time, invoiceNumber, grandTotal, amountPaid, notes, 0, true
+		);
+	}
+
+	public long insertPurchase(
+        int partyId,
+        String date,
+        String time,
+        String invoiceNumber,
+        double grandTotal,
+        double amountPaid,
+        String notes,
+        double otherCharges,
+        boolean otherChargesToParty
+	) {
+
 		SQLiteDatabase db = this.getWritableDatabase();
 
 		if (invoiceNumber == null || invoiceNumber.trim().length() == 0) {
@@ -1900,6 +1931,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("amount_paid", amountPaid);
 		values.put("notes", notes);
 		values.put("source", "Manual");
+		values.put("other_charges", otherCharges);
+		values.put("other_charges_to_party", otherChargesToParty ? 1 : 0);
 
 		long id = db.insert(
             TABLE_PURCHASES,
@@ -2132,7 +2165,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 			"SELECT p.party_id, pa.name, p.date, p.time, " +
 			"p.invoice_number, p.grand_total, " +
-			"p.amount_paid, p.notes " +
+			"p.amount_paid, p.notes, p.other_charges, p.other_charges_to_party " +
 			"FROM " + TABLE_PURCHASES + " p " +
 			"INNER JOIN " + TABLE_PARTIES + " pa " +
 			"ON p.party_id = pa.id " +
@@ -2153,12 +2186,71 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("grand_total", cursor.getDouble(5));
 			map.put("amount_paid", cursor.getDouble(6));
 			map.put("notes", cursor.getString(7));
+			map.put("other_charges", cursor.getDouble(8));
+			map.put("other_charges_to_party", cursor.getInt(9) != 0);
 		}
 
 		cursor.close();
 
 		return map;
 	}
+
+	// =====================
+	// Blends a newly-arrived batch's per-unit extra cost (its allocated
+	// share of that purchase's other_charges - transport/shipping/etc.,
+	// split across the purchase's line items by value) into the item's
+	// running extra_cost_per_unit by weighted average against its
+	// current stock. This is the same "single current cost" approach
+	// the rest of the app already takes with purchase_price - not a
+	// per-batch/lot cost, since stock itself isn't lot-tracked.
+	//
+	// Must be called BEFORE this item's balance is adjusted for the
+	// incoming quantity (i.e. before insertPurchaseItem()), so the
+	// weighting reflects stock as it stood immediately before this
+	// purchase. Only ever called for a brand-new purchase - editing or
+	// deleting one doesn't try to reverse an already-blended average,
+	// same as purchase_price is never retroactively corrected either.
+	// =====================
+	public void applyExtraCostToItem(
+		int itemId, double incomingQty, double incomingExtraCostTotal) {
+
+		if (incomingQty <= 0) {
+			return;
+		}
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		double oldBalance = 0;
+		double oldExtraCostPerUnit = 0;
+
+		Cursor cursor = db.rawQuery(
+			"SELECT balance, extra_cost_per_unit FROM " + TABLE_ITEMS + " WHERE id=?",
+			new String[]{String.valueOf(itemId)}
+		);
+
+		if (cursor.moveToFirst()) {
+			oldBalance = cursor.getDouble(0);
+			oldExtraCostPerUnit = cursor.getDouble(1);
+		}
+
+		cursor.close();
+
+		// A zero/negative existing balance contributes no weight - the
+		// incoming batch is effectively starting the average fresh.
+		double oldWeight = Math.max(oldBalance, 0);
+
+		double incomingExtraCostPerUnit = incomingExtraCostTotal / incomingQty;
+
+		double newExtraCostPerUnit =
+			(oldExtraCostPerUnit * oldWeight + incomingExtraCostPerUnit * incomingQty) /
+			(oldWeight + incomingQty);
+
+		ContentValues values = new ContentValues();
+		values.put("extra_cost_per_unit", newExtraCostPerUnit);
+
+		db.update(TABLE_ITEMS, values, "id=?", new String[]{String.valueOf(itemId)});
+	}
+
 	// =====================
 // INSERT PURCHASE ITEM
 // =====================
@@ -2588,6 +2680,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         double amountPaid,
         String notes) {
 
+		return updatePurchase(
+			purchaseId, partyId, date, time, invoiceNumber, grandTotal,
+			amountPaid, notes, 0, true
+		);
+	}
+
+	public boolean updatePurchase(
+        int purchaseId,
+        int partyId,
+        String date,
+        String time,
+        String invoiceNumber,
+        double grandTotal,
+        double amountPaid,
+        String notes,
+        double otherCharges,
+        boolean otherChargesToParty) {
+
 		SQLiteDatabase db = this.getWritableDatabase();
 
 		// Reverse this purchase's previous effect on its old party's
@@ -2620,6 +2730,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("amount_paid", amountPaid);
 		values.put("notes", notes);
 		values.put("source", "Manual");
+		values.put("other_charges", otherCharges);
+		values.put("other_charges_to_party", otherChargesToParty ? 1 : 0);
 
 		int rows = db.update(
             TABLE_PURCHASES,
@@ -2949,7 +3061,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// and a Vyapar import both use for a walk-in/unnamed customer) -
 	// every other party is a real, named customer. Profit per line item
 	// mirrors Net Profit's own cost basis (amount - qty * current
-	// purchase_price).
+	// landed cost, i.e. purchase_price + extra_cost_per_unit).
 	// =====================
 	public HashMap<String, Object> getProfitSplitByPartyType(String fromDate, String toDate) {
 
@@ -2960,7 +3072,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		Cursor cursor = db.rawQuery(
 			"SELECT " +
 			"CASE WHEN pa.id IS NULL OR pa.name = 'Cash Sale' THEN 'cash' ELSE 'party' END AS bucket, " +
-			"COALESCE(SUM(si.amount - si.qty * i.purchase_price), 0) AS profit " +
+			"COALESCE(SUM(si.amount - si.qty * (i.purchase_price + i.extra_cost_per_unit)), 0) AS profit " +
 			"FROM sales s " +
 			"LEFT JOIN " + TABLE_PARTIES + " pa ON pa.id = s.party_id " +
 			"INNER JOIN sale_items si ON si.sale_id = s.id " +
@@ -3414,11 +3526,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// =====================
 	// REPORT: NET PROFIT (sale total - item cost - expenses) FOR A DATE
 	// RANGE. fromDate/toDate null means All Time (no date bound). Item
-	// cost is each sale line's quantity times its item's CURRENT
-	// purchase_price - this app doesn't keep a historical cost snapshot
-	// per sale, so a price change today also reshapes past periods'
-	// profit, same simplification the rest of the app already makes by
-	// treating items.purchase_price as a single current cost.
+	// cost is each sale line's quantity times its item's CURRENT landed
+	// cost (purchase_price + extra_cost_per_unit, the latter a running
+	// weighted-average transport/shipping cost - see
+	// applyExtraCostToItem()) - this app doesn't keep a historical cost
+	// snapshot per sale, so a cost change today also reshapes past
+	// periods' profit, same simplification the rest of the app already
+	// makes by treating an item's cost as a single current figure.
 	// =====================
 	public HashMap<String, Object> getNetProfitSummary(String fromDate, String toDate) {
 
@@ -3439,7 +3553,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		double itemCost = sumColumn(
 			db,
-			"SELECT COALESCE(SUM(si.qty * i.purchase_price), 0) " +
+			"SELECT COALESCE(SUM(si.qty * (i.purchase_price + i.extra_cost_per_unit)), 0) " +
 			"FROM sale_items si " +
 			"INNER JOIN sales s ON s.id = si.sale_id " +
 			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = si.item_id" +
@@ -3542,7 +3656,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		Cursor cursor = db.rawQuery(
 			"SELECT i.id, i.name, strftime('%Y-%m', s.date) AS ym, " +
 			"SUM(si.amount) AS sales_total, " +
-			"SUM(si.qty * i.purchase_price) AS cost_total " +
+			"SUM(si.qty * (i.purchase_price + i.extra_cost_per_unit)) AS cost_total " +
 			"FROM sale_items si " +
 			"INNER JOIN sales s ON s.id = si.sale_id " +
 			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = si.item_id " +

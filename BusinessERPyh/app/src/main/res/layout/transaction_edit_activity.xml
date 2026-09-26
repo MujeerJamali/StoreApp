@@ -244,6 +244,37 @@
                 android:visibility="gone"
                 android:inputType="textMultiLine|textNoSuggestions" />
 
+            <!-- Purchase only - see Transactioneditactivity#toggling this
+                 GONE for a Sale. A transport/shipping/etc. charge for
+                 this purchase, blended into the purchased items' cost
+                 (see DatabaseHelper#applyExtraCostToItem) for profit
+                 calculations - Stock Worth never counts it. -->
+            <LinearLayout
+                android:id="@+id/container_other_charges"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/FieldLabel"
+                    android:text="Other Charges (Transport/Shipping)" />
+
+                <EditText
+                    android:id="@+id/et_other_charges"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="numberDecimal" />
+
+                <CheckBox
+                    android:id="@+id/cb_other_charges_to_party"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:checked="true"
+                    android:text="Add to amount owed to supplier" />
+
+            </LinearLayout>
+
             <TextView style="@style/FieldLabel" android:text="Amount Paid" />
             <LinearLayout
                 android:layout_width="match_parent"

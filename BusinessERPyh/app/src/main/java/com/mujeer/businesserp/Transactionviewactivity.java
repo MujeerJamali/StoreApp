@@ -281,8 +281,26 @@ public class Transactionviewactivity extends Activity {
 			tv_purchase_invoice.setText(
 				"Invoice: " + purchase.get("invoice_number"));
 
-			tv_purchase_total.setText(
-				"Grand Total: " + AmountFormat.format((Double) purchase.get("grand_total")));
+			double otherCharges = 0;
+
+			if (purchase.get("other_charges") != null) {
+				otherCharges = (Double) purchase.get("other_charges");
+			}
+
+			String grandTotalLine =
+				"Grand Total: " + AmountFormat.format((Double) purchase.get("grand_total"));
+
+			if (otherCharges != 0) {
+
+				boolean toParty = Boolean.TRUE.equals(purchase.get("other_charges_to_party"));
+
+				grandTotalLine += toParty ?
+					" (includes " + AmountFormat.format(otherCharges) + " other charges)" :
+					" (other charges of " + AmountFormat.format(otherCharges) +
+					" tracked separately, not added to supplier balance)";
+			}
+
+			tv_purchase_total.setText(grandTotalLine);
 
 			tv_purchase_paid.setText(
 				"Amount Paid: " + AmountFormat.format((Double) purchase.get("amount_paid")));

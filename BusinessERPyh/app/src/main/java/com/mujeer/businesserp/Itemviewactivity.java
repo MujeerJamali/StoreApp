@@ -24,6 +24,8 @@ public class Itemviewactivity extends Activity {
     TextView tv_sale_price;
     TextView tv_item_stock;
     TextView tv_transactions_empty;
+    View container_extra_cost;
+    TextView tv_extra_cost_per_unit;
 
     LinearLayout cardVarietiesView;
     LinearLayout containerVarietiesView;
@@ -52,6 +54,8 @@ public class Itemviewactivity extends Activity {
         tv_sale_price = findViewById(R.id.tv_sale_price);
         tv_item_stock = findViewById(R.id.tv_item_stock);
         tv_transactions_empty = findViewById(R.id.tv_transactions_empty);
+        container_extra_cost = findViewById(R.id.container_extra_cost);
+        tv_extra_cost_per_unit = findViewById(R.id.tv_extra_cost_per_unit);
 
         cardVarietiesView = findViewById(R.id.card_varieties_view);
         containerVarietiesView = findViewById(R.id.container_varieties_view);
@@ -251,6 +255,22 @@ public class Itemviewactivity extends Activity {
             tv_item_name.setText((String) item.get("name"));
             tv_purchase_price.setText(AmountFormat.format((Double) item.get("purchase_price")));
             tv_sale_price.setText(AmountFormat.format((Double) item.get("sale_price")));
+
+            double extraCostPerUnit = 0;
+
+            if (item.get("extra_cost_per_unit") != null) {
+                extraCostPerUnit = (Double) item.get("extra_cost_per_unit");
+            }
+
+            if (extraCostPerUnit != 0) {
+
+                container_extra_cost.setVisibility(View.VISIBLE);
+                tv_extra_cost_per_unit.setText(AmountFormat.format(extraCostPerUnit));
+
+            } else {
+
+                container_extra_cost.setVisibility(View.GONE);
+            }
 
             double stock = 0;
 

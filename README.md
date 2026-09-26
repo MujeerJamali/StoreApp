@@ -32,7 +32,12 @@ BusinessERPyh/                  Gradle project root
   items only show sizes with stock, bulk Excel import for purchases. The
   Add/Edit Item dialog's Quantity, Price and Total fields are linked live:
   editing Total back-solves Price at the current Quantity (e.g. 4 @ 50 =
-  200; changing Total to 100 sets Price to 25).
+  200; changing Total to 100 sets Price to 25). A Purchase can carry an
+  **Other Charges** amount (transport/shipping/etc.), with a checkbox for
+  whether it's added to the supplier's owed balance or tracked purely as
+  a cost. It's split across that purchase's line items by value and
+  blended into each item's **Extra Cost/Unit** by weighted average
+  against current stock (see "Landed cost" below).
 - **Payments** — payment in/out against a party.
 - **Expenses** — one-off and **recurring** (weekly/monthly/specific dates).
 - **Cash** — a single ledger of all cash movement (sales, purchases,
@@ -52,6 +57,20 @@ BusinessERPyh/                  Gradle project root
 - **Data tools** — bulk Excel import for purchases and items; full backup
   export/import in Vyapar's `.vyb` format (round-trips this app's own
   variety/combo and cash-adjustment data alongside standard Vyapar data).
+
+## Landed cost (Extra Cost/Unit)
+
+Every item can carry an **Extra Cost/Unit** (transport, shipping, etc.)
+alongside its Purchase Price, maintained automatically as a running
+weighted average — a Purchase's Other Charges are split across its line
+items by value and blended in against the item's stock at the time.
+**Net Profit, the Cash Sale vs Party profit split, and Item Monthly Rank
+by Profit all use Purchase Price + Extra Cost/Unit as the cost basis.
+Stock Worth deliberately does not** — it's quantity × Purchase Price
+only, same as before. Like Purchase Price itself, this is a single
+current figure per item, not a per-batch/lot cost (stock isn't lot-
+tracked); editing or deleting a past Purchase doesn't retroactively
+re-blend it.
 
 ## Reports
 

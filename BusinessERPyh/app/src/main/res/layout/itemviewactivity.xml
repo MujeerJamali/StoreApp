@@ -57,6 +57,32 @@
                 android:textColor="@color/text_primary"
                 android:textSize="17sp" />
 
+            <!-- Only shown when this item has one - see
+                 DatabaseHelper#applyExtraCostToItem(). A weighted-average
+                 transport/shipping cost per unit, blended in from past
+                 purchases' Other Charges; counted in profit reports, not
+                 in Stock Worth. -->
+            <LinearLayout
+                android:id="@+id/container_extra_cost"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    style="@style/FieldLabel"
+                    android:text="Extra Cost/Unit (Transport/Shipping)" />
+
+                <TextView
+                    android:id="@+id/tv_extra_cost_per_unit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0.00"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="17sp" />
+
+            </LinearLayout>
+
             <TextView
                 style="@style/FieldLabel"
                 android:text="Sale Price" />

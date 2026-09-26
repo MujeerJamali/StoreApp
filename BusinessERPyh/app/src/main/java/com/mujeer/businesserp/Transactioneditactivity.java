@@ -51,7 +51,10 @@ public class Transactioneditactivity extends Activity {
 	AutoCompleteTextView actv_party;
     EditText et_date, et_time, et_invoice_number, et_amount_paid, et_notes;
     EditText et_search_transaction_items;
+    EditText et_other_charges;
     CheckBox cb_full_paid;
+    CheckBox cb_other_charges_to_party;
+    View container_other_charges;
     View tv_add_note;
     TextView tv_grand_total;
     TextView tv_cash_before, tv_cash_after;
@@ -191,6 +194,45 @@ public class Transactioneditactivity extends Activity {
 		cb_full_paid.setOnCheckedChangeListener(fullPaidCheckedChangeListener);
         et_notes = findViewById(R.id.et_notes);
         tv_add_note = findViewById(R.id.tv_add_note);
+
+        container_other_charges = findViewById(R.id.container_other_charges);
+        et_other_charges = findViewById(R.id.et_other_charges);
+        cb_other_charges_to_party = findViewById(R.id.cb_other_charges_to_party);
+
+        // Only a Purchase has a supplier bill to add transport/shipping
+        // to - a Sale has no equivalent concept.
+        container_other_charges.setVisibility(
+            transactionType == TYPE_PURCHASE ? View.VISIBLE : View.GONE
+        );
+
+        et_other_charges.addTextChangedListener(
+            new android.text.TextWatcher() {
+
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                }
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                }
+
+                @Override
+                public void afterTextChanged(android.text.Editable s) {
+                    updateGrandTotal();
+                }
+            }
+        );
+
+        cb_other_charges_to_party.setOnCheckedChangeListener(
+            new android.widget.CompoundButton.OnCheckedChangeListener() {
+
+                @Override
+                public void onCheckedChanged(
+                    android.widget.CompoundButton buttonView, boolean isChecked) {
+                    updateGrandTotal();
+                }
+            }
+        );
 		tv_add_note.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
@@ -303,6 +345,8 @@ public class Transactioneditactivity extends Activity {
 			et_invoice_number.setText(
 				db.getNextPurchaseInvoiceNo()
 			);
+
+			et_other_charges.setText("0");
 		}
 		
 		if (isEditMode) {
@@ -1173,6 +1217,16 @@ public class Transactioneditactivity extends Activity {
 			et_amount_paid.setText((String) data.get("amount_paid"));
 		}
 
+		if (data.get("other_charges") != null) {
+			et_other_charges.setText((String) data.get("other_charges"));
+		}
+
+		if (data.get("other_charges_to_party") != null) {
+			cb_other_charges_to_party.setChecked(
+				Boolean.TRUE.equals(data.get("other_charges_to_party"))
+			);
+		}
+
 		ArrayList<HashMap<String, Object>> items =
 			(ArrayList<HashMap<String, Object>>) data.get("items");
 
@@ -1213,6 +1267,11 @@ public class Transactioneditactivity extends Activity {
 		data.put("notes", et_notes.getText().toString());
 		data.put("amount_paid", et_amount_paid.getText().toString());
 		data.put("items", new ArrayList<HashMap<String, Object>>(transactionItemList));
+
+		if (transactionType == TYPE_PURCHASE) {
+			data.put("other_charges", et_other_charges.getText().toString());
+			data.put("other_charges_to_party", cb_other_charges_to_party.isChecked());
+		}
 
 		String encoded = DraftCodec.encode(data);
 
@@ -2176,6 +2235,16 @@ public class Transactioneditactivity extends Activity {
 			total += (Double) map.get("total");
 		}
 
+		if (transactionType == TYPE_PURCHASE && cb_other_charges_to_party.isChecked()) {
+
+			try {
+
+				total += Double.parseDouble(et_other_charges.getText().toString());
+
+			} catch (Exception e) {
+			}
+		}
+
 		tv_grand_total.setText(
 			AmountFormat.format(total)
 		);
@@ -2365,11 +2434,26 @@ public class Transactioneditactivity extends Activity {
 		// thousands (AmountFormat.format()), which Double.parseDouble()
 		// can't parse and would throw on any total >= 1000, crashing the
 		// save for larger purchases while small ones (no comma) worked.
-		double grandTotal = 0;
+		double itemsSubtotal = 0;
 
 		for (HashMap<String, Object> item : transactionItemList) {
-			grandTotal += (Double) item.get("total");
+			itemsSubtotal += (Double) item.get("total");
 		}
+
+		double otherCharges = 0;
+
+		try {
+
+			otherCharges = Double.parseDouble(
+				et_other_charges.getText().toString()
+			);
+
+		} catch (Exception e) {
+		}
+
+		boolean otherChargesToParty = cb_other_charges_to_party.isChecked();
+
+		double grandTotal = itemsSubtotal + (otherChargesToParty ? otherCharges : 0);
 
 		if (amountPaid > grandTotal) {
 
@@ -2468,7 +2552,9 @@ public class Transactioneditactivity extends Activity {
 			et_invoice_number.getText().toString(),
 			grandTotal,
 			amountPaid,
-				et_notes.getText().toString()
+				et_notes.getText().toString(),
+				otherCharges,
+				otherChargesToParty
 				);
 
 					if (!success) {
@@ -2493,7 +2579,9 @@ public class Transactioneditactivity extends Activity {
 			et_invoice_number.getText().toString(),
 		grandTotal,
 			amountPaid,
-			et_notes.getText().toString()
+			et_notes.getText().toString(),
+			otherCharges,
+			otherChargesToParty
 				);
 
 				if (newPurchaseId <= 0) {
@@ -2512,6 +2600,23 @@ public class Transactioneditactivity extends Activity {
 
 		// Save all purchase items
 		for (HashMap<String, Object> item : transactionItemList) {
+
+			// Blend this line's share of Other Charges into the item's
+			// running extra_cost_per_unit BEFORE this purchase's stock is
+			// added in (see applyExtraCostToItem()'s own ordering note).
+			// Only for a brand-new purchase - editing one doesn't try to
+			// undo/redo an already-blended average.
+			if (!isEditMode && itemsSubtotal > 0) {
+
+				double lineShare =
+					((Double) item.get("total")).doubleValue() / itemsSubtotal;
+
+				db.applyExtraCostToItem(
+					((Integer) item.get("item_id")).intValue(),
+					((Double) item.get("quantity")).doubleValue(),
+					otherCharges * lineShare
+				);
+			}
 
 			db.insertPurchaseItem(
 
@@ -2891,6 +2996,14 @@ public class Transactioneditactivity extends Activity {
 
 		et_amount_paid.setText(
 			purchase.get("amount_paid").toString()
+		);
+
+		et_other_charges.setText(
+			AmountFormat.formatPlain((Double) purchase.get("other_charges"))
+		);
+
+		cb_other_charges_to_party.setChecked(
+			Boolean.TRUE.equals(purchase.get("other_charges_to_party"))
 		);
 
 		setFullPaidCheckboxSilently(
