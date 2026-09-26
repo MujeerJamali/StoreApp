@@ -11,3 +11,11 @@
   isn't possible here. Substitute rigorous static checks instead: brace/
   paren balance, XML well-formedness, R.id cross-referencing - and say so
   explicitly rather than implying the app was actually built or run.
+- Keep README.md current. Whenever a change adds/removes/renames a
+  module, report, or user-facing feature, update the README's Modules/
+  Reports sections in the same commit - don't let it drift and require a
+  separate catch-up pass later.
+- The app is developed via AIDE on-device, not Android Studio. When a
+  change needs a full rebuild (new file, new resource, manifest edit,
+  build.gradle edit) versus when a plain incremental Run is enough, say
+  so explicitly so the user isn't stuck guessing whether to rebuild.
