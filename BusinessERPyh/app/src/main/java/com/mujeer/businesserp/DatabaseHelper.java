@@ -2667,6 +2667,20 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		adjustItemBalance(db, itemId, quantity);
 		adjustComboBalance(db, comboId, quantity);
 
+		// Keep the item's own Purchase Price current with what was actually
+		// paid on the most recent purchase - this used to be a manual-only
+		// field (only ever set from Add/Edit Item), which is how items
+		// bought for real through this exact screen could still end up
+		// sitting at a purchase price of 0 forever. Only for a real,
+		// positive price - a $0 line (a freebie/correction) shouldn't wipe
+		// out the item's known cost.
+		if (purchasePrice > 0) {
+
+			ContentValues itemValues = new ContentValues();
+			itemValues.put("purchase_price", purchasePrice);
+
+			db.update(TABLE_ITEMS, itemValues, "id=?", new String[]{String.valueOf(itemId)});
+		}
 
 		return id;
 	}
