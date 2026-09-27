@@ -19,3 +19,15 @@
   change needs a full rebuild (new file, new resource, manifest edit,
   build.gradle edit) versus when a plain incremental Run is enough, say
   so explicitly so the user isn't stuck guessing whether to rebuild.
+- Keep the Vyapar (`.vyb`) backup round-trip complete. Whenever a change
+  adds, renames, or changes the meaning of a table/column that holds
+  real user data (a new feature's schema, a new field on an existing
+  table), update BOTH `ExportVyaparActivity` and `ImportVyaparActivity`
+  in the same commit so a fresh backup actually carries that data and a
+  restore actually brings it back - in both directions, not just one.
+  Gate a new table/column the same way existing optional ones already
+  are (`tableExists`/`columnExists` in `ImportVyaparActivity`) so an
+  older backup made before the feature existed still restores cleanly
+  instead of failing. This was missed for an entire session's worth of
+  features before being caught and fixed in one pass - don't let it
+  drift again and require another catch-up audit later.
