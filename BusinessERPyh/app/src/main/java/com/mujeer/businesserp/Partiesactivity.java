@@ -9,9 +9,11 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -25,14 +27,28 @@ import java.util.HashMap;
 
     Button btn_add_party;
 
-    Button btn_party_sort_recent;
-    Button btn_party_sort_oldest;
-    Button btn_party_sort_balance_high;
-    Button btn_party_sort_balance_low;
-    Button btn_party_sort_name_asc;
-    Button btn_party_sort_name_desc;
+    Spinner spinner_party_sort;
 
     ListView lv_parties;
+
+    // Each entry pairs a DatabaseHelper.PARTY_SORT_* with the ascending
+    // flag that gives it the label at the same index in
+    // partySortLabels() - order must match the Spinner's options.
+    private static final int[] PARTY_SORT_VALUES = {
+        DatabaseHelper.PARTY_SORT_LATEST_TXN, DatabaseHelper.PARTY_SORT_LATEST_TXN,
+        DatabaseHelper.PARTY_SORT_BALANCE, DatabaseHelper.PARTY_SORT_BALANCE,
+        DatabaseHelper.PARTY_SORT_NAME, DatabaseHelper.PARTY_SORT_NAME
+    };
+
+    private static final boolean[] PARTY_SORT_ASCENDING = {
+        false, true, false, true, true, false
+    };
+
+    private static final String[] PARTY_SORT_LABELS = {
+        "Recent Activity", "Oldest Activity",
+        "Balance: High to Low", "Balance: Low to High",
+        "Name: A-Z", "Name: Z-A"
+    };
 
     DatabaseHelper db;
 
@@ -53,12 +69,7 @@ import java.util.HashMap;
 
         btn_add_party = findViewById(R.id.btn_add_party);
 
-        btn_party_sort_recent = findViewById(R.id.btn_party_sort_recent);
-        btn_party_sort_oldest = findViewById(R.id.btn_party_sort_oldest);
-        btn_party_sort_balance_high = findViewById(R.id.btn_party_sort_balance_high);
-        btn_party_sort_balance_low = findViewById(R.id.btn_party_sort_balance_low);
-        btn_party_sort_name_asc = findViewById(R.id.btn_party_sort_name_asc);
-        btn_party_sort_name_desc = findViewById(R.id.btn_party_sort_name_desc);
+        spinner_party_sort = findViewById(R.id.spinner_party_sort);
 
         lv_parties = findViewById(R.id.lv_parties);
 
@@ -66,47 +77,23 @@ import java.util.HashMap;
 
 				db = new DatabaseHelper(this);
 
-				btn_party_sort_recent.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						selectPartySort(DatabaseHelper.PARTY_SORT_LATEST_TXN, false);
-					}
-				});
+				ArrayAdapter<String> partySortAdapter = new ArrayAdapter<String>(
+					this, android.R.layout.simple_spinner_item, PARTY_SORT_LABELS
+				);
 
-				btn_party_sort_oldest.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						selectPartySort(DatabaseHelper.PARTY_SORT_LATEST_TXN, true);
-					}
-				});
+				partySortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+				spinner_party_sort.setAdapter(partySortAdapter);
 
-				btn_party_sort_balance_high.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						selectPartySort(DatabaseHelper.PARTY_SORT_BALANCE, false);
-					}
-				});
+				spinner_party_sort.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+						@Override
+						public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+							selectPartySort(PARTY_SORT_VALUES[position], PARTY_SORT_ASCENDING[position]);
+						}
 
-				btn_party_sort_balance_low.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						selectPartySort(DatabaseHelper.PARTY_SORT_BALANCE, true);
-					}
-				});
-
-				btn_party_sort_name_asc.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						selectPartySort(DatabaseHelper.PARTY_SORT_NAME, true);
-					}
-				});
-
-				btn_party_sort_name_desc.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						selectPartySort(DatabaseHelper.PARTY_SORT_NAME, false);
-					}
-				});
+						@Override
+						public void onNothingSelected(AdapterView<?> parent) {
+						}
+					});
 
 				loadParties();
 
@@ -171,34 +158,6 @@ Partiesactivity.this,
 
         selectedPartySort = sort;
         selectedPartySortAscending = ascending;
-
-        Button[] buttons = {
-            btn_party_sort_recent, btn_party_sort_oldest,
-            btn_party_sort_balance_high, btn_party_sort_balance_low,
-            btn_party_sort_name_asc, btn_party_sort_name_desc
-        };
-
-        int[] sorts = {
-            DatabaseHelper.PARTY_SORT_LATEST_TXN, DatabaseHelper.PARTY_SORT_LATEST_TXN,
-            DatabaseHelper.PARTY_SORT_BALANCE, DatabaseHelper.PARTY_SORT_BALANCE,
-            DatabaseHelper.PARTY_SORT_NAME, DatabaseHelper.PARTY_SORT_NAME
-        };
-
-        boolean[] ascendings = {false, true, false, true, true, false};
-
-        for (int i = 0; i < buttons.length; i++) {
-
-            if (sorts[i] == sort && ascendings[i] == ascending) {
-
-                buttons[i].setBackgroundResource(R.drawable.bg_button_primary);
-                buttons[i].setTextColor(getResources().getColor(R.color.text_on_primary));
-
-            } else {
-
-                buttons[i].setBackgroundResource(R.drawable.bg_button_outline);
-                buttons[i].setTextColor(getResources().getColor(R.color.primary));
-            }
-        }
 
         loadParties();
     }

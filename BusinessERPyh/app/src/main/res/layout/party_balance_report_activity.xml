@@ -13,92 +13,26 @@
         android:layout_marginTop="0dp"
         android:text="Every party's balance and how long since their last Sale/Purchase/Payment/Expense/Transfer - sort by that to see which balances have been sitting the longest." />
 
-    <TextView style="@style/FieldLabel" android:text="Show" />
-
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
-        android:scrollbars="none">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/btn_balance_filter_all"
-                style="@style/AppButton.Small"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:minWidth="0dp"
-                android:paddingStart="18dp"
-                android:paddingEnd="18dp"
-                android:text="All Parties" />
-
-            <Button
-                android:id="@+id/btn_balance_filter_nonzero"
-                style="@style/AppButton.Outline.Small"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:minWidth="0dp"
-                android:paddingStart="18dp"
-                android:paddingEnd="18dp"
-                android:text="Non-Zero Balance" />
-
-            <Button
-                android:id="@+id/btn_balance_filter_zero"
-                style="@style/AppButton.Outline.Small"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:paddingStart="18dp"
-                android:paddingEnd="18dp"
-                android:text="Zero Balance" />
-
-        </LinearLayout>
-
-    </HorizontalScrollView>
-
-    <TextView style="@style/FieldLabel" android:text="Sort By Last Activity" />
-
-    <HorizontalScrollView
-        android:layout_width="match_parent"
+    <LinearLayout
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginBottom="16dp"
-        android:scrollbars="none">
+        android:orientation="horizontal">
 
-        <LinearLayout
+        <Spinner
+            android:id="@+id/spinner_balance_filter"
+            style="@style/FilterSpinner"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:layout_marginEnd="10dp" />
 
-            <Button
-                android:id="@+id/btn_due_sort_most_overdue"
-                style="@style/AppButton.Small"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:minWidth="0dp"
-                android:paddingStart="18dp"
-                android:paddingEnd="18dp"
-                android:text="Most Overdue First" />
+        <Spinner
+            android:id="@+id/spinner_party_sort"
+            style="@style/FilterSpinner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
 
-            <Button
-                android:id="@+id/btn_due_sort_least_overdue"
-                style="@style/AppButton.Outline.Small"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:paddingStart="18dp"
-                android:paddingEnd="18dp"
-                android:text="Least Overdue First" />
-
-        </LinearLayout>
-
-    </HorizontalScrollView>
+    </LinearLayout>
 
     <TextView
         android:id="@+id/tv_no_parties"

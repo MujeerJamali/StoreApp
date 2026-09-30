@@ -5,8 +5,9 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.Button;
+import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -16,24 +17,51 @@ import java.util.HashMap;
 // Every party's balance alongside how long it's been since their last
 // Sale/Purchase/Payment/Expense/Transfer (see
 // DatabaseHelper.getPartiesWithActivity()) - a zero/non-zero balance
-// filter plus a sort by that "days since" figure, so the parties whose
-// balance has been sitting untouched the longest float to the top.
+// filter plus the same 6-way sort as the Parties screen (Recent/Oldest
+// Activity, Balance High-Low/Low-High, Name A-Z/Z-A), so a balance
+// sitting untouched the longest - or any other ordering the Parties
+// screen offers - can be found here too.
 // =====================
 public class PartyBalanceReportActivity extends Activity {
 
-	private Button btn_balance_filter_all;
-	private Button btn_balance_filter_nonzero;
-	private Button btn_balance_filter_zero;
-
-	private Button btn_due_sort_most_overdue;
-	private Button btn_due_sort_least_overdue;
+	private Spinner spinner_balance_filter;
+	private Spinner spinner_party_sort;
 
 	private TextView tv_no_parties;
 	private ListView lv_parties;
 
 	private DatabaseHelper db;
 
+	private static final int[] BALANCE_FILTER_VALUES = {
+		DatabaseHelper.PARTY_BALANCE_FILTER_ALL,
+		DatabaseHelper.PARTY_BALANCE_FILTER_NONZERO,
+		DatabaseHelper.PARTY_BALANCE_FILTER_ZERO
+	};
+
+	private static final String[] BALANCE_FILTER_LABELS = {
+		"All Parties", "Non-Zero Balance", "Zero Balance"
+	};
+
+	// Same sort options, same order, as Partiesactivity's Spinner - kept
+	// in sync by hand since each screen owns its own Spinner instance.
+	private static final int[] PARTY_SORT_VALUES = {
+		DatabaseHelper.PARTY_SORT_LATEST_TXN, DatabaseHelper.PARTY_SORT_LATEST_TXN,
+		DatabaseHelper.PARTY_SORT_BALANCE, DatabaseHelper.PARTY_SORT_BALANCE,
+		DatabaseHelper.PARTY_SORT_NAME, DatabaseHelper.PARTY_SORT_NAME
+	};
+
+	private static final boolean[] PARTY_SORT_ASCENDING = {
+		false, true, false, true, true, false
+	};
+
+	private static final String[] PARTY_SORT_LABELS = {
+		"Recent Activity", "Oldest Activity",
+		"Balance: High to Low", "Balance: Low to High",
+		"Name: A-Z", "Name: Z-A"
+	};
+
 	private int selectedBalanceFilter = DatabaseHelper.PARTY_BALANCE_FILTER_ALL;
+	private int selectedPartySort = DatabaseHelper.PARTY_SORT_LATEST_TXN;
 	private boolean selectedSortAscending = false;
 
 	private final ArrayList<HashMap<String, Object>> partyList =
@@ -53,12 +81,8 @@ public class PartyBalanceReportActivity extends Activity {
 
 		setTitle("Party Balances");
 
-		btn_balance_filter_all = findViewById(R.id.btn_balance_filter_all);
-		btn_balance_filter_nonzero = findViewById(R.id.btn_balance_filter_nonzero);
-		btn_balance_filter_zero = findViewById(R.id.btn_balance_filter_zero);
-
-		btn_due_sort_most_overdue = findViewById(R.id.btn_due_sort_most_overdue);
-		btn_due_sort_least_overdue = findViewById(R.id.btn_due_sort_least_overdue);
+		spinner_balance_filter = findViewById(R.id.spinner_balance_filter);
+		spinner_party_sort = findViewById(R.id.spinner_party_sort);
 
 		tv_no_parties = findViewById(R.id.tv_no_parties);
 		lv_parties = findViewById(R.id.lv_parties);
@@ -84,38 +108,44 @@ public class PartyBalanceReportActivity extends Activity {
 				}
 			});
 
-		btn_balance_filter_all.setOnClickListener(new View.OnClickListener() {
+		ArrayAdapter<String> balanceFilterAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, BALANCE_FILTER_LABELS
+		);
+
+		balanceFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_balance_filter.setAdapter(balanceFilterAdapter);
+
+		spinner_balance_filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectBalanceFilter(DatabaseHelper.PARTY_BALANCE_FILTER_ALL);
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectedBalanceFilter = BALANCE_FILTER_VALUES[position];
+					loadReport();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
-		btn_balance_filter_nonzero.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectBalanceFilter(DatabaseHelper.PARTY_BALANCE_FILTER_NONZERO);
-				}
-			});
+		ArrayAdapter<String> partySortAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, PARTY_SORT_LABELS
+		);
 
-		btn_balance_filter_zero.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectBalanceFilter(DatabaseHelper.PARTY_BALANCE_FILTER_ZERO);
-				}
-			});
+		partySortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_party_sort.setAdapter(partySortAdapter);
 
-		btn_due_sort_most_overdue.setOnClickListener(new View.OnClickListener() {
+		spinner_party_sort.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectSort(false);
-				}
-			});
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
 
-		btn_due_sort_least_overdue.setOnClickListener(new View.OnClickListener() {
+					selectedPartySort = PARTY_SORT_VALUES[position];
+					selectedSortAscending = PARTY_SORT_ASCENDING[position];
+
+					loadReport();
+				}
+
 				@Override
-				public void onClick(View v) {
-					selectSort(true);
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
@@ -128,59 +158,9 @@ public class PartyBalanceReportActivity extends Activity {
 		loadReport();
 	}
 
-	private void selectBalanceFilter(int filter) {
-
-		selectedBalanceFilter = filter;
-
-		Button[] buttons = {btn_balance_filter_all, btn_balance_filter_nonzero, btn_balance_filter_zero};
-
-		int[] filters = {
-			DatabaseHelper.PARTY_BALANCE_FILTER_ALL,
-			DatabaseHelper.PARTY_BALANCE_FILTER_NONZERO,
-			DatabaseHelper.PARTY_BALANCE_FILTER_ZERO
-		};
-
-		for (int i = 0; i < buttons.length; i++) {
-
-			if (filters[i] == filter) {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_primary);
-				buttons[i].setTextColor(getResources().getColor(R.color.text_on_primary));
-
-			} else {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_outline);
-				buttons[i].setTextColor(getResources().getColor(R.color.primary));
-			}
-		}
-
-		loadReport();
-	}
-
-	private void selectSort(boolean ascending) {
-
-		selectedSortAscending = ascending;
-
-		if (ascending) {
-
-			btn_due_sort_least_overdue.setBackgroundResource(R.drawable.bg_button_primary);
-			btn_due_sort_least_overdue.setTextColor(getResources().getColor(R.color.text_on_primary));
-			btn_due_sort_most_overdue.setBackgroundResource(R.drawable.bg_button_outline);
-			btn_due_sort_most_overdue.setTextColor(getResources().getColor(R.color.primary));
-
-		} else {
-
-			btn_due_sort_most_overdue.setBackgroundResource(R.drawable.bg_button_primary);
-			btn_due_sort_most_overdue.setTextColor(getResources().getColor(R.color.text_on_primary));
-			btn_due_sort_least_overdue.setBackgroundResource(R.drawable.bg_button_outline);
-			btn_due_sort_least_overdue.setTextColor(getResources().getColor(R.color.primary));
-		}
-
-		loadReport();
-	}
-
 	private void loadReport() {
 
+		final int sort_forQuery = selectedPartySort;
 		final int filter_forQuery = selectedBalanceFilter;
 		final boolean ascending_forQuery = selectedSortAscending;
 		final long myGeneration = ++loadGeneration;
@@ -190,7 +170,7 @@ public class PartyBalanceReportActivity extends Activity {
 				public void run() {
 
 					final ArrayList<HashMap<String, Object>> result = db.getPartiesWithActivity(
-						DatabaseHelper.PARTY_SORT_LATEST_TXN, ascending_forQuery, filter_forQuery
+						sort_forQuery, ascending_forQuery, filter_forQuery
 					);
 
 					runOnUiThread(new Runnable() {
