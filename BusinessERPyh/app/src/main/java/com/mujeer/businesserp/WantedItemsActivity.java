@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
@@ -52,7 +53,7 @@ public class WantedItemsActivity extends Activity {
         btnAdd.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                promptAddWantedItem();
+                promptWantedItemDialog(null);
             }
         });
 
@@ -60,6 +61,17 @@ public class WantedItemsActivity extends Activity {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 loadList();
+            }
+        });
+
+        lvList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+                HashMap<String, Object> existing =
+                    (HashMap<String, Object>) lvList.getAdapter().getItem(position);
+
+                promptWantedItemDialog(existing);
             }
         });
 
@@ -125,7 +137,7 @@ public class WantedItemsActivity extends Activity {
         }).start();
     }
 
-    private void promptAddWantedItem() {
+    private void promptWantedItemDialog(final HashMap<String, Object> existing) {
 
         View view = getLayoutInflater().inflate(R.layout.dialog_wanted_item, null);
 
@@ -157,20 +169,45 @@ public class WantedItemsActivity extends Activity {
         );
         actvParty.setThreshold(1);
 
-        new AlertDialog.Builder(this)
-            .setTitle("Add Wanted Item")
+        if (existing != null) {
+            actvItemName.setText(String.valueOf(existing.get("item_name")));
+
+            if (existing.get("party_name") != null) {
+                actvParty.setText(String.valueOf(existing.get("party_name")));
+            }
+
+            Object notes = existing.get("notes");
+
+            if (notes != null) {
+                etNotes.setText(notes.toString());
+            }
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+            .setTitle(existing == null ? "Add Wanted Item" : "Edit Wanted Item")
             .setView(view)
             .setPositiveButton("Save", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
-                    saveWantedItem(items, parties, actvItemName, actvParty, etNotes);
+                    saveWantedItem(existing, items, parties, actvItemName, actvParty, etNotes);
                 }
             })
-            .setNegativeButton("Cancel", null)
-            .show();
+            .setNegativeButton("Cancel", null);
+
+        if (existing != null) {
+            builder.setNeutralButton("Delete", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    deleteWantedItem((Integer) existing.get("id"));
+                }
+            });
+        }
+
+        builder.show();
     }
 
     private void saveWantedItem(
+        HashMap<String, Object> existing,
         ArrayList<HashMap<String, Object>> items,
         ArrayList<HashMap<String, Object>> parties,
         AutoCompleteTextView actvItemName,
@@ -206,15 +243,42 @@ public class WantedItemsActivity extends Activity {
             }
         }
 
-        String date = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
-        String time = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+        String notes = etNotes.getText().toString().trim();
 
-        db.insertWantedItem(
-            itemId, itemName, date, time, partyId, etNotes.getText().toString().trim()
-        );
+        if (existing == null) {
 
-        Toast.makeText(this, "Wanted item saved", Toast.LENGTH_SHORT).show();
+            String date = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+            String time = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+
+            db.insertWantedItem(itemId, itemName, date, time, partyId, notes);
+
+            Toast.makeText(this, "Wanted item saved", Toast.LENGTH_SHORT).show();
+        } else {
+
+            db.updateWantedItem((Integer) existing.get("id"), itemId, itemName, partyId, notes);
+
+            Toast.makeText(this, "Wanted item updated", Toast.LENGTH_SHORT).show();
+        }
 
         loadList();
+    }
+
+    private void deleteWantedItem(final int wantedItemId) {
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                db.deleteWantedItem(wantedItemId);
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(WantedItemsActivity.this, "Wanted item deleted", Toast.LENGTH_SHORT).show();
+                        loadList();
+                    }
+                });
+            }
+        }).start();
     }
 }

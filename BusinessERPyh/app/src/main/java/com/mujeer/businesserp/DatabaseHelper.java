@@ -7242,6 +7242,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return db.insert(TABLE_WANTED_ITEMS, null, values);
 	}
 
+	public boolean updateWantedItem(
+		int id, Integer itemId, String itemName, Integer partyId, String notes) {
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.put("item_name", itemName);
+		values.put("party_id", partyId);
+		values.put("notes", notes);
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		int rows = db.update(
+			TABLE_WANTED_ITEMS, values, "id=?", new String[]{String.valueOf(id)}
+		);
+
+		return rows > 0;
+	}
+
 	public ArrayList<HashMap<String, Object>> getWantedItems(boolean includeFulfilled) {
 
 		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
@@ -7313,6 +7331,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		);
 
 		return rows > 0;
+	}
+
+	// Bulk-import counterpart of insertWantedItem() - operates on the given
+	// db instead of getWritableDatabase(), and takes fulfilled directly
+	// (a restored backup keeps whatever fulfilled state it was exported
+	// with, rather than always starting unfulfilled like a fresh add).
+	public long insertWantedItemBulk(
+		SQLiteDatabase db, Integer itemId, String itemName, String date, String time,
+		Integer partyId, String notes, boolean fulfilled) {
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.put("item_name", itemName);
+		values.put("date", date);
+		values.put("time", time);
+		values.put("party_id", partyId);
+		values.put("notes", notes);
+		values.put("fulfilled", fulfilled ? 1 : 0);
+
+		return db.insert(TABLE_WANTED_ITEMS, null, values);
 	}
 
 	// =====================

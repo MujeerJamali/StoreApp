@@ -171,6 +171,7 @@ public class ExportVyaparActivity extends Activity {
 			exportPurchaseExpenseLinks(local, vyb);
 			exportRecurringExpenses(local, vyb);
 			exportDrafts(local, vyb);
+			exportWantedItems(local, vyb);
 
 			vyb.setTransactionSuccessful();
 			vyb.endTransaction();
@@ -533,6 +534,24 @@ public class ExportVyaparActivity extends Activity {
 			"data TEXT, " +
 			"date TEXT, " +
 			"time TEXT" +
+			")"
+		);
+
+		// A customer request for something not currently in stock (an
+		// existing catalog item that's out, or something not in the
+		// catalog at all) - not tied to any transaction, so item_id/
+		// party_id are just the local ids, copied straight across like
+		// businesserp_cash_adjustments above.
+		vyb.execSQL(
+			"CREATE TABLE businesserp_wanted_items (" +
+			"id INTEGER PRIMARY KEY, " +
+			"item_id INTEGER, " +
+			"item_name TEXT, " +
+			"date TEXT, " +
+			"time TEXT, " +
+			"party_id INTEGER, " +
+			"notes TEXT, " +
+			"fulfilled INTEGER" +
 			")"
 		);
 	}
@@ -1103,6 +1122,41 @@ public class ExportVyaparActivity extends Activity {
 			values.put("time", c.getString(5));
 
 			vyb.insert("businesserp_drafts", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// WANTED ITEMS -> businesserp_wanted_items (1:1 copy)
+	// =====================
+	private void exportWantedItems(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery(
+			"SELECT id, item_id, item_name, date, time, party_id, notes, fulfilled " +
+			"FROM wanted_items", null);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("id", c.getLong(0));
+
+			if (!c.isNull(1)) {
+				values.put("item_id", c.getLong(1));
+			}
+
+			values.put("item_name", c.getString(2));
+			values.put("date", c.getString(3));
+			values.put("time", c.getString(4));
+
+			if (!c.isNull(5)) {
+				values.put("party_id", c.getLong(5));
+			}
+
+			values.put("notes", c.getString(6));
+			values.put("fulfilled", c.getInt(7));
+
+			vyb.insert("businesserp_wanted_items", null, values);
 		}
 
 		c.close();

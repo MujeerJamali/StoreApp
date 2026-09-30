@@ -119,6 +119,7 @@ public class ImportVyaparActivity extends Activity {
         int purchaseExpenseLinksImported, purchaseExpenseLinksDuplicate;
         int recurringExpensesImported, recurringExpensesDuplicate;
         int draftsImported, draftsDuplicate;
+        int wantedItemsImported, wantedItemsDuplicate;
     }
 
     @Override
@@ -297,6 +298,7 @@ public class ImportVyaparActivity extends Activity {
             boolean hasCostItemsTable = tableExists(vyaparDb, "businesserp_cost_items");
             boolean hasPurchaseExpenseLinksTable = tableExists(vyaparDb, "businesserp_purchase_expense_links");
             boolean hasRecurringExpensesTable = tableExists(vyaparDb, "businesserp_recurring_expenses");
+            boolean hasWantedItemsTable = tableExists(vyaparDb, "businesserp_wanted_items");
             boolean hasDraftsTable = tableExists(vyaparDb, "businesserp_drafts");
 
             helper = new DatabaseHelper(this);
@@ -405,6 +407,12 @@ public class ImportVyaparActivity extends Activity {
                     expenseIdMap, skipped, counts);
             }
 
+            if (hasWantedItemsTable) {
+
+                setStatus("Importing wanted items...");
+                importWantedItems(vyaparDb, helper, db, partyIdMap, itemIdMap, skipped, counts);
+            }
+
             setStatus("Logging unsupported transaction types...");
             logUnsupportedTypes(vyaparDb, skipped);
 
@@ -506,6 +514,10 @@ public class ImportVyaparActivity extends Activity {
                     if (finalCounts.draftsImported > 0 || finalCounts.draftsDuplicate > 0) {
                         summary.append("Drafts: " + finalCounts.draftsImported
 									   + " imported, " + finalCounts.draftsDuplicate + " already imported\n");
+                    }
+                    if (finalCounts.wantedItemsImported > 0 || finalCounts.wantedItemsDuplicate > 0) {
+                        summary.append("Wanted items: " + finalCounts.wantedItemsImported
+									   + " imported, " + finalCounts.wantedItemsDuplicate + " already imported\n");
                     }
 
                     summary.append("\nRows not imported: " + finalSkippedCount);
@@ -2098,6 +2110,63 @@ public class ImportVyaparActivity extends Activity {
 
             helper.markImportKeyUsedBulk(db, importKey);
             counts.draftsImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // STEP 16 - WANTED ITEMS (businesserp_wanted_items) - this app's own
+    // extension, only present when hasWantedItemsTable was true. A
+    // customer request not tied to any transaction, so unlike a Purchase/
+    // Sale draft's items there's just the one item_id/party_id pair to
+    // remap, both nullable - a reference that can't be resolved (item or
+    // party not present in this backup) is simply dropped, keeping the
+    // plain-text item_name/notes rather than skipping the whole row, same
+    // as how a Sale/Purchase's own party_id degrades to "no party" rather
+    // than failing the row.
+    // =====================
+    private void importWantedItems(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> partyIdMap,
+        HashMap<Long, Integer> itemIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT id, item_id, item_name, date, time, party_id, notes, fulfilled " +
+            "FROM businesserp_wanted_items", null);
+
+        while (c.moveToNext()) {
+
+            long id = c.getLong(0);
+            Long vybItemId = c.isNull(1) ? null : c.getLong(1);
+            String itemName = c.getString(2);
+            String date = c.getString(3);
+            String time = c.getString(4);
+            Long vybPartyId = c.isNull(5) ? null : c.getLong(5);
+            String notes = c.getString(6);
+            boolean fulfilled = c.getInt(7) != 0;
+
+            String importKey = "vyb_wanted_item_" + id;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.wantedItemsDuplicate++;
+                continue;
+            }
+
+            Integer itemId = vybItemId == null ? null : resolveItem(helper, db, itemIdMap, vybItemId);
+            Integer partyId = resolveParty(helper, db, partyIdMap, vybPartyId);
+
+            helper.insertWantedItemBulk(
+                db, itemId, itemName == null ? "" : itemName,
+                date == null ? "" : date, time == null ? "" : time,
+                partyId, notes, fulfilled);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.wantedItemsImported++;
         }
 
         c.close();
