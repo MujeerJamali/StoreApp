@@ -131,7 +131,9 @@ low-to-high, for every item with a sale in the period) · Stock Worth ·
 Party Balances (zero/non-zero balance filter, sortable by days since
 each party's last Sale/Purchase/Payment/Expense/Transfer) · Item
 Monthly Rank (penalizes months an item didn't sell) · Average Cart
-Size/Amount · Profit: Cash Sale vs Party
+Size/Amount · Profit: Cash Sale vs Party · Shoes vs Non-Shoes
+(Sale/Profit toggle, same period selector, % split between shoe items
+and everything else)
 
 The Parties list itself also sorts (Recent/Oldest Activity, Balance
 High-Low/Low-High, Name A-Z/Z-A) using the same underlying query as

@@ -4296,6 +4296,72 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// REPORT: SHOES VS NON-SHOES - sales and profit for a period, split
+	// by the same "item name starts with 'Shoe'" rule as everywhere else
+	// (Item Ranking's shoes filter, Stock Worth). Both metrics are
+	// computed together so the UI can flip between Sale/Profit without a
+	// second query; percentages are computed separately per metric since
+	// a sales split and a profit split over the same period can differ.
+	// =====================
+	public HashMap<String, Object> getShoesVsNonShoesSummary(String fromDate, String toDate) {
+
+		HashMap<String, Object> map = new HashMap<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		boolean allTime = fromDate == null || toDate == null;
+
+		String[] args = allTime ? null : new String[]{fromDate, toDate};
+
+		String sql =
+			"SELECT " +
+			"COALESCE(SUM(CASE WHEN i.name LIKE 'Shoe%' THEN si.amount ELSE 0 END), 0) AS shoes_sales, " +
+			"COALESCE(SUM(CASE WHEN i.name NOT LIKE 'Shoe%' THEN si.amount ELSE 0 END), 0) AS non_shoes_sales, " +
+			"COALESCE(SUM(CASE WHEN i.name LIKE 'Shoe%' " +
+			"THEN si.qty * (i.purchase_price + i.extra_cost_per_unit) ELSE 0 END), 0) AS shoes_cost, " +
+			"COALESCE(SUM(CASE WHEN i.name NOT LIKE 'Shoe%' " +
+			"THEN si.qty * (i.purchase_price + i.extra_cost_per_unit) ELSE 0 END), 0) AS non_shoes_cost " +
+			"FROM sale_items si " +
+			"INNER JOIN sales s ON s.id = si.sale_id " +
+			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = si.item_id" +
+			(allTime ? "" : " WHERE s.date BETWEEN ? AND ?");
+
+		Cursor cursor = db.rawQuery(sql, args);
+
+		double shoesSales = 0;
+		double nonShoesSales = 0;
+		double shoesCost = 0;
+		double nonShoesCost = 0;
+
+		if (cursor.moveToFirst()) {
+			shoesSales = cursor.getDouble(0);
+			nonShoesSales = cursor.getDouble(1);
+			shoesCost = cursor.getDouble(2);
+			nonShoesCost = cursor.getDouble(3);
+		}
+
+		cursor.close();
+
+		double shoesProfit = shoesSales - shoesCost;
+		double nonShoesProfit = nonShoesSales - nonShoesCost;
+
+		double totalSales = shoesSales + nonShoesSales;
+		double totalProfit = shoesProfit + nonShoesProfit;
+
+		map.put("shoes_sales", shoesSales);
+		map.put("non_shoes_sales", nonShoesSales);
+		map.put("shoes_profit", shoesProfit);
+		map.put("non_shoes_profit", nonShoesProfit);
+
+		map.put("shoes_sales_percent", totalSales == 0 ? 0 : (shoesSales / totalSales) * 100.0);
+		map.put("non_shoes_sales_percent", totalSales == 0 ? 0 : (nonShoesSales / totalSales) * 100.0);
+		map.put("shoes_profit_percent", totalProfit == 0 ? 0 : (shoesProfit / totalProfit) * 100.0);
+		map.put("non_shoes_profit_percent", totalProfit == 0 ? 0 : (nonShoesProfit / totalProfit) * 100.0);
+
+		return map;
+	}
+
+	// =====================
 	// REPORT: STOCK WORTH - current stock quantity times purchase_price,
 	// split into shoes/non-shoes by the same name-prefix rule as
 	// everywhere else. This is always a snapshot of right now: the app

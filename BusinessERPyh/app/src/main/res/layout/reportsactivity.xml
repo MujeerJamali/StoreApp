@@ -114,6 +114,16 @@
             style="@style/ToolRow"
             android:text="Profit: Cash Sale vs Party" />
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
+            android:id="@+id/btn_report_shoes_vs_non_shoes"
+            style="@style/ToolRow"
+            android:text="Shoes vs Non-Shoes" />
+
     </LinearLayout>
 
 </LinearLayout>
