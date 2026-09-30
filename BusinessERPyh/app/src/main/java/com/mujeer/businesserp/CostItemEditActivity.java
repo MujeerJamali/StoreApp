@@ -50,6 +50,20 @@ public class CostItemEditActivity extends Activity {
 			}
 
 			btn_delete_cost_item.setVisibility(View.VISIBLE);
+
+		} else {
+
+			// Lets a caller (the Cost Item picker's "+ Add New Cost Item"
+			// row) pre-fill the name when the user typed something that
+			// didn't match any existing cost item, so they don't have to
+			// retype it here.
+			String prefillName = getIntent().getStringExtra("cost_item_name");
+
+			if (prefillName != null && !prefillName.trim().isEmpty()) {
+
+				et_cost_item_name.setText(prefillName.trim());
+				et_cost_item_name.setSelection(et_cost_item_name.getText().length());
+			}
 		}
 
 		btn_save_cost_item.setOnClickListener(new View.OnClickListener() {

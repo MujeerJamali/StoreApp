@@ -47,6 +47,8 @@
         android:id="@+id/cb_wanted_item_fulfilled"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_vertical" />
+        android:layout_gravity="center_vertical"
+        android:focusable="false"
+        android:focusableInTouchMode="false" />
 
 </LinearLayout>

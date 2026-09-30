@@ -71,6 +71,7 @@ public class Expenseeditactivity extends Activity {
 	private Map<String, Integer> partyIdByName;
 	private Map<Integer, String> partyNameById;
 	private TwoLineAutoCompleteAdapter partyAdapter;
+	private final PreSelectionTextWatcher partyTextTracker = new PreSelectionTextWatcher();
 
 	// name -> id for the Cost Item field, same purpose as partyIdByName
 	// above - saveExpense() requires the typed text to resolve to one of
@@ -119,14 +120,21 @@ public class Expenseeditactivity extends Activity {
 		loadPartyAutoComplete();
 		loadCostItemAutoComplete();
 
+		actv_party.addTextChangedListener(partyTextTracker);
+
+		final PreSelectionTextWatcher costItemTextTracker = new PreSelectionTextWatcher();
+		et_item.addTextChangedListener(costItemTextTracker);
+
 		et_item.setOnItemClickListener(new AdapterView.OnItemClickListener() {
 				@Override
 				public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 
 					if (costItemAdapter != null && costItemAdapter.isAddNewPosition(position)) {
 
+						String typedName = costItemTextTracker.textBeforeChange.trim();
+
 						et_item.setText("", false);
-						openAddCostItem();
+						openAddCostItem(typedName);
 						return;
 					}
 
@@ -361,7 +369,7 @@ public class Expenseeditactivity extends Activity {
 
 					if (partyAdapter.isAddNewPosition(position)) {
 
-						String typedName = actv_party.getText().toString().trim();
+						String typedName = partyTextTracker.textBeforeChange.trim();
 
 						actv_party.setText("", false);
 
@@ -409,10 +417,11 @@ public class Expenseeditactivity extends Activity {
 		et_item.setThreshold(1);
 	}
 
-	private void openAddCostItem() {
+	private void openAddCostItem(String prefillName) {
 
 		Intent intent = new Intent(this, CostItemEditActivity.class);
 		intent.putExtra("cost_item_id", 0);
+		intent.putExtra("cost_item_name", prefillName);
 
 		startActivityForResult(intent, REQUEST_ADD_COST_ITEM);
 	}

@@ -60,6 +60,7 @@ public class Paymenteditactivity extends Activity {
 	new ArrayList<HashMap<String, Object>>();
 
 	private TwoLineAutoCompleteAdapter partyAdapter;
+	private final PreSelectionTextWatcher partyTextTracker = new PreSelectionTextWatcher();
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -178,6 +179,8 @@ public class Paymenteditactivity extends Activity {
 
 		reloadPartyAdapter();
 
+		et_party.addTextChangedListener(partyTextTracker);
+
 		et_party.setOnItemClickListener(
 			new AdapterView.OnItemClickListener() {
 
@@ -190,7 +193,7 @@ public class Paymenteditactivity extends Activity {
 
 					if (partyAdapter.isAddNewPosition(position)) {
 
-						String typedName = et_party.getText().toString().trim();
+						String typedName = partyTextTracker.textBeforeChange.trim();
 
 						et_party.setText("", false);
 

@@ -811,6 +811,9 @@ public class Transactioneditactivity extends Activity {
 		actv_party.setAdapter(adapter);
 		actv_party.setThreshold(1);
 
+		final PreSelectionTextWatcher partyTextTracker = new PreSelectionTextWatcher();
+		actv_party.addTextChangedListener(partyTextTracker);
+
 		actv_party.setOnItemClickListener(
 			new AdapterView.OnItemClickListener() {
 
@@ -823,7 +826,7 @@ public class Transactioneditactivity extends Activity {
 					// pattern as the Item field's own "+ Add New Item".
 					if (adapter.isAddNewPosition(position)) {
 
-						String typedName = actv_party.getText().toString().trim();
+						String typedName = partyTextTracker.textBeforeChange.trim();
 
 						actv_party.setText("", false);
 
@@ -1025,6 +1028,9 @@ public class Transactioneditactivity extends Activity {
 
 		final int[] selectedPosition = {-1};
 
+		final PreSelectionTextWatcher itemTextTracker = new PreSelectionTextWatcher();
+		actvItem.addTextChangedListener(itemTextTracker);
+
 		actvItem.setOnItemClickListener(
 			new AdapterView.OnItemClickListener() {
 
@@ -1042,7 +1048,7 @@ public class Transactioneditactivity extends Activity {
 					// Add/Add & New buttons).
 					if (adapter.isAddNewPosition(position)) {
 
-						String typedName = actvItem.getText().toString().trim();
+						String typedName = itemTextTracker.textBeforeChange.trim();
 
 						actvItem.setText("", false);
 						dialog.dismiss();
@@ -2416,6 +2422,9 @@ public class Transactioneditactivity extends Activity {
 		actvItem.setThreshold(1);
 		actvItem.setText(itemNames.get(selectedPosition), false);
 
+		final PreSelectionTextWatcher editItemTextTracker = new PreSelectionTextWatcher();
+		actvItem.addTextChangedListener(editItemTextTracker);
+
 		Map<Integer, Integer> preselectedVarietyValues = null;
 
 		// A presetItemId means this is a different item than the line
@@ -2462,7 +2471,7 @@ public class Transactioneditactivity extends Activity {
 					// onActivityResult().
 					if (adapter.isAddNewPosition(position)) {
 
-						String typedName = actvItem.getText().toString().trim();
+						String typedName = editItemTextTracker.textBeforeChange.trim();
 
 						actvItem.setText("", false);
 						dialog.dismiss();
