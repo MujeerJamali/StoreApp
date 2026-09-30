@@ -4608,7 +4608,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// subtracted per item.
 	// =====================
 	public ArrayList<HashMap<String, Object>> getNetProfitByItem(
-		String fromDate, String toDate, boolean ascending) {
+		String fromDate, String toDate, boolean ascending, int shoesFilter) {
 
 		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
 
@@ -4616,7 +4616,30 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		boolean allTime = fromDate == null || toDate == null;
 
-		String[] args = allTime ? null : new String[]{fromDate, toDate};
+		ArrayList<String> conditions = new ArrayList<>();
+		ArrayList<String> argList = new ArrayList<>();
+
+		if (!allTime) {
+			conditions.add("s.date BETWEEN ? AND ?");
+			argList.add(fromDate);
+			argList.add(toDate);
+		}
+
+		if (shoesFilter == SHOES_FILTER_SHOES_ONLY) {
+			conditions.add("i.name LIKE 'Shoe%'");
+		} else if (shoesFilter == SHOES_FILTER_NON_SHOES_ONLY) {
+			conditions.add("i.name NOT LIKE 'Shoe%'");
+		}
+
+		StringBuilder whereClause = new StringBuilder();
+
+		for (int i = 0; i < conditions.size(); i++) {
+			whereClause.append(i == 0 ? "WHERE " : " AND ").append(conditions.get(i));
+		}
+
+		if (whereClause.length() > 0) {
+			whereClause.append(" ");
+		}
 
 		String sql =
 			"SELECT i.id, i.code, i.name, SUM(si.qty) AS qty, " +
@@ -4626,11 +4649,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"FROM sale_items si " +
 			"INNER JOIN sales s ON s.id = si.sale_id " +
 			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = si.item_id " +
-			(allTime ? "" : "WHERE s.date BETWEEN ? AND ? ") +
+			whereClause +
 			"GROUP BY i.id " +
 			"ORDER BY profit " + (ascending ? "ASC" : "DESC");
 
-		Cursor cursor = db.rawQuery(sql, args);
+		Cursor cursor = db.rawQuery(sql, argList.toArray(new String[0]));
 
 		while (cursor.moveToNext()) {
 

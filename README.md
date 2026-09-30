@@ -146,7 +146,8 @@ re-blend it.
 
 Total Sales · Sales by Party · Item Ranking · Party Ranking · Net Profit
 (with a per-item profit/loss breakdown, sortable high-to-low or
-low-to-high, for every item with a sale in the period) · Stock Worth ·
+low-to-high, and an All/Shoes Only/Non-Shoes Only filter, for every
+item with a sale in the period) · Stock Worth ·
 Party Balances (zero/non-zero balance filter, sortable by days since
 each party's last Sale/Purchase/Payment/Expense/Transfer) · Item
 Monthly Rank (penalizes months an item didn't sell) · Average Cart

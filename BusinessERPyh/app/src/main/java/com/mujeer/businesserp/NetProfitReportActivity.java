@@ -4,9 +4,12 @@ import android.app.Activity;
 import android.app.DatePickerDialog;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
@@ -54,8 +57,8 @@ public class NetProfitReportActivity extends Activity {
 	private TextView tv_net_profit;
 	private SimpleBarChartView chart_net_profit;
 
-	private Button btn_item_sort_profit_desc;
-	private Button btn_item_sort_profit_asc;
+	private Spinner spinner_item_sort;
+	private Spinner spinner_item_shoes_filter;
 	private TextView tv_item_profit_empty;
 	private ListView lv_item_profit;
 
@@ -68,6 +71,7 @@ public class NetProfitReportActivity extends Activity {
 
 	private int selectedRange = RANGE_TODAY;
 	private boolean itemSortAscending = false;
+	private int selectedShoesFilter = DatabaseHelper.SHOES_FILTER_ALL;
 
 	// Bumped on every loadReport() call; a background result is only
 	// applied if it's still the most recent request by the time it
@@ -105,25 +109,56 @@ public class NetProfitReportActivity extends Activity {
 		tv_net_profit = findViewById(R.id.tv_net_profit);
 		chart_net_profit = findViewById(R.id.chart_net_profit);
 
-		btn_item_sort_profit_desc = findViewById(R.id.btn_item_sort_profit_desc);
-		btn_item_sort_profit_asc = findViewById(R.id.btn_item_sort_profit_asc);
+		spinner_item_sort = findViewById(R.id.spinner_item_sort);
+		spinner_item_shoes_filter = findViewById(R.id.spinner_item_shoes_filter);
 		tv_item_profit_empty = findViewById(R.id.tv_item_profit_empty);
 		lv_item_profit = findViewById(R.id.lv_item_profit);
 
 		itemProfitAdapter = new ItemProfitAdapter(this, itemProfitList);
 		lv_item_profit.setAdapter(itemProfitAdapter);
 
-		btn_item_sort_profit_desc.setOnClickListener(new View.OnClickListener() {
+		ArrayAdapter<String> itemSortAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item,
+			new String[]{"Profit: High to Low", "Profit: Low to High"}
+		);
+
+		itemSortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_item_sort.setAdapter(itemSortAdapter);
+
+		spinner_item_sort.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectItemSort(false);
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					itemSortAscending = position == 1;
+					loadReport();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
-		btn_item_sort_profit_asc.setOnClickListener(new View.OnClickListener() {
+		ArrayAdapter<String> shoesFilterAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item,
+			new String[]{"All Items", "Shoes Only", "Non-Shoes Only"}
+		);
+
+		shoesFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_item_shoes_filter.setAdapter(shoesFilterAdapter);
+
+		spinner_item_shoes_filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectItemSort(true);
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+
+					selectedShoesFilter =
+						position == 1 ? DatabaseHelper.SHOES_FILTER_SHOES_ONLY :
+						position == 2 ? DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY :
+						DatabaseHelper.SHOES_FILTER_ALL;
+
+					loadReport();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
@@ -338,33 +373,12 @@ public class NetProfitReportActivity extends Activity {
 		};
 	}
 
-	private void selectItemSort(boolean ascending) {
-
-		itemSortAscending = ascending;
-
-		if (ascending) {
-
-			btn_item_sort_profit_asc.setBackgroundResource(R.drawable.bg_button_primary);
-			btn_item_sort_profit_asc.setTextColor(getResources().getColor(R.color.text_on_primary));
-			btn_item_sort_profit_desc.setBackgroundResource(R.drawable.bg_button_outline);
-			btn_item_sort_profit_desc.setTextColor(getResources().getColor(R.color.primary));
-
-		} else {
-
-			btn_item_sort_profit_desc.setBackgroundResource(R.drawable.bg_button_primary);
-			btn_item_sort_profit_desc.setTextColor(getResources().getColor(R.color.text_on_primary));
-			btn_item_sort_profit_asc.setBackgroundResource(R.drawable.bg_button_outline);
-			btn_item_sort_profit_asc.setTextColor(getResources().getColor(R.color.primary));
-		}
-
-		loadReport();
-	}
-
 	private void loadReport() {
 
 		final String[] range = computeRange(selectedRange);
 		final int range_forLabel = selectedRange;
 		final boolean ascending_forQuery = itemSortAscending;
+		final int shoesFilter_forQuery = selectedShoesFilter;
 		final long myGeneration = ++loadGeneration;
 
 		new Thread(new Runnable() {
@@ -375,7 +389,9 @@ public class NetProfitReportActivity extends Activity {
 						db.getNetProfitSummary(range[0], range[1]);
 
 					final ArrayList<HashMap<String, Object>> byItem =
-						db.getNetProfitByItem(range[0], range[1], ascending_forQuery);
+						db.getNetProfitByItem(
+							range[0], range[1], ascending_forQuery, shoesFilter_forQuery
+						);
 
 					runOnUiThread(new Runnable() {
 							@Override
