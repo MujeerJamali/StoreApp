@@ -96,6 +96,10 @@ BusinessERPyh/                  Gradle project root
   the draft is deleted once it's actually saved for real.
 - **Generate Entries** — bulk-create sale/purchase/payment/expense entries
   across a date range via a calendar tap UI.
+- **Wanted Items** — log something a customer asked for that's out of
+  stock or not in the catalog; not tied to a transaction. Tapping a row
+  reopens the same Add dialog prefilled for editing, with a Delete
+  option; a checkbox can mark it fulfilled once restocked/handled.
 - **Display Shoes / Sample Shoes** — a free-form grid (Display, the
   right-foot shoe on the shelf - insert/remove rows and columns to
   mirror the actual shelf layout, landscape-locked) and a plain list
