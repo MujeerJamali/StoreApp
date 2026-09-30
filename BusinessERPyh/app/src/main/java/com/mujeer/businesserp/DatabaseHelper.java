@@ -1847,6 +1847,122 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return label.toString();
 	}
 
+	// =====================
+	// REPORT: COMBO/VARIETY STOCK - one row per distinct variety value
+	// (e.g. each Size across every shoe model), with total stock and how
+	// many distinct items carry it. Grouped by (group_id, value_id) - a
+	// value from one group ("Size" 9) is kept separate from a
+	// same-labeled value in a different group, even though that's rare
+	// in practice for this shop (Size is the only group almost every
+	// item has).
+	// =====================
+	public ArrayList<HashMap<String, Object>> getComboStockSummary() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT g.id, g.name, v.id, v.label, " +
+			"SUM(c.balance) AS total_stock, COUNT(DISTINCT c.item_id) AS item_count " +
+			"FROM " + TABLE_VARIETY_COMBO_VALUES + " cv " +
+			"INNER JOIN " + TABLE_VARIETY_COMBOS + " c ON c.id = cv.combo_id " +
+			"INNER JOIN " + TABLE_VARIETY_VALUES + " v ON v.id = cv.value_id " +
+			"INNER JOIN " + TABLE_VARIETY_GROUPS + " g ON g.id = cv.group_id " +
+			"GROUP BY cv.group_id, cv.value_id " +
+			"ORDER BY g.sort_order, g.id, v.sort_order, v.id",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<>();
+
+			row.put("group_id", cursor.getInt(0));
+			row.put("group_name", cursor.getString(1));
+			row.put("value_id", cursor.getInt(2));
+			row.put("value_label", cursor.getString(3));
+			row.put("total_stock", cursor.getDouble(4));
+			row.put("item_count", cursor.getInt(5));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// Every distinct variety value label across the whole catalog (e.g.
+	// every Size that exists on any item) - feeds the Excel-style
+	// multi-select filter on the Combo/Variety Stock report. Two
+	// differently-spelled labels for "the same size" (e.g. "9" and "09")
+	// are kept as separate entries, same as everywhere else values are
+	// free text with no normalization.
+	public ArrayList<String> getDistinctVarietyValueLabels() {
+
+		ArrayList<String> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT DISTINCT v.label FROM " + TABLE_VARIETY_VALUES + " v " +
+			"INNER JOIN " + TABLE_VARIETY_COMBO_VALUES + " cv ON cv.value_id = v.id " +
+			"ORDER BY v.label",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+			list.add(cursor.getString(0));
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// Every item that carries the given variety value in one of its
+	// combos (e.g. every item available in Size 9) - each item's own
+	// "stock" here is that one combo's balance (how many of THIS size it
+	// has), plus its full combos list (every size it comes in, not just
+	// the ones with stock - see getVarietyCombos()) for the item row's
+	// "other sizes" dropdown.
+	public ArrayList<HashMap<String, Object>> getItemsForVarietyValue(int valueId) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT i.id, i.code, i.name, c.balance " +
+			"FROM " + TABLE_VARIETY_COMBO_VALUES + " cv " +
+			"INNER JOIN " + TABLE_VARIETY_COMBOS + " c ON c.id = cv.combo_id " +
+			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = c.item_id " +
+			"WHERE cv.value_id = ? " +
+			"ORDER BY i.code",
+			new String[]{String.valueOf(valueId)}
+		);
+
+		while (cursor.moveToNext()) {
+
+			int itemId = cursor.getInt(0);
+
+			HashMap<String, Object> row = new HashMap<>();
+
+			row.put("item_id", itemId);
+			row.put("code", cursor.getString(1));
+			row.put("name", cursor.getString(2));
+			row.put("stock_at_value", cursor.getDouble(3));
+			row.put("combos", getVarietyCombos(itemId));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
 	// Given the value selected for every group of an item, finds the
 	// combo row that matches all of them. Returns null if there are no
 	// selections (the item has no variety groups - nothing to resolve).

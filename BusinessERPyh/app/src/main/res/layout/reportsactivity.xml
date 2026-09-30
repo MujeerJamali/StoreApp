@@ -124,6 +124,16 @@
             style="@style/ToolRow"
             android:text="Shoes vs Non-Shoes" />
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
+            android:id="@+id/btn_report_combo_stock"
+            style="@style/ToolRow"
+            android:text="Combo/Variety Stock" />
+
     </LinearLayout>
 
 </LinearLayout>

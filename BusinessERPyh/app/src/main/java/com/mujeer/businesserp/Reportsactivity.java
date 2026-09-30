@@ -19,6 +19,7 @@ public class Reportsactivity extends Activity {
 	Button btn_report_average_cart;
 	Button btn_report_profit_split;
 	Button btn_report_shoes_vs_non_shoes;
+	Button btn_report_combo_stock;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -38,6 +39,7 @@ public class Reportsactivity extends Activity {
 		btn_report_average_cart = findViewById(R.id.btn_report_average_cart);
 		btn_report_profit_split = findViewById(R.id.btn_report_profit_split);
 		btn_report_shoes_vs_non_shoes = findViewById(R.id.btn_report_shoes_vs_non_shoes);
+		btn_report_combo_stock = findViewById(R.id.btn_report_combo_stock);
 
 		btn_report_sales.setOnClickListener(new View.OnClickListener() {
 				@Override
@@ -176,6 +178,19 @@ public class Reportsactivity extends Activity {
 					Intent intent = new Intent(
 						Reportsactivity.this,
 						ShoesVsNonShoesReportActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_report_combo_stock.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						Reportsactivity.this,
+						ComboStockReportActivity.class
 					);
 
 					startActivity(intent);

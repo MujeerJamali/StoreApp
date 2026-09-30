@@ -206,6 +206,16 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".ComboStockReportActivity"
+            android:label="Combo/Variety Stock"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".ComboStockItemsActivity"
+            android:label="Combo Items"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".StockWorthReportActivity"
             android:label="Stock Worth"
             android:configChanges="orientation|screenSize|keyboardHidden" />
