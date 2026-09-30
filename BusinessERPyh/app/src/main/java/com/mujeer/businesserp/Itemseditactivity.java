@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.text.InputType;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -21,6 +22,7 @@ public class Itemseditactivity extends Activity {
     EditText et_purchase_price;
     EditText et_sale_price;
     TextView tv_item_stock;
+    CheckBox cb_active;
 
     LinearLayout cardVarieties;
     LinearLayout containerVarieties;
@@ -41,6 +43,7 @@ public class Itemseditactivity extends Activity {
         et_purchase_price = findViewById(R.id.et_purchase_price);
         et_sale_price = findViewById(R.id.et_sale_price);
         tv_item_stock = findViewById(R.id.tv_item_stock);
+        cb_active = findViewById(R.id.cb_active);
 
         btn_update_item = findViewById(R.id.btn_update_item);
 
@@ -73,6 +76,8 @@ public class Itemseditactivity extends Activity {
             } else {
                 tv_item_stock.setTextColor(getResources().getColor(R.color.mod_items));
             }
+
+            cb_active.setChecked(!Boolean.FALSE.equals(item.get("active")));
 
             // Varieties only make sense once the item has an id to attach
             // groups to - a brand-new item has to be saved once first.
@@ -115,6 +120,8 @@ public class Itemseditactivity extends Activity {
 							purchasePrice,
 							salePrice
 						)) {
+
+						db.setItemActive(itemId, cb_active.isChecked());
 
 						Toast.makeText(
                             Itemseditactivity.this,

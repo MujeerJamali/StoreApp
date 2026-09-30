@@ -295,6 +295,7 @@ public class ImportVyaparActivity extends Activity {
             // hasVarietyTables/hasCashAdjustmentsTable above, for a backup
             // exported before each one existed.
             boolean itemsHaveExtraCost = columnExists(vyaparDb, "kb_items", "item_extra_cost_per_unit");
+            boolean itemsHaveActive = columnExists(vyaparDb, "kb_items", "item_active");
             boolean hasCostItemsTable = tableExists(vyaparDb, "businesserp_cost_items");
             boolean hasPurchaseExpenseLinksTable = tableExists(vyaparDb, "businesserp_purchase_expense_links");
             boolean hasRecurringExpensesTable = tableExists(vyaparDb, "businesserp_recurring_expenses");
@@ -326,7 +327,7 @@ public class ImportVyaparActivity extends Activity {
             importParties(vyaparDb, helper, db, partyIdMap, skipped, counts);
 
             setStatus("Importing items...");
-            importItems(vyaparDb, helper, db, itemIdMap, itemsHaveExtraCost, skipped, counts);
+            importItems(vyaparDb, helper, db, itemIdMap, itemsHaveExtraCost, itemsHaveActive, skipped, counts);
 
             if (hasVarietyTables) {
 
@@ -763,16 +764,20 @@ public class ImportVyaparActivity extends Activity {
         SQLiteDatabase db,
         HashMap<Long, Integer> itemIdMap,
         boolean itemsHaveExtraCost,
+        boolean itemsHaveActive,
         ArrayList<SkippedRow> skipped,
         Counts counts) {
 
-        // item_extra_cost_per_unit is this app's own extension (see
-        // itemsHaveExtraCost in runImport()) - only selected when the
-        // backup's kb_items actually has that column, since a real Vyapar
-        // backup or an export made before landed cost existed won't.
+        // item_extra_cost_per_unit/item_active are this app's own
+        // extensions (see itemsHaveExtraCost/itemsHaveActive in
+        // runImport()) - only selected when the backup's kb_items
+        // actually has that column, since a real Vyapar backup or an
+        // export made before either existed won't; item_active defaults
+        // to active (see below) rather than failing in that case.
         Cursor c = vyaparDb.rawQuery(
             "SELECT item_id, item_code, item_name, item_purchase_unit_price, item_sale_unit_price" +
-            (itemsHaveExtraCost ? ", item_extra_cost_per_unit" : "") + " " +
+            (itemsHaveExtraCost ? ", item_extra_cost_per_unit" : "") +
+            (itemsHaveActive ? ", item_active" : "") + " " +
             "FROM kb_items " +
             "WHERE item_type != 2 " +
             "   OR item_id IN (" +
@@ -782,6 +787,9 @@ public class ImportVyaparActivity extends Activity {
             "   )",
             null);
 
+        int extraCostColumn = 5;
+        int activeColumn = itemsHaveExtraCost ? 6 : 5;
+
         while (c.moveToNext()) {
 
             long itemId = c.getLong(0);
@@ -789,7 +797,13 @@ public class ImportVyaparActivity extends Activity {
             String name = c.getString(2);
             double purchasePrice = c.getDouble(3);
             double salePrice = c.getDouble(4);
-            double extraCostPerUnit = (itemsHaveExtraCost && !c.isNull(5)) ? c.getDouble(5) : 0.0;
+
+            double extraCostPerUnit = (itemsHaveExtraCost && !c.isNull(extraCostColumn)) ?
+                c.getDouble(extraCostColumn) : 0.0;
+
+            boolean active = (!itemsHaveActive || c.isNull(activeColumn)) ?
+                true : c.getInt(activeColumn) != 0;
+
             String importKey = "vyb_item_" + itemId;
 
             if (helper.isImportKeyUsedBulk(db, importKey)) {
@@ -804,7 +818,8 @@ public class ImportVyaparActivity extends Activity {
                 continue;
             }
 
-            long localId = helper.insertItemBulk(db, code, name, purchasePrice, salePrice, extraCostPerUnit);
+            long localId = helper.insertItemBulk(
+                db, code, name, purchasePrice, salePrice, extraCostPerUnit, active);
 
             helper.markImportKeyUsedBulk(db, importKey);
             helper.saveVybLocalId(db, "item", itemId, localId);

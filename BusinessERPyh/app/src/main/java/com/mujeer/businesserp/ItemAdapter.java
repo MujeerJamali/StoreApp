@@ -57,7 +57,11 @@ public class ItemAdapter extends BaseAdapter implements Filterable {
         HashMap<String, Object> item = filteredList.get(position);
 
         tvCode.setText((String) item.get("code"));
-        tvName.setText((String) item.get("name"));
+
+        boolean active = !Boolean.FALSE.equals(item.get("active"));
+
+        tvName.setText(active ? (String) item.get("name") : item.get("name") + " (Inactive)");
+        tvName.setAlpha(active ? 1f : 0.5f);
 
         double stock = 0;
 

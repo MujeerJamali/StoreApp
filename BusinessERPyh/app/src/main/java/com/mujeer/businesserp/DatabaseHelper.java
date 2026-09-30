@@ -1155,15 +1155,31 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 // GET ITEMS
 // =====================
 
+	public static final int ITEM_ACTIVE_FILTER_ALL = 0;
+	public static final int ITEM_ACTIVE_FILTER_ACTIVE_ONLY = 1;
+	public static final int ITEM_ACTIVE_FILTER_INACTIVE_ONLY = 2;
+
 	public ArrayList<java.util.HashMap<String, Object>> getItems() {
+		return getItems(ITEM_ACTIVE_FILTER_ALL);
+	}
+
+	public ArrayList<java.util.HashMap<String, Object>> getItems(int activeFilter) {
 
 		ArrayList<java.util.HashMap<String, Object>> list = new ArrayList<>();
 
 		SQLiteDatabase db = this.getReadableDatabase();
 
+		String where = "";
+
+		if (activeFilter == ITEM_ACTIVE_FILTER_ACTIVE_ONLY) {
+			where = " WHERE active = 1";
+		} else if (activeFilter == ITEM_ACTIVE_FILTER_INACTIVE_ONLY) {
+			where = " WHERE active = 0";
+		}
+
 		Cursor cursor = db.rawQuery(
-			"SELECT id, code, name, purchase_price, sale_price, balance FROM " +
-			TABLE_ITEMS +
+			"SELECT id, code, name, purchase_price, sale_price, balance, active FROM " +
+			TABLE_ITEMS + where +
 			" ORDER BY code",
 			null
 		);
@@ -1178,6 +1194,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("purchase_price", cursor.getDouble(3));
 			map.put("sale_price", cursor.getDouble(4));
 			map.put("balance", cursor.getDouble(5));
+			map.put("active", cursor.getInt(6) != 0);
 
 			list.add(map);
 		}
@@ -1198,7 +1215,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		SQLiteDatabase db = this.getReadableDatabase();
 
 		Cursor cursor = db.rawQuery(
-			"SELECT code, name, purchase_price, sale_price, balance, extra_cost_per_unit FROM " +
+			"SELECT code, name, purchase_price, sale_price, balance, extra_cost_per_unit, active FROM " +
 			TABLE_ITEMS +
 			" WHERE id=?",
 			new String[]{String.valueOf(id)}
@@ -1212,11 +1229,31 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("sale_price", cursor.getDouble(3));
 			map.put("balance", cursor.getDouble(4));
 			map.put("extra_cost_per_unit", cursor.getDouble(5));
+			map.put("active", cursor.getInt(6) != 0);
 		}
 
 		cursor.close();
 
 		return map;
+	}
+
+	// Wherever an item's active/inactive state alone needs updating,
+	// separate from its name/price/balance (see Itemseditactivity's
+	// "Active" checkbox) - active=false is the "discontinued, stop
+	// offering this in item pickers" flag; see getItemsForSpinner(),
+	// which is the one place that filters on it.
+	public boolean setItemActive(int id, boolean active) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		ContentValues values = new ContentValues();
+		values.put("active", active ? 1 : 0);
+
+		int rows = db.update(
+			TABLE_ITEMS, values, "id=?", new String[]{String.valueOf(id)}
+		);
+
+		return rows > 0;
 	}
 
 	// purchase_price + extra_cost_per_unit for one item - the same cost
@@ -2455,6 +2492,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 // GET ITEMS FOR SPINNER
 // =====================
 
+	// Used by every item picker (Sale/Purchase's item dialog, Wanted
+	// Items) - active=0 items are discontinued and shouldn't be offered
+	// for a new entry, so this is the one place items.active is
+	// actually filtered on (see CLAUDE.md's "universal filter" note;
+	// the plain Items list itself still shows everything, with its own
+	// All/Active/Inactive filter for management).
 	public ArrayList<HashMap<String, Object>> getItemsForSpinner() {
 
 		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
@@ -2464,6 +2507,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		Cursor cursor = db.rawQuery(
 			"SELECT id, code, name, purchase_price, sale_price, balance " +
 			"FROM " + TABLE_ITEMS +
+			" WHERE active = 1" +
 			" ORDER BY name",
 			null
 		);
@@ -6626,6 +6670,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		double salePrice,
 		double extraCostPerUnit) {
 
+		return insertItemBulk(db, preferredCode, name, purchasePrice, salePrice, extraCostPerUnit, true);
+	}
+
+	public long insertItemBulk(
+		SQLiteDatabase db,
+		String preferredCode,
+		String name,
+		double purchasePrice,
+		double salePrice,
+		double extraCostPerUnit,
+		boolean active) {
+
 		preferredCode = preferredCode == null ? "" : preferredCode.trim();
 		name = name == null || name.trim().length() == 0 ? "Imported Item" : name.trim();
 
@@ -6640,6 +6696,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("sale_price", salePrice);
 		values.put("balance", 0.0);
 		values.put("extra_cost_per_unit", extraCostPerUnit);
+		values.put("active", active ? 1 : 0);
 
 		return db.insert(TABLE_ITEMS, null, values);
 	}

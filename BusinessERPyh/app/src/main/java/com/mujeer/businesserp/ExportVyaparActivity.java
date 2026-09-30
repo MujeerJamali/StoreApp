@@ -370,7 +370,13 @@ public class ExportVyaparActivity extends Activity {
 			// backup or an export made before landed cost existed, which
 			// ImportVyaparActivity's itemsHaveExtraCost detects up front
 			// so it defaults to 0 instead of failing.
-			"item_extra_cost_per_unit REAL" +
+			"item_extra_cost_per_unit REAL, " +
+			// Another of this app's own extensions - absent from a real
+			// Vyapar backup or one exported before Active/Inactive
+			// existed, which ImportVyaparActivity's itemsHaveActive
+			// detects up front so it defaults to active (1) instead of
+			// failing.
+			"item_active INTEGER" +
 			")"
 		);
 
@@ -583,7 +589,7 @@ public class ExportVyaparActivity extends Activity {
 	private void exportItems(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
-			"SELECT id, code, name, purchase_price, sale_price, extra_cost_per_unit FROM items", null);
+			"SELECT id, code, name, purchase_price, sale_price, extra_cost_per_unit, active FROM items", null);
 
 		while (c.moveToNext()) {
 
@@ -594,6 +600,7 @@ public class ExportVyaparActivity extends Activity {
 			values.put("item_purchase_unit_price", c.getDouble(3));
 			values.put("item_sale_unit_price", c.getDouble(4));
 			values.put("item_type", 1);
+			values.put("item_active", c.getInt(6));
 			values.put("item_extra_cost_per_unit", c.getDouble(5));
 
 			vyb.insert("kb_items", null, values);

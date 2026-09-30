@@ -25,6 +25,10 @@ public class Itemsactivity extends Activity {
 
     Button btn_add_item;
 
+    Button btn_item_filter_all;
+    Button btn_item_filter_active;
+    Button btn_item_filter_inactive;
+
     ListView lv_items;
 
     DatabaseHelper db;
@@ -32,6 +36,8 @@ public class Itemsactivity extends Activity {
     ArrayList<HashMap<String, Object>> itemList;
 
     ItemAdapter adapter;
+
+    private int selectedItemFilter = DatabaseHelper.ITEM_ACTIVE_FILTER_ALL;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,11 +48,37 @@ public class Itemsactivity extends Activity {
         tv_no_items = findViewById(R.id.tv_no_items);
 
         btn_add_item = findViewById(R.id.btn_add_item);
+
+        btn_item_filter_all = findViewById(R.id.btn_item_filter_all);
+        btn_item_filter_active = findViewById(R.id.btn_item_filter_active);
+        btn_item_filter_inactive = findViewById(R.id.btn_item_filter_inactive);
+
         lv_items = findViewById(R.id.lv_items);
 
         lv_items.setEmptyView(tv_no_items);
 
         db = new DatabaseHelper(this);
+
+        btn_item_filter_all.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					selectItemFilter(DatabaseHelper.ITEM_ACTIVE_FILTER_ALL);
+				}
+			});
+
+        btn_item_filter_active.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					selectItemFilter(DatabaseHelper.ITEM_ACTIVE_FILTER_ACTIVE_ONLY);
+				}
+			});
+
+        btn_item_filter_inactive.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					selectItemFilter(DatabaseHelper.ITEM_ACTIVE_FILTER_INACTIVE_ONLY);
+				}
+			});
 
         loadItems();
 
@@ -105,9 +137,38 @@ public class Itemsactivity extends Activity {
         loadItems();
     }
 
+    private void selectItemFilter(int filter) {
+
+        selectedItemFilter = filter;
+
+        Button[] buttons = {btn_item_filter_all, btn_item_filter_active, btn_item_filter_inactive};
+
+        int[] filters = {
+            DatabaseHelper.ITEM_ACTIVE_FILTER_ALL,
+            DatabaseHelper.ITEM_ACTIVE_FILTER_ACTIVE_ONLY,
+            DatabaseHelper.ITEM_ACTIVE_FILTER_INACTIVE_ONLY
+        };
+
+        for (int i = 0; i < buttons.length; i++) {
+
+            if (filters[i] == filter) {
+
+                buttons[i].setBackgroundResource(R.drawable.bg_button_primary);
+                buttons[i].setTextColor(getResources().getColor(R.color.text_on_primary));
+
+            } else {
+
+                buttons[i].setBackgroundResource(R.drawable.bg_button_outline);
+                buttons[i].setTextColor(getResources().getColor(R.color.primary));
+            }
+        }
+
+        loadItems();
+    }
+
     private void loadItems() {
 
-        itemList = db.getItems();
+        itemList = db.getItems(selectedItemFilter);
 
         adapter = new ItemAdapter(
 			this,

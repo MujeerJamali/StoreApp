@@ -27,7 +27,12 @@ BusinessERPyh/                  Gradle project root
 - **Parties** — customers/suppliers, running balance.
 - **Items** — inventory, purchase/sale price, optional **size/variety
   tracking** (e.g. shoe sizes), each variety+size combination keeps its
-  own stock balance.
+  own stock balance. Each item also carries an **Active/Inactive**
+  label (Edit Item screen), with an All/Active Only/Inactive Only
+  filter on the Items list; an inactive item is hidden from every
+  item picker used to add a new Sale/Purchase line or Wanted Item, but
+  stays fully visible/editable on the Items list itself and in past
+  transactions.
 - **Purchases / Sales** — line-item transactions, size dropdowns on sale
   items only show sizes with stock, bulk Excel import for purchases. The
   Add/Edit Item dialog's Quantity, Price and Total fields are linked live:
