@@ -120,6 +120,8 @@ public class ImportVyaparActivity extends Activity {
         int recurringExpensesImported, recurringExpensesDuplicate;
         int draftsImported, draftsDuplicate;
         int wantedItemsImported, wantedItemsDuplicate;
+        int displayShoesImported, displayShoesDuplicate;
+        int sampleShoesImported, sampleShoesDuplicate;
     }
 
     @Override
@@ -300,6 +302,8 @@ public class ImportVyaparActivity extends Activity {
             boolean hasPurchaseExpenseLinksTable = tableExists(vyaparDb, "businesserp_purchase_expense_links");
             boolean hasRecurringExpensesTable = tableExists(vyaparDb, "businesserp_recurring_expenses");
             boolean hasWantedItemsTable = tableExists(vyaparDb, "businesserp_wanted_items");
+            boolean hasDisplayShoesTable = tableExists(vyaparDb, "businesserp_display_shoes");
+            boolean hasSampleShoesTable = tableExists(vyaparDb, "businesserp_sample_shoes");
             boolean hasDraftsTable = tableExists(vyaparDb, "businesserp_drafts");
 
             helper = new DatabaseHelper(this);
@@ -414,6 +418,18 @@ public class ImportVyaparActivity extends Activity {
                 importWantedItems(vyaparDb, helper, db, partyIdMap, itemIdMap, skipped, counts);
             }
 
+            if (hasDisplayShoesTable) {
+
+                setStatus("Importing display shoes...");
+                importDisplayShoes(vyaparDb, helper, db, itemIdMap, varietyComboIdMap, skipped, counts);
+            }
+
+            if (hasSampleShoesTable) {
+
+                setStatus("Importing sample shoes...");
+                importSampleShoes(vyaparDb, helper, db, itemIdMap, varietyComboIdMap, skipped, counts);
+            }
+
             setStatus("Logging unsupported transaction types...");
             logUnsupportedTypes(vyaparDb, skipped);
 
@@ -519,6 +535,14 @@ public class ImportVyaparActivity extends Activity {
                     if (finalCounts.wantedItemsImported > 0 || finalCounts.wantedItemsDuplicate > 0) {
                         summary.append("Wanted items: " + finalCounts.wantedItemsImported
 									   + " imported, " + finalCounts.wantedItemsDuplicate + " already imported\n");
+                    }
+                    if (finalCounts.displayShoesImported > 0 || finalCounts.displayShoesDuplicate > 0) {
+                        summary.append("Display shoes: " + finalCounts.displayShoesImported
+									   + " imported, " + finalCounts.displayShoesDuplicate + " already imported\n");
+                    }
+                    if (finalCounts.sampleShoesImported > 0 || finalCounts.sampleShoesDuplicate > 0) {
+                        summary.append("Sample shoes: " + finalCounts.sampleShoesImported
+									   + " imported, " + finalCounts.sampleShoesDuplicate + " already imported\n");
                     }
 
                     summary.append("\nRows not imported: " + finalSkippedCount);
@@ -2182,6 +2206,114 @@ public class ImportVyaparActivity extends Activity {
 
             helper.markImportKeyUsedBulk(db, importKey);
             counts.wantedItemsImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // DISPLAY SHOES (businesserp_display_shoes) - only present when
+    // hasDisplayShoesTable was true. item_id/combo_id both need
+    // remapping (unlike Wanted Items' nullable ones, both are NOT NULL
+    // here - see TABLE_DISPLAY_SHOES) - a row whose item or combo isn't
+    // in this backup is dropped rather than left dangling.
+    // =====================
+    private void importDisplayShoes(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> itemIdMap,
+        HashMap<Long, Integer> comboIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT id, item_id, combo_id, row_pos, col_pos FROM businesserp_display_shoes", null);
+
+        while (c.moveToNext()) {
+
+            long id = c.getLong(0);
+            long vybItemId = c.getLong(1);
+            long vybComboId = c.getLong(2);
+            int rowPos = c.getInt(3);
+            int colPos = c.getInt(4);
+
+            String importKey = "vyb_display_shoe_" + id;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.displayShoesDuplicate++;
+                continue;
+            }
+
+            Integer itemId = resolveItem(helper, db, itemIdMap, vybItemId);
+            Integer comboId = resolveVarietyCombo(helper, db, comboIdMap, vybComboId);
+
+            if (itemId == null || comboId == null) {
+
+                addSkipped(
+                    skipped, "display_shoe", id,
+                    "Its item or size no longer exists in this backup"
+                );
+
+                continue;
+            }
+
+            helper.insertDisplayShoeBulk(db, itemId, comboId, rowPos, colPos);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.displayShoesImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // SAMPLE SHOES (businesserp_sample_shoes) - only present when
+    // hasSampleShoesTable was true. Same remap/drop reasoning as
+    // Display Shoes above, minus the grid position.
+    // =====================
+    private void importSampleShoes(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> itemIdMap,
+        HashMap<Long, Integer> comboIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT id, item_id, combo_id FROM businesserp_sample_shoes", null);
+
+        while (c.moveToNext()) {
+
+            long id = c.getLong(0);
+            long vybItemId = c.getLong(1);
+            long vybComboId = c.getLong(2);
+
+            String importKey = "vyb_sample_shoe_" + id;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.sampleShoesDuplicate++;
+                continue;
+            }
+
+            Integer itemId = resolveItem(helper, db, itemIdMap, vybItemId);
+            Integer comboId = resolveVarietyCombo(helper, db, comboIdMap, vybComboId);
+
+            if (itemId == null || comboId == null) {
+
+                addSkipped(
+                    skipped, "sample_shoe", id,
+                    "Its item or size no longer exists in this backup"
+                );
+
+                continue;
+            }
+
+            helper.insertSampleShoeBulk(db, itemId, comboId);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.sampleShoesImported++;
         }
 
         c.close();

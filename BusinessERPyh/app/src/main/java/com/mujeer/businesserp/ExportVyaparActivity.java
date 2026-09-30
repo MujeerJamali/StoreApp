@@ -172,6 +172,8 @@ public class ExportVyaparActivity extends Activity {
 			exportRecurringExpenses(local, vyb);
 			exportDrafts(local, vyb);
 			exportWantedItems(local, vyb);
+			exportDisplayShoes(local, vyb);
+			exportSampleShoes(local, vyb);
 
 			vyb.setTransactionSuccessful();
 			vyb.endTransaction();
@@ -558,6 +560,29 @@ public class ExportVyaparActivity extends Activity {
 			"party_id INTEGER, " +
 			"notes TEXT, " +
 			"fulfilled INTEGER" +
+			")"
+		);
+
+		// The free-form Display Shoes grid - row_pos/col_pos are the
+		// user's own manual shelf-layout positions, copied straight
+		// across like every other businesserp_* table's ids.
+		vyb.execSQL(
+			"CREATE TABLE businesserp_display_shoes (" +
+			"id INTEGER PRIMARY KEY, " +
+			"item_id INTEGER, " +
+			"combo_id INTEGER, " +
+			"row_pos INTEGER, " +
+			"col_pos INTEGER" +
+			")"
+		);
+
+		// The Sample Shoes list - same shape as Display Shoes minus the
+		// grid position (it's a plain list, not a grid).
+		vyb.execSQL(
+			"CREATE TABLE businesserp_sample_shoes (" +
+			"id INTEGER PRIMARY KEY, " +
+			"item_id INTEGER, " +
+			"combo_id INTEGER" +
 			")"
 		);
 	}
@@ -1164,6 +1189,50 @@ public class ExportVyaparActivity extends Activity {
 			values.put("fulfilled", c.getInt(7));
 
 			vyb.insert("businesserp_wanted_items", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// DISPLAY SHOES -> businesserp_display_shoes (1:1 copy)
+	// =====================
+	private void exportDisplayShoes(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery(
+			"SELECT id, item_id, combo_id, row_pos, col_pos FROM display_shoes", null);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("id", c.getLong(0));
+			values.put("item_id", c.getLong(1));
+			values.put("combo_id", c.getLong(2));
+			values.put("row_pos", c.getInt(3));
+			values.put("col_pos", c.getInt(4));
+
+			vyb.insert("businesserp_display_shoes", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// SAMPLE SHOES -> businesserp_sample_shoes (1:1 copy)
+	// =====================
+	private void exportSampleShoes(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery(
+			"SELECT id, item_id, combo_id FROM sample_shoes", null);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("id", c.getLong(0));
+			values.put("item_id", c.getLong(1));
+			values.put("combo_id", c.getLong(2));
+
+			vyb.insert("businesserp_sample_shoes", null, values);
 		}
 
 		c.close();

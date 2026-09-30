@@ -96,16 +96,31 @@ BusinessERPyh/                  Gradle project root
   the draft is deleted once it's actually saved for real.
 - **Generate Entries** — bulk-create sale/purchase/payment/expense entries
   across a date range via a calendar tap UI.
+- **Display Shoes / Sample Shoes** — a free-form grid (Display, the
+  right-foot shoe on the shelf - insert/remove rows and columns to
+  mirror the actual shelf layout, landscape-locked) and a plain list
+  (Sample, the left-foot shoe kept out to try on) of "Code - Size"
+  references. Adding a shoe to either is a pure reference overlay - it
+  never reserves or removes stock, and multiple identical Code+Size
+  entries are allowed (interchangeable - removing one for a sale just
+  removes any one of them, since they're identical). After a Sale
+  saves: if that was the last unit of a Size that had a Display/Sample
+  entry, the entry is removed automatically (there's no stock left for
+  it to reference); if stock remains, the app asks "was this the
+  Display/Sample one?" for each board that has an entry.
 - **Data tools** — bulk Excel import for purchases and items; full backup
   export/import in Vyapar's `.vyb` format. Alongside standard Vyapar data
   (parties, items, purchases, sales, payments, expenses, party transfers),
   it round-trips every one of this app's own extensions: item variety/
   combo tracking, cash adjustments, each item's Extra Cost/Unit, each
   expense's paid/credit split, Cost Items, Expense-to-Purchase landed-cost
-  links, recurring expense rules, and Drafts (a Purchase/Sale draft's
+  links, recurring expense rules, Drafts (a Purchase/Sale draft's
   party/item/size/linked-expense selections are re-mapped to the restored
-  device's new ids; a Payment/Expense draft has none to remap). Restoring
-  is a full replace, not a merge, for every one of these too.
+  device's new ids; a Payment/Expense draft has none to remap), Wanted
+  Items, and Display/Sample Shoes (each entry's item+size re-mapped the
+  same way, dropped rather than left dangling if either no longer exists
+  in the backup). Restoring is a full replace, not a merge, for every one
+  of these too.
 
 ## Landed cost (Extra Cost/Unit)
 

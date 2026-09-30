@@ -256,6 +256,17 @@
             android:label="Drafts"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
+        <activity
+            android:name=".DisplayShoesActivity"
+            android:label="Display Shoes"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".SampleShoesActivity"
+            android:label="Sample Shoes"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
         <!-- Main (dashboard) -->
         <activity
             android:name=".MainActivity"

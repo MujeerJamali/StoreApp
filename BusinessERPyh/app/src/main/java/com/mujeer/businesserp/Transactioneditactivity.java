@@ -3870,6 +3870,133 @@ public class Transactioneditactivity extends Activity {
 			draftId = -1;
 		}
 
+		runDisplaySampleHookThenFinish(andNew);
+	}
+
+	// =====================
+	// DISPLAY/SAMPLE SHOES - after a Sale saves, for every sold line
+	// that has a combo (a Size), check whether that combo just ran out
+	// (auto-remove any matching Display/Sample board entry silently -
+	// there's no stock left for it to reference) or still has stock
+	// left with a board entry present (ask which physical unit was
+	// sold, since the app has no way to know on its own). Only ever
+	// runs for a brand-new Sale (not an edit) - see saveSale()'s only
+	// caller.
+	// =====================
+	private void runDisplaySampleHookThenFinish(final boolean andNew) {
+
+		final ArrayList<HashMap<String, Object>> prompts = new ArrayList<HashMap<String, Object>>();
+
+		for (HashMap<String, Object> item : transactionItemList) {
+
+			Object comboObj = item.get("combo_id");
+
+			if (comboObj == null) {
+				continue;
+			}
+
+			int itemId = (Integer) item.get("item_id");
+			int comboId = (Integer) comboObj;
+
+			boolean hasDisplay = db.hasDisplayShoeForCombo(itemId, comboId);
+			boolean hasSample = db.hasSampleShoeForCombo(itemId, comboId);
+
+			if (!hasDisplay && !hasSample) {
+				continue;
+			}
+
+			double remaining = db.getComboBalance(comboId);
+
+			if (remaining <= 0) {
+
+				if (hasDisplay) {
+					db.removeOneDisplayShoeForCombo(itemId, comboId);
+				}
+
+				if (hasSample) {
+					db.removeOneSampleShoeForCombo(itemId, comboId);
+				}
+
+				continue;
+			}
+
+			String itemName = String.valueOf(item.get("name"));
+			String comboLabel = db.getComboLabel(comboId);
+
+			if (hasDisplay) {
+
+				HashMap<String, Object> prompt = new HashMap<String, Object>();
+				prompt.put("board", "display");
+				prompt.put("item_id", itemId);
+				prompt.put("combo_id", comboId);
+				prompt.put("item_name", itemName);
+				prompt.put("combo_label", comboLabel);
+				prompts.add(prompt);
+			}
+
+			if (hasSample) {
+
+				HashMap<String, Object> prompt = new HashMap<String, Object>();
+				prompt.put("board", "sample");
+				prompt.put("item_id", itemId);
+				prompt.put("combo_id", comboId);
+				prompt.put("item_name", itemName);
+				prompt.put("combo_label", comboLabel);
+				prompts.add(prompt);
+			}
+		}
+
+		showNextDisplaySamplePrompt(prompts, 0, andNew);
+	}
+
+	private void showNextDisplaySamplePrompt(
+		final ArrayList<HashMap<String, Object>> prompts, final int index, final boolean andNew) {
+
+		if (index >= prompts.size()) {
+			finishSaleSave(andNew);
+			return;
+		}
+
+		final HashMap<String, Object> prompt = prompts.get(index);
+		final boolean isDisplay = "display".equals(prompt.get("board"));
+
+		String boardLabel = isDisplay ? "Display (right shoe)" : "Sample (left shoe)";
+
+		new AlertDialog.Builder(this)
+			.setTitle("Was this the " + boardLabel + "?")
+			.setMessage(
+				prompt.get("item_name") + " - " + prompt.get("combo_label") +
+				" - just sold one and stock remains. Was the unit sold the one kept as " +
+				boardLabel + "?"
+			)
+			.setCancelable(false)
+			.setPositiveButton("Yes", new android.content.DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(android.content.DialogInterface dialog, int which) {
+
+						int itemId = (Integer) prompt.get("item_id");
+						int comboId = (Integer) prompt.get("combo_id");
+
+						if (isDisplay) {
+							db.removeOneDisplayShoeForCombo(itemId, comboId);
+						} else {
+							db.removeOneSampleShoeForCombo(itemId, comboId);
+						}
+
+						showNextDisplaySamplePrompt(prompts, index + 1, andNew);
+					}
+				})
+			.setNegativeButton("No", new android.content.DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(android.content.DialogInterface dialog, int which) {
+						showNextDisplaySamplePrompt(prompts, index + 1, andNew);
+					}
+				})
+			.show();
+	}
+
+	private void finishSaleSave(boolean andNew) {
+
 		android.widget.Toast.makeText(
 			this,
 			"Sale saved",
@@ -3884,9 +4011,8 @@ public class Transactioneditactivity extends Activity {
 
 			finishOrGoToDashboard();
 		}
-		
 	}
-	
+
 	private void showSaleItemDialog() {
 
 		showAddTransactionItemDialog();

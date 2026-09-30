@@ -1821,6 +1821,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return combos;
 	}
 
+	public String getComboLabel(int comboId) {
+		return getComboLabel(this.getReadableDatabase(), comboId);
+	}
+
 	private String getComboLabel(SQLiteDatabase db, int comboId) {
 
 		StringBuilder label = new StringBuilder();
@@ -1961,6 +1965,310 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		cursor.close();
 
 		return list;
+	}
+
+	// Every item that has at least one variety combo (Size, ...) -
+	// feeds the item picker on the Display/Sample Shoes "Add" dialog,
+	// since a board entry always needs a specific combo to point at
+	// (TABLE_DISPLAY_SHOES/TABLE_SAMPLE_SHOES.combo_id is NOT NULL).
+	public ArrayList<HashMap<String, Object>> getItemsWithVarietyCombos() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT DISTINCT i.id, i.code, i.name FROM " + TABLE_ITEMS + " i " +
+			"INNER JOIN " + TABLE_VARIETY_COMBOS + " c ON c.item_id = i.id " +
+			"ORDER BY i.name",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<>();
+			row.put("id", cursor.getInt(0));
+			row.put("code", cursor.getString(1));
+			row.put("name", cursor.getString(2));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// Current stock for one combo - used by the Display/Sample Shoes
+	// sale-time hook to decide whether a just-sold combo hit 0 (auto-
+	// remove silently) or still has stock left (ask which physical unit
+	// it was).
+	public double getComboBalance(int comboId) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT balance FROM " + TABLE_VARIETY_COMBOS + " WHERE id=?",
+			new String[]{String.valueOf(comboId)}
+		);
+
+		double balance = 0;
+
+		if (cursor.moveToFirst()) {
+			balance = cursor.getDouble(0);
+		}
+
+		cursor.close();
+
+		return balance;
+	}
+
+	// =====================
+	// DISPLAY SHOES - a free-form grid the user manually arranges to
+	// mirror the physical shelf, one row per shared prefix comment on
+	// TABLE_DISPLAY_SHOES. Placing a shoe here is a pure reference
+	// overlay - it never reserves/removes stock (see
+	// Transactioneditactivity's post-sale hook for the only place a row
+	// here is ever removed automatically).
+	// =====================
+	public ArrayList<HashMap<String, Object>> getDisplayShoes() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT d.id, d.item_id, i.code, d.combo_id, d.row_pos, d.col_pos " +
+			"FROM " + TABLE_DISPLAY_SHOES + " d " +
+			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = d.item_id " +
+			"ORDER BY d.row_pos, d.col_pos",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			int comboId = cursor.getInt(3);
+
+			HashMap<String, Object> row = new HashMap<>();
+			row.put("id", cursor.getInt(0));
+			row.put("item_id", cursor.getInt(1));
+			row.put("code", cursor.getString(2));
+			row.put("combo_id", comboId);
+			row.put("combo_label", getComboLabel(db, comboId));
+			row.put("row_pos", cursor.getInt(4));
+			row.put("col_pos", cursor.getInt(5));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	public long addDisplayShoe(int itemId, int comboId, int rowPos, int colPos) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.put("combo_id", comboId);
+		values.put("row_pos", rowPos);
+		values.put("col_pos", colPos);
+
+		return db.insert(TABLE_DISPLAY_SHOES, null, values);
+	}
+
+	// Bulk-import counterpart of addDisplayShoe() - operates on the given
+	// db instead of getWritableDatabase().
+	public long insertDisplayShoeBulk(SQLiteDatabase db, int itemId, int comboId, int rowPos, int colPos) {
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.put("combo_id", comboId);
+		values.put("row_pos", rowPos);
+		values.put("col_pos", colPos);
+
+		return db.insert(TABLE_DISPLAY_SHOES, null, values);
+	}
+
+	public void removeDisplayShoeById(int id) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.delete(TABLE_DISPLAY_SHOES, "id=?", new String[]{String.valueOf(id)});
+	}
+
+	// Removes any ONE entry matching this item+combo - the entries are
+	// interchangeable (same model, same size, same physical role), so
+	// which specific row is removed doesn't matter; see the sale-time
+	// hook that calls this. Returns false if there was nothing to remove.
+	public boolean removeOneDisplayShoeForCombo(int itemId, int comboId) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id FROM " + TABLE_DISPLAY_SHOES + " WHERE item_id=? AND combo_id=? LIMIT 1",
+			new String[]{String.valueOf(itemId), String.valueOf(comboId)}
+		);
+
+		Integer id = cursor.moveToFirst() ? cursor.getInt(0) : null;
+		cursor.close();
+
+		if (id == null) {
+			return false;
+		}
+
+		db.delete(TABLE_DISPLAY_SHOES, "id=?", new String[]{String.valueOf(id)});
+
+		return true;
+	}
+
+	public boolean hasDisplayShoeForCombo(int itemId, int comboId) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT 1 FROM " + TABLE_DISPLAY_SHOES + " WHERE item_id=? AND combo_id=? LIMIT 1",
+			new String[]{String.valueOf(itemId), String.valueOf(comboId)}
+		);
+
+		boolean has = cursor.moveToFirst();
+		cursor.close();
+
+		return has;
+	}
+
+	// Removing an entire row/column shifts every entry beyond it back by
+	// one, so the grid stays contiguous - same reasoning as removing a
+	// row/column in a spreadsheet. Adding a row/column is always done at
+	// the end (no shifting needed) - see DisplayShoesActivity.
+	public void removeDisplayGridRow(int rowPos) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.delete(TABLE_DISPLAY_SHOES, "row_pos=?", new String[]{String.valueOf(rowPos)});
+
+		db.execSQL(
+			"UPDATE " + TABLE_DISPLAY_SHOES + " SET row_pos = row_pos - 1 WHERE row_pos > ?",
+			new Object[]{rowPos}
+		);
+	}
+
+	public void removeDisplayGridColumn(int colPos) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.delete(TABLE_DISPLAY_SHOES, "col_pos=?", new String[]{String.valueOf(colPos)});
+
+		db.execSQL(
+			"UPDATE " + TABLE_DISPLAY_SHOES + " SET col_pos = col_pos - 1 WHERE col_pos > ?",
+			new Object[]{colPos}
+		);
+	}
+
+	// =====================
+	// SAMPLE SHOES - same data model and sale-time logic as Display
+	// Shoes above, just a plain list instead of a positioned grid (no
+	// row_pos/col_pos - see TABLE_SAMPLE_SHOES).
+	// =====================
+	public ArrayList<HashMap<String, Object>> getSampleShoes() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT s.id, s.item_id, i.code, i.name, s.combo_id " +
+			"FROM " + TABLE_SAMPLE_SHOES + " s " +
+			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = s.item_id " +
+			"ORDER BY i.code",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			int comboId = cursor.getInt(4);
+
+			HashMap<String, Object> row = new HashMap<>();
+			row.put("id", cursor.getInt(0));
+			row.put("item_id", cursor.getInt(1));
+			row.put("code", cursor.getString(2));
+			row.put("name", cursor.getString(3));
+			row.put("combo_id", comboId);
+			row.put("combo_label", getComboLabel(db, comboId));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	public long addSampleShoe(int itemId, int comboId) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.put("combo_id", comboId);
+
+		return db.insert(TABLE_SAMPLE_SHOES, null, values);
+	}
+
+	// Bulk-import counterpart of addSampleShoe() - operates on the given
+	// db instead of getWritableDatabase().
+	public long insertSampleShoeBulk(SQLiteDatabase db, int itemId, int comboId) {
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.put("combo_id", comboId);
+
+		return db.insert(TABLE_SAMPLE_SHOES, null, values);
+	}
+
+	public void removeSampleShoeById(int id) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.delete(TABLE_SAMPLE_SHOES, "id=?", new String[]{String.valueOf(id)});
+	}
+
+	public boolean removeOneSampleShoeForCombo(int itemId, int comboId) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id FROM " + TABLE_SAMPLE_SHOES + " WHERE item_id=? AND combo_id=? LIMIT 1",
+			new String[]{String.valueOf(itemId), String.valueOf(comboId)}
+		);
+
+		Integer id = cursor.moveToFirst() ? cursor.getInt(0) : null;
+		cursor.close();
+
+		if (id == null) {
+			return false;
+		}
+
+		db.delete(TABLE_SAMPLE_SHOES, "id=?", new String[]{String.valueOf(id)});
+
+		return true;
+	}
+
+	public boolean hasSampleShoeForCombo(int itemId, int comboId) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT 1 FROM " + TABLE_SAMPLE_SHOES + " WHERE item_id=? AND combo_id=? LIMIT 1",
+			new String[]{String.valueOf(itemId), String.valueOf(comboId)}
+		);
+
+		boolean has = cursor.moveToFirst();
+		cursor.close();
+
+		return has;
 	}
 
 	// Given the value selected for every group of an item, finds the
@@ -7158,6 +7466,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		db.delete(TABLE_COST_ITEMS, null, null);
 		db.delete(TABLE_RECURRING_EXPENSES, null, null);
 		db.delete(TABLE_DRAFTS, null, null);
+		db.delete(TABLE_DISPLAY_SHOES, null, null);
+		db.delete(TABLE_SAMPLE_SHOES, null, null);
 		db.delete(TABLE_ITEMS, null, null);
 		db.delete(TABLE_PARTIES, null, null);
 		db.delete(TABLE_IMPORT_LOG, null, null);
