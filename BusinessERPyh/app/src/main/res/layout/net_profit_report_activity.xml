@@ -17,107 +17,12 @@
             android:layout_marginTop="0dp"
             android:text="Net Profit = Sales Total - Item Cost - Expenses" />
 
-        <HorizontalScrollView
-            android:layout_width="match_parent"
+        <Spinner
+            android:id="@+id/spinner_range"
+            style="@style/FilterSpinner"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:scrollbars="none">
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/btn_range_today"
-                    style="@style/AppButton.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Today" />
-
-                <Button
-                    android:id="@+id/btn_range_yesterday"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Yesterday" />
-
-                <Button
-                    android:id="@+id/btn_range_week"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Week" />
-
-                <Button
-                    android:id="@+id/btn_range_month"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Month" />
-
-                <Button
-                    android:id="@+id/btn_range_quarter"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Quarter" />
-
-                <Button
-                    android:id="@+id/btn_range_year"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Year" />
-
-                <Button
-                    android:id="@+id/btn_range_all_time"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="All Time" />
-
-                <Button
-                    android:id="@+id/btn_range_custom"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Custom Range" />
-
-            </LinearLayout>
-
-        </HorizontalScrollView>
+            android:layout_marginBottom="12dp" />
 
         <LinearLayout
             android:id="@+id/container_custom_range"
