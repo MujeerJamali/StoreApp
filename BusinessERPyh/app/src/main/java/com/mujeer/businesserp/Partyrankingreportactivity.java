@@ -3,8 +3,10 @@ package com.mujeer.businesserp;
 import android.app.Activity;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.Button;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
@@ -22,9 +24,17 @@ import java.util.Locale;
 // first by default.
 public class Partyrankingreportactivity extends Activity {
 
-	private Button btn_sort_combined_desc;
-	private Button btn_sort_combined_asc;
-	private Button btn_sort_name;
+	private Spinner spinner_party_ranking_sort;
+
+	private static final int[] SORT_VALUES = {
+		DatabaseHelper.RANK_SORT_COMBINED_DESC,
+		DatabaseHelper.RANK_SORT_COMBINED_ASC,
+		DatabaseHelper.RANK_SORT_NAME_ASC
+	};
+
+	private static final String[] SORT_LABELS = {
+		"Combined: High to Low", "Combined: Low to High", "Party Name"
+	};
 
 	private TextView tv_empty;
 	private ListView lv_ranking;
@@ -53,9 +63,7 @@ public class Partyrankingreportactivity extends Activity {
 
 		setTitle("Party Ranking");
 
-		btn_sort_combined_desc = findViewById(R.id.btn_sort_combined_desc);
-		btn_sort_combined_asc = findViewById(R.id.btn_sort_combined_asc);
-		btn_sort_name = findViewById(R.id.btn_sort_name);
+		spinner_party_ranking_sort = findViewById(R.id.spinner_party_ranking_sort);
 
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_ranking = findViewById(R.id.lv_ranking);
@@ -65,66 +73,31 @@ public class Partyrankingreportactivity extends Activity {
 		adapter = new RankingAdapter(this, rankingList, "party_name");
 		lv_ranking.setAdapter(adapter);
 
-		btn_sort_combined_desc.setOnClickListener(new View.OnClickListener() {
+		ArrayAdapter<String> sortAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, SORT_LABELS
+		);
+
+		sortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_party_ranking_sort.setAdapter(sortAdapter);
+
+		spinner_party_ranking_sort.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectSort(DatabaseHelper.RANK_SORT_COMBINED_DESC);
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectedSort = SORT_VALUES[position];
+					loadReport();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
-		btn_sort_combined_asc.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectSort(DatabaseHelper.RANK_SORT_COMBINED_ASC);
-				}
-			});
-
-		btn_sort_name.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectSort(DatabaseHelper.RANK_SORT_NAME_ASC);
-				}
-			});
-
-		selectSort(DatabaseHelper.RANK_SORT_COMBINED_DESC);
+		loadReport();
 	}
 
 	@Override
 	protected void onResume() {
 		super.onResume();
-		loadReport();
-	}
-
-	private void selectSort(int sort) {
-
-		selectedSort = sort;
-
-		Button[] buttons = {
-			btn_sort_combined_desc,
-			btn_sort_combined_asc,
-			btn_sort_name
-		};
-
-		int[] sorts = {
-			DatabaseHelper.RANK_SORT_COMBINED_DESC,
-			DatabaseHelper.RANK_SORT_COMBINED_ASC,
-			DatabaseHelper.RANK_SORT_NAME_ASC
-		};
-
-		for (int i = 0; i < buttons.length; i++) {
-
-			if (sorts[i] == sort) {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_primary);
-				buttons[i].setTextColor(getResources().getColor(R.color.text_on_primary));
-
-			} else {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_outline);
-				buttons[i].setTextColor(getResources().getColor(R.color.primary));
-			}
-		}
-
 		loadReport();
 	}
 

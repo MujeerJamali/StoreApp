@@ -3,8 +3,10 @@ package com.mujeer.businesserp;
 import android.app.Activity;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.Button;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
@@ -22,13 +24,28 @@ import java.util.Locale;
 // first by default.
 public class Itemrankingreportactivity extends Activity {
 
-	private Button btn_sort_combined_desc;
-	private Button btn_sort_combined_asc;
-	private Button btn_sort_name;
+	private Spinner spinner_item_sort;
+	private Spinner spinner_shoes_filter;
 
-	private Button btn_shoes_all;
-	private Button btn_shoes_only;
-	private Button btn_shoes_non;
+	private static final int[] SORT_VALUES = {
+		DatabaseHelper.RANK_SORT_COMBINED_DESC,
+		DatabaseHelper.RANK_SORT_COMBINED_ASC,
+		DatabaseHelper.RANK_SORT_NAME_ASC
+	};
+
+	private static final String[] SORT_LABELS = {
+		"Combined: High to Low", "Combined: Low to High", "Item Name"
+	};
+
+	private static final int[] SHOES_FILTER_VALUES = {
+		DatabaseHelper.SHOES_FILTER_ALL,
+		DatabaseHelper.SHOES_FILTER_SHOES_ONLY,
+		DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY
+	};
+
+	private static final String[] SHOES_FILTER_LABELS = {
+		"All Items", "Shoes Only", "Non-Shoes Only"
+	};
 
 	private TextView tv_empty;
 	private ListView lv_ranking;
@@ -58,13 +75,8 @@ public class Itemrankingreportactivity extends Activity {
 
 		setTitle("Item Ranking");
 
-		btn_sort_combined_desc = findViewById(R.id.btn_sort_combined_desc);
-		btn_sort_combined_asc = findViewById(R.id.btn_sort_combined_asc);
-		btn_sort_name = findViewById(R.id.btn_sort_name);
-
-		btn_shoes_all = findViewById(R.id.btn_shoes_all);
-		btn_shoes_only = findViewById(R.id.btn_shoes_only);
-		btn_shoes_non = findViewById(R.id.btn_shoes_non);
+		spinner_item_sort = findViewById(R.id.spinner_item_sort);
+		spinner_shoes_filter = findViewById(R.id.spinner_shoes_filter);
 
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_ranking = findViewById(R.id.lv_ranking);
@@ -74,76 +86,43 @@ public class Itemrankingreportactivity extends Activity {
 		adapter = new RankingAdapter(this, rankingList, "item_name");
 		lv_ranking.setAdapter(adapter);
 
-		btn_sort_combined_desc.setOnClickListener(new View.OnClickListener() {
+		ArrayAdapter<String> sortAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, SORT_LABELS
+		);
+
+		sortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_item_sort.setAdapter(sortAdapter);
+
+		spinner_item_sort.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectSort(DatabaseHelper.RANK_SORT_COMBINED_DESC);
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectedSort = SORT_VALUES[position];
+					loadReport();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
-		btn_sort_combined_asc.setOnClickListener(new View.OnClickListener() {
+		ArrayAdapter<String> shoesFilterAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, SHOES_FILTER_LABELS
+		);
+
+		shoesFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_shoes_filter.setAdapter(shoesFilterAdapter);
+
+		spinner_shoes_filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectSort(DatabaseHelper.RANK_SORT_COMBINED_ASC);
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectedShoesFilter = SHOES_FILTER_VALUES[position];
+					loadReport();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
-
-		btn_sort_name.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectSort(DatabaseHelper.RANK_SORT_NAME_ASC);
-				}
-			});
-
-		btn_shoes_all.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectShoesFilter(DatabaseHelper.SHOES_FILTER_ALL);
-				}
-			});
-
-		btn_shoes_only.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectShoesFilter(DatabaseHelper.SHOES_FILTER_SHOES_ONLY);
-				}
-			});
-
-		btn_shoes_non.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectShoesFilter(DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY);
-				}
-			});
-
-		selectSort(DatabaseHelper.RANK_SORT_COMBINED_DESC);
-	}
-
-	private void selectShoesFilter(int filter) {
-
-		selectedShoesFilter = filter;
-
-		Button[] buttons = {btn_shoes_all, btn_shoes_only, btn_shoes_non};
-
-		int[] filters = {
-			DatabaseHelper.SHOES_FILTER_ALL,
-			DatabaseHelper.SHOES_FILTER_SHOES_ONLY,
-			DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY
-		};
-
-		for (int i = 0; i < buttons.length; i++) {
-
-			if (filters[i] == filter) {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_primary);
-				buttons[i].setTextColor(getResources().getColor(R.color.text_on_primary));
-
-			} else {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_outline);
-				buttons[i].setTextColor(getResources().getColor(R.color.primary));
-			}
-		}
 
 		loadReport();
 	}
@@ -151,39 +130,6 @@ public class Itemrankingreportactivity extends Activity {
 	@Override
 	protected void onResume() {
 		super.onResume();
-		loadReport();
-	}
-
-	private void selectSort(int sort) {
-
-		selectedSort = sort;
-
-		Button[] buttons = {
-			btn_sort_combined_desc,
-			btn_sort_combined_asc,
-			btn_sort_name
-		};
-
-		int[] sorts = {
-			DatabaseHelper.RANK_SORT_COMBINED_DESC,
-			DatabaseHelper.RANK_SORT_COMBINED_ASC,
-			DatabaseHelper.RANK_SORT_NAME_ASC
-		};
-
-		for (int i = 0; i < buttons.length; i++) {
-
-			if (sorts[i] == sort) {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_primary);
-				buttons[i].setTextColor(getResources().getColor(R.color.text_on_primary));
-
-			} else {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_outline);
-				buttons[i].setTextColor(getResources().getColor(R.color.primary));
-			}
-		}
-
 		loadReport();
 	}
 

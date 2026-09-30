@@ -17,107 +17,26 @@
             android:layout_marginTop="0dp"
             android:text="Each item's Today + Week + Month + Quarter + Year + All Time sales are added together into one combined score, and items are ranked by that score." />
 
-        <TextView
-            style="@style/FieldLabel"
-            android:text="Sort By" />
-
-        <HorizontalScrollView
-            android:layout_width="match_parent"
+        <LinearLayout
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:scrollbars="none">
+            android:orientation="horizontal">
 
-            <LinearLayout
+            <Spinner
+                android:id="@+id/spinner_item_sort"
+                style="@style/FilterSpinner"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:layout_marginEnd="10dp" />
 
-                <Button
-                    android:id="@+id/btn_sort_combined_desc"
-                    style="@style/AppButton.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Combined: High to Low" />
-
-                <Button
-                    android:id="@+id/btn_sort_combined_asc"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Combined: Low to High" />
-
-                <Button
-                    android:id="@+id/btn_sort_name"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Item Name" />
-
-            </LinearLayout>
-
-        </HorizontalScrollView>
-
-        <TextView
-            style="@style/FieldLabel"
-            android:text="Show" />
-
-        <HorizontalScrollView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:scrollbars="none">
-
-            <LinearLayout
+            <Spinner
+                android:id="@+id/spinner_shoes_filter"
+                style="@style/FilterSpinner"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:layout_height="wrap_content" />
 
-                <Button
-                    android:id="@+id/btn_shoes_all"
-                    style="@style/AppButton.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="All Items" />
-
-                <Button
-                    android:id="@+id/btn_shoes_only"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Shoes Only" />
-
-                <Button
-                    android:id="@+id/btn_shoes_non"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Non-Shoes Only" />
-
-            </LinearLayout>
-
-        </HorizontalScrollView>
+        </LinearLayout>
 
         <TextView
             android:id="@+id/tv_empty"

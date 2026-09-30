@@ -9,9 +9,11 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -25,11 +27,19 @@ public class Itemsactivity extends Activity {
 
     Button btn_add_item;
 
-    Button btn_item_filter_all;
-    Button btn_item_filter_active;
-    Button btn_item_filter_inactive;
+    Spinner spinner_item_filter;
 
     ListView lv_items;
+
+    private static final int[] ITEM_FILTER_VALUES = {
+        DatabaseHelper.ITEM_ACTIVE_FILTER_ALL,
+        DatabaseHelper.ITEM_ACTIVE_FILTER_ACTIVE_ONLY,
+        DatabaseHelper.ITEM_ACTIVE_FILTER_INACTIVE_ONLY
+    };
+
+    private static final String[] ITEM_FILTER_LABELS = {
+        "All Items", "Active Only", "Inactive Only"
+    };
 
     DatabaseHelper db;
 
@@ -49,9 +59,7 @@ public class Itemsactivity extends Activity {
 
         btn_add_item = findViewById(R.id.btn_add_item);
 
-        btn_item_filter_all = findViewById(R.id.btn_item_filter_all);
-        btn_item_filter_active = findViewById(R.id.btn_item_filter_active);
-        btn_item_filter_inactive = findViewById(R.id.btn_item_filter_inactive);
+        spinner_item_filter = findViewById(R.id.spinner_item_filter);
 
         lv_items = findViewById(R.id.lv_items);
 
@@ -59,24 +67,22 @@ public class Itemsactivity extends Activity {
 
         db = new DatabaseHelper(this);
 
-        btn_item_filter_all.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectItemFilter(DatabaseHelper.ITEM_ACTIVE_FILTER_ALL);
-				}
-			});
+        ArrayAdapter<String> itemFilterAdapter = new ArrayAdapter<String>(
+            this, android.R.layout.simple_spinner_item, ITEM_FILTER_LABELS
+        );
 
-        btn_item_filter_active.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectItemFilter(DatabaseHelper.ITEM_ACTIVE_FILTER_ACTIVE_ONLY);
-				}
-			});
+        itemFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner_item_filter.setAdapter(itemFilterAdapter);
 
-        btn_item_filter_inactive.setOnClickListener(new View.OnClickListener() {
+        spinner_item_filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectItemFilter(DatabaseHelper.ITEM_ACTIVE_FILTER_INACTIVE_ONLY);
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectedItemFilter = ITEM_FILTER_VALUES[position];
+					loadItems();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
@@ -134,35 +140,6 @@ public class Itemsactivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        loadItems();
-    }
-
-    private void selectItemFilter(int filter) {
-
-        selectedItemFilter = filter;
-
-        Button[] buttons = {btn_item_filter_all, btn_item_filter_active, btn_item_filter_inactive};
-
-        int[] filters = {
-            DatabaseHelper.ITEM_ACTIVE_FILTER_ALL,
-            DatabaseHelper.ITEM_ACTIVE_FILTER_ACTIVE_ONLY,
-            DatabaseHelper.ITEM_ACTIVE_FILTER_INACTIVE_ONLY
-        };
-
-        for (int i = 0; i < buttons.length; i++) {
-
-            if (filters[i] == filter) {
-
-                buttons[i].setBackgroundResource(R.drawable.bg_button_primary);
-                buttons[i].setTextColor(getResources().getColor(R.color.text_on_primary));
-
-            } else {
-
-                buttons[i].setBackgroundResource(R.drawable.bg_button_outline);
-                buttons[i].setTextColor(getResources().getColor(R.color.primary));
-            }
-        }
-
         loadItems();
     }
 
