@@ -4,8 +4,10 @@ import android.app.Activity;
 import android.app.DatePickerDialog;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.Button;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
@@ -23,13 +25,15 @@ public class Salesreportactivity extends Activity {
 	private static final int RANGE_YEAR = 5;
 	private static final int RANGE_CUSTOM = 6;
 
-	private Button btn_range_today;
-	private Button btn_range_yesterday;
-	private Button btn_range_week;
-	private Button btn_range_month;
-	private Button btn_range_quarter;
-	private Button btn_range_year;
-	private Button btn_range_custom;
+	private Spinner spinner_range;
+
+	// Labels are positioned to match the RANGE_* constants above
+	// exactly (Today=0 ... Custom=6), so the Spinner's selected
+	// position can be used as the range value directly.
+	private static final String[] RANGE_LABELS = {
+		"Today", "Yesterday", "This Week", "This Month",
+		"This Quarter", "This Year", "Custom Range"
+	};
 
 	private View container_custom_range;
 	private EditText et_custom_from;
@@ -60,13 +64,7 @@ public class Salesreportactivity extends Activity {
 
 		setTitle("Total Sales");
 
-		btn_range_today = findViewById(R.id.btn_range_today);
-		btn_range_yesterday = findViewById(R.id.btn_range_yesterday);
-		btn_range_week = findViewById(R.id.btn_range_week);
-		btn_range_month = findViewById(R.id.btn_range_month);
-		btn_range_quarter = findViewById(R.id.btn_range_quarter);
-		btn_range_year = findViewById(R.id.btn_range_year);
-		btn_range_custom = findViewById(R.id.btn_range_custom);
+		spinner_range = findViewById(R.id.spinner_range);
 
 		container_custom_range = findViewById(R.id.container_custom_range);
 		et_custom_from = findViewById(R.id.et_custom_from);
@@ -97,56 +95,25 @@ public class Salesreportactivity extends Activity {
 				}
 			});
 
-		btn_range_today.setOnClickListener(new View.OnClickListener() {
+		ArrayAdapter<String> rangeAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, RANGE_LABELS
+		);
+
+		rangeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_range.setAdapter(rangeAdapter);
+
+		spinner_range.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_TODAY);
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectRange(position);
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
-		btn_range_yesterday.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_YESTERDAY);
-				}
-			});
-
-		btn_range_week.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_WEEK);
-				}
-			});
-
-		btn_range_month.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_MONTH);
-				}
-			});
-
-		btn_range_quarter.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_QUARTER);
-				}
-			});
-
-		btn_range_year.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_YEAR);
-				}
-			});
-
-		btn_range_custom.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_CUSTOM);
-				}
-			});
-
-		selectRange(RANGE_TODAY);
+		loadReport();
 	}
 
 	@Override
@@ -190,40 +157,6 @@ public class Salesreportactivity extends Activity {
 	private void selectRange(int range) {
 
 		selectedRange = range;
-
-		Button[] buttons = {
-			btn_range_today,
-			btn_range_yesterday,
-			btn_range_week,
-			btn_range_month,
-			btn_range_quarter,
-			btn_range_year,
-			btn_range_custom
-		};
-
-		int[] ranges = {
-			RANGE_TODAY,
-			RANGE_YESTERDAY,
-			RANGE_WEEK,
-			RANGE_MONTH,
-			RANGE_QUARTER,
-			RANGE_YEAR,
-			RANGE_CUSTOM
-		};
-
-		for (int i = 0; i < buttons.length; i++) {
-
-			if (ranges[i] == range) {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_primary);
-				buttons[i].setTextColor(getResources().getColor(R.color.text_on_primary));
-
-			} else {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_outline);
-				buttons[i].setTextColor(getResources().getColor(R.color.primary));
-			}
-		}
 
 		container_custom_range.setVisibility(range == RANGE_CUSTOM ? View.VISIBLE : View.GONE);
 
