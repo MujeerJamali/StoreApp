@@ -274,7 +274,8 @@ public class Expensesactivity extends Activity {
 	}
 
 	// =====================
-	// Six quick-add boxes for the most frequently logged expense items -
+	// Six quick-add boxes for the most frequently logged expense items
+	// in the last 7 days (see DatabaseHelper.getTopExpenseItems()) -
 	// tapping one confirms via a dialog, then adds a new Expense dated
 	// today with that item's own last-used amount, fully paid, no
 	// navigation to the full editor. Boxes are rebuilt every onResume()

@@ -6019,20 +6019,30 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 // LAST EXPENSE AMOUNT FOR AN ITEM
 // =====================
 
-	// The N most frequently logged expense items (by how many times
-	// each distinct item text has been used, not by total amount spent)
-	// - each paired with its own most recent amount, for the Expenses
-	// screen's quick-add boxes.
+	// The N most frequently logged expense items in the last 7 days (by
+	// how many times each distinct item text has been used in that
+	// rolling window, not by total amount spent) - each paired with its
+	// own most recent amount (from any time, not just the window), for
+	// the Expenses screen's quick-add boxes. A window this short can
+	// come back with fewer than `limit` items (or none) for a
+	// low-activity week - callers just show however many boxes that is,
+	// rather than backfilling from all-time history.
 	public ArrayList<HashMap<String, Object>> getTopExpenseItems(int limit) {
 
 		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
 
 		SQLiteDatabase db = this.getReadableDatabase();
 
+		Calendar weekAgo = Calendar.getInstance();
+		weekAgo.add(Calendar.DAY_OF_YEAR, -7);
+
+		String weekAgoDate =
+			new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(weekAgo.getTime());
+
 		Cursor cursor = db.rawQuery(
 			"SELECT item, COUNT(*) AS uses FROM " + TABLE_EXPENSES +
-			" GROUP BY item ORDER BY uses DESC, item ASC LIMIT ?",
-			new String[]{String.valueOf(limit)}
+			" WHERE date >= ? GROUP BY item ORDER BY uses DESC, item ASC LIMIT ?",
+			new String[]{weekAgoDate, String.valueOf(limit)}
 		);
 
 		while (cursor.moveToNext()) {
