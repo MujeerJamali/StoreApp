@@ -716,22 +716,44 @@ public class Expenseeditactivity extends Activity {
 		}
 
 		String typedParty = actv_party.getText().toString().trim();
-		Integer partyId = null;
 
-		if (typedParty.length() > 0) {
+		if (typedParty.length() == 0) {
 
-			partyId = partyIdByName.get(typedParty);
+			Toast.makeText(
+				this,
+				"Please select a party",
+				Toast.LENGTH_SHORT
+			).show();
 
-			if (partyId == null) {
+			return;
+		}
 
-				Toast.makeText(
-					this,
-					"Select a valid party, or leave it blank",
-					Toast.LENGTH_SHORT
-				).show();
+		Integer partyId = partyIdByName.get(typedParty);
 
-				return;
-			}
+		if (partyId == null) {
+
+			Toast.makeText(
+				this,
+				"Select a valid party",
+				Toast.LENGTH_SHORT
+			).show();
+
+			return;
+		}
+
+		// "Cash Expenses" stands in for "no real party" - since there's
+		// no real party to ever collect a balance from later, it must be
+		// paid in full on save, unlike a named party which can carry a
+		// partial/credit balance.
+		if ("Cash Expenses".equalsIgnoreCase(typedParty) && paidAmount < amount) {
+
+			Toast.makeText(
+				this,
+				"Cash Expenses must be paid in full - no partial or credit",
+				Toast.LENGTH_LONG
+			).show();
+
+			return;
 		}
 
 		if (!cashBaselineLoaded) {

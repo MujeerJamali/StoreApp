@@ -38,7 +38,7 @@ import java.util.TreeMap;
  * flow (instead of a separate picker screen you'd have to back out to in
  * order to change your mind), then you configure one or more lines (an
  * item+price for Purchase/Sale, a party+amount for Payment, a description
- * +amount and optional party for Expense), and for each line tap dates on a
+ * +amount+party for Expense), and for each line tap dates on a
  * calendar - each tap registers one more unit on that date, a long-press
  * removes one. A review step lists every configured line before a single
  * "Generate" commits everything to the database in one transaction.
@@ -164,6 +164,8 @@ public class GenerateEntriesActivity extends Activity {
 	}
 
 	private void loadPartiesAndItems() {
+
+		db.getOrCreatePartyId("Cash Expenses");
 
 		allParties = db.getParties();
 		allItems = db.getItems();
@@ -613,7 +615,7 @@ public class GenerateEntriesActivity extends Activity {
 			} else if (entryType == TYPE_PAYMENT_OUT) {
 				tvPartyLabel.setText("Paid To");
 			} else if (entryType == TYPE_EXPENSE) {
-				tvPartyLabel.setText("Party (optional)");
+				tvPartyLabel.setText("Party");
 			} else {
 				tvPartyLabel.setText(entryType == TYPE_PURCHASE ? "Supplier" : "Customer");
 			}
@@ -623,8 +625,12 @@ public class GenerateEntriesActivity extends Activity {
 			// Payment stores its party name in label (label doubles as
 			// the party's display name for that line, since a payment
 			// has no separate description); everything else - including
-			// Expense's optional party - uses linePartyName instead.
+			// Expense's party - uses linePartyName instead.
 			String prefillPartyName = isPayment ? line.label : line.linePartyName;
+
+			if (prefillPartyName == null && entryType == TYPE_EXPENSE) {
+				prefillPartyName = "Cash Expenses";
+			}
 
 			if (prefillPartyName != null) {
 				actvParty.setText(prefillPartyName, false);
@@ -817,33 +823,20 @@ public class GenerateEntriesActivity extends Activity {
 			String typed = actvParty.getText().toString().trim();
 			boolean isPayment = entryType == TYPE_PAYMENT_IN || entryType == TYPE_PAYMENT_OUT;
 
-			if (typed.length() == 0 && entryType == TYPE_EXPENSE) {
+			Integer partyId = partyIdByName.get(typed);
 
-				// Optional for Expense - blank just means no party.
-				line.linePartyId = null;
-				line.linePartyName = null;
+			if (partyId == null) {
 
+				Toast.makeText(this, "Select a valid party", Toast.LENGTH_SHORT).show();
+				return;
+			}
+
+			if (isPayment) {
+				line.refId = partyId;
+				line.label = typed;
 			} else {
-
-				Integer partyId = partyIdByName.get(typed);
-
-				if (partyId == null) {
-
-					String message = entryType == TYPE_EXPENSE
-						? "Select a valid party, or leave it blank"
-						: "Select a valid party";
-
-					Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-					return;
-				}
-
-				if (isPayment) {
-					line.refId = partyId;
-					line.label = typed;
-				} else {
-					line.linePartyId = partyId;
-					line.linePartyName = typed;
-				}
+				line.linePartyId = partyId;
+				line.linePartyName = typed;
 			}
 		}
 

@@ -343,11 +343,16 @@ public class Transactioneditactivity extends Activity {
 			});
 
         // Created (once) before loadParties() so it's already in the
-        // in-memory list below - a new Sale defaults its party to this,
-        // since most walk-in sales have no real named customer. Left
-        // out for Purchase on purpose.
+        // in-memory list below - a new Sale/Purchase defaults its party
+        // to this, since most walk-in sales/cash purchases have no real
+        // named party, and every transaction now requires a party
+        // selection (no more blank "no party" shortcut).
         if (!isEditMode && transactionType == TYPE_SALE) {
             db.getOrCreatePartyId("Cash Sale");
+        }
+
+        if (!isEditMode && transactionType == TYPE_PURCHASE) {
+            db.getOrCreatePartyId("Cash Purchase");
         }
 
         loadParties();
@@ -392,6 +397,10 @@ public class Transactioneditactivity extends Activity {
 
 			if (transactionType == TYPE_SALE) {
 				actv_party.setText("Cash Sale", false);
+			}
+
+			if (transactionType == TYPE_PURCHASE) {
+				actv_party.setText("Cash Purchase", false);
 			}
 
 			if (draftId != -1) {
@@ -2943,6 +2952,17 @@ public class Transactioneditactivity extends Activity {
 			return;
 		}
 
+		if (isCashPlaceholderParty((String) parties.get(partyPosition).get("name")) && amountPaid < grandTotal) {
+
+			android.widget.Toast.makeText(
+				this,
+				"Cash Purchase must be paid in full - no partial or credit",
+				android.widget.Toast.LENGTH_LONG
+			).show();
+
+			return;
+		}
+
 		if (!cashBaselineLoaded) {
 
 			android.widget.Toast.makeText(
@@ -3377,6 +3397,16 @@ public class Transactioneditactivity extends Activity {
 	}
 
 
+	// The reserved cash-placeholder parties ("Cash Sale" for a Sale,
+	// "Cash Purchase" for a Purchase) stand in for "no real party" - since
+	// there's no real party to ever collect a balance from later, these
+	// specifically must be paid in full on save, unlike a named party
+	// which can carry a partial/credit balance.
+	private boolean isCashPlaceholderParty(String partyName) {
+		return "Cash Sale".equalsIgnoreCase(partyName)
+			|| "Cash Purchase".equalsIgnoreCase(partyName);
+	}
+
 	private int getSelectedPartyPosition() {
 
 		String partyName =
@@ -3448,7 +3478,7 @@ public class Transactioneditactivity extends Activity {
 		setListViewHeightBasedOnChildren(lv_transaction_items);
 
 		actv_party.setText(
-			transactionType == TYPE_SALE ? "Cash Sale" : "",
+			transactionType == TYPE_SALE ? "Cash Sale" : "Cash Purchase",
 			false
 		);
 
@@ -3771,6 +3801,17 @@ public class Transactioneditactivity extends Activity {
 			return;
 		}
 
+		if (isCashPlaceholderParty((String) parties.get(partyPosition).get("name")) && paidAmount < grandTotal) {
+
+			android.widget.Toast.makeText(
+				this,
+				"Cash Sale must be paid in full - no partial or credit",
+				android.widget.Toast.LENGTH_LONG
+			).show();
+
+			return;
+		}
+
 		double balance = grandTotal - paidAmount;
 
 		saleMap.put("subtotal", subtotal);
@@ -3921,6 +3962,17 @@ public class Transactioneditactivity extends Activity {
 				this,
 				"Amount paid cannot be greater than Grand Total",
 				android.widget.Toast.LENGTH_SHORT
+			).show();
+
+			return;
+		}
+
+		if (isCashPlaceholderParty((String) parties.get(partyPosition).get("name")) && paidAmount < subtotal) {
+
+			android.widget.Toast.makeText(
+				this,
+				"Cash Sale must be paid in full - no partial or credit",
+				android.widget.Toast.LENGTH_LONG
 			).show();
 
 			return;

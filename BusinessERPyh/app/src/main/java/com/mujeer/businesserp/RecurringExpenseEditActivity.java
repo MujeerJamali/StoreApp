@@ -180,6 +180,10 @@ public class RecurringExpenseEditActivity extends Activity {
 
 			selectFrequency(DatabaseHelper.RECURRING_DAILY);
 
+			db.getOrCreatePartyId("Cash Expenses");
+			loadPartyAutoComplete();
+			actv_party.setText("Cash Expenses", false);
+
 		} else {
 
 			btn_delete.setVisibility(View.VISIBLE);
@@ -390,18 +394,17 @@ public class RecurringExpenseEditActivity extends Activity {
 		}
 
 		String typedParty = actv_party.getText().toString().trim();
-		Integer partyId = null;
 
-		if (typedParty.length() > 0) {
+		if (typedParty.length() == 0) {
+			Toast.makeText(this, "Please select a party", Toast.LENGTH_SHORT).show();
+			return;
+		}
 
-			partyId = partyIdByName.get(typedParty);
+		Integer partyId = partyIdByName.get(typedParty);
 
-			if (partyId == null) {
-				Toast.makeText(
-					this, "Select a valid party, or leave it blank", Toast.LENGTH_SHORT
-				).show();
-				return;
-			}
+		if (partyId == null) {
+			Toast.makeText(this, "Select a valid party", Toast.LENGTH_SHORT).show();
+			return;
 		}
 
 		Integer dayOfWeek = null;
