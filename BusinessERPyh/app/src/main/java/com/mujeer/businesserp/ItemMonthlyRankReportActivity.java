@@ -4,9 +4,11 @@ import android.app.Activity;
 import android.app.DatePickerDialog;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.Button;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
@@ -29,19 +31,28 @@ public class ItemMonthlyRankReportActivity extends Activity {
 	private static final int RANGE_ALL_TIME = 4;
 	private static final int RANGE_CUSTOM = 5;
 
-	private Button btn_metric_sales;
-	private Button btn_metric_profit;
+	private Spinner spinner_metric;
 
-	private Button btn_range_yesterday;
-	private Button btn_range_month;
-	private Button btn_range_quarter;
-	private Button btn_range_year;
-	private Button btn_range_all_time;
-	private Button btn_range_custom;
+	private static final String[] METRIC_LABELS = {"Sales", "Profit"};
 
-	private Button btn_shoes_all;
-	private Button btn_shoes_only;
-	private Button btn_shoes_non;
+	private Spinner spinner_range;
+
+	// Positioned to match the RANGE_* constants above exactly.
+	private static final String[] RANGE_LABELS = {
+		"Yesterday", "This Month", "Quarter", "Year", "All Time", "Custom Range"
+	};
+
+	private Spinner spinner_shoes_filter;
+
+	private static final int[] SHOES_FILTER_VALUES = {
+		DatabaseHelper.SHOES_FILTER_ALL,
+		DatabaseHelper.SHOES_FILTER_SHOES_ONLY,
+		DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY
+	};
+
+	private static final String[] SHOES_FILTER_LABELS = {
+		"All Items", "Shoes Only", "Non-Shoes Only"
+	};
 
 	private View container_custom_range;
 	private EditText et_custom_from;
@@ -73,19 +84,9 @@ public class ItemMonthlyRankReportActivity extends Activity {
 
 		setTitle("Item Monthly Rank");
 
-		btn_metric_sales = findViewById(R.id.btn_metric_sales);
-		btn_metric_profit = findViewById(R.id.btn_metric_profit);
-
-		btn_range_yesterday = findViewById(R.id.btn_range_yesterday);
-		btn_range_month = findViewById(R.id.btn_range_month);
-		btn_range_quarter = findViewById(R.id.btn_range_quarter);
-		btn_range_year = findViewById(R.id.btn_range_year);
-		btn_range_all_time = findViewById(R.id.btn_range_all_time);
-		btn_range_custom = findViewById(R.id.btn_range_custom);
-
-		btn_shoes_all = findViewById(R.id.btn_shoes_all);
-		btn_shoes_only = findViewById(R.id.btn_shoes_only);
-		btn_shoes_non = findViewById(R.id.btn_shoes_non);
+		spinner_metric = findViewById(R.id.spinner_metric);
+		spinner_range = findViewById(R.id.spinner_range);
+		spinner_shoes_filter = findViewById(R.id.spinner_shoes_filter);
 
 		container_custom_range = findViewById(R.id.container_custom_range);
 		et_custom_from = findViewById(R.id.et_custom_from);
@@ -117,86 +118,64 @@ public class ItemMonthlyRankReportActivity extends Activity {
 				}
 			});
 
-		btn_metric_sales.setOnClickListener(new View.OnClickListener() {
+		ArrayAdapter<String> metricAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, METRIC_LABELS
+		);
+
+		metricAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_metric.setAdapter(metricAdapter);
+
+		spinner_metric.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectMetric(false);
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectMetric(position == 1);
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
-		btn_metric_profit.setOnClickListener(new View.OnClickListener() {
+		ArrayAdapter<String> rangeAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, RANGE_LABELS
+		);
+
+		rangeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_range.setAdapter(rangeAdapter);
+
+		spinner_range.setSelection(RANGE_MONTH);
+
+		spinner_range.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectMetric(true);
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectRange(position);
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
-		btn_range_yesterday.setOnClickListener(new View.OnClickListener() {
+		ArrayAdapter<String> shoesFilterAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, SHOES_FILTER_LABELS
+		);
+
+		shoesFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_shoes_filter.setAdapter(shoesFilterAdapter);
+
+		spinner_shoes_filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_YESTERDAY);
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectedShoesFilter = SHOES_FILTER_VALUES[position];
+					loadReport();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
-		btn_range_month.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_MONTH);
-				}
-			});
-
-		btn_range_quarter.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_QUARTER);
-				}
-			});
-
-		btn_range_year.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_YEAR);
-				}
-			});
-
-		btn_range_all_time.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_ALL_TIME);
-				}
-			});
-
-		btn_range_custom.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_CUSTOM);
-				}
-			});
-
-		btn_shoes_all.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectShoesFilter(DatabaseHelper.SHOES_FILTER_ALL);
-				}
-			});
-
-		btn_shoes_only.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectShoesFilter(DatabaseHelper.SHOES_FILTER_SHOES_ONLY);
-				}
-			});
-
-		btn_shoes_non.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectShoesFilter(DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY);
-				}
-			});
-
-		selectMetric(false);
-		selectShoesFilter(DatabaseHelper.SHOES_FILTER_ALL);
-		selectRange(RANGE_MONTH);
+		loadReport();
 	}
 
 	@Override
@@ -241,23 +220,6 @@ public class ItemMonthlyRankReportActivity extends Activity {
 
 		byProfit = profit;
 
-		if (profit) {
-
-			btn_metric_profit.setBackgroundResource(R.drawable.bg_button_primary);
-			btn_metric_profit.setTextColor(getResources().getColor(R.color.text_on_primary));
-
-			btn_metric_sales.setBackgroundResource(R.drawable.bg_button_outline);
-			btn_metric_sales.setTextColor(getResources().getColor(R.color.primary));
-
-		} else {
-
-			btn_metric_sales.setBackgroundResource(R.drawable.bg_button_primary);
-			btn_metric_sales.setTextColor(getResources().getColor(R.color.text_on_primary));
-
-			btn_metric_profit.setBackgroundResource(R.drawable.bg_button_outline);
-			btn_metric_profit.setTextColor(getResources().getColor(R.color.primary));
-		}
-
 		loadReport();
 	}
 
@@ -265,59 +227,7 @@ public class ItemMonthlyRankReportActivity extends Activity {
 
 		selectedRange = range;
 
-		Button[] buttons = {
-			btn_range_yesterday, btn_range_month, btn_range_quarter,
-			btn_range_year, btn_range_all_time, btn_range_custom
-		};
-
-		int[] ranges = {
-			RANGE_YESTERDAY, RANGE_MONTH, RANGE_QUARTER, RANGE_YEAR, RANGE_ALL_TIME, RANGE_CUSTOM
-		};
-
-		for (int i = 0; i < buttons.length; i++) {
-
-			if (ranges[i] == range) {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_primary);
-				buttons[i].setTextColor(getResources().getColor(R.color.text_on_primary));
-
-			} else {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_outline);
-				buttons[i].setTextColor(getResources().getColor(R.color.primary));
-			}
-		}
-
 		container_custom_range.setVisibility(range == RANGE_CUSTOM ? View.VISIBLE : View.GONE);
-
-		loadReport();
-	}
-
-	private void selectShoesFilter(int filter) {
-
-		selectedShoesFilter = filter;
-
-		Button[] buttons = {btn_shoes_all, btn_shoes_only, btn_shoes_non};
-
-		int[] filters = {
-			DatabaseHelper.SHOES_FILTER_ALL,
-			DatabaseHelper.SHOES_FILTER_SHOES_ONLY,
-			DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY
-		};
-
-		for (int i = 0; i < buttons.length; i++) {
-
-			if (filters[i] == filter) {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_primary);
-				buttons[i].setTextColor(getResources().getColor(R.color.text_on_primary));
-
-			} else {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_outline);
-				buttons[i].setTextColor(getResources().getColor(R.color.primary));
-			}
-		}
 
 		loadReport();
 	}

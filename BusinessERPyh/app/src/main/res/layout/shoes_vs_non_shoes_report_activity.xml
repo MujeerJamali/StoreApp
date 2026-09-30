@@ -17,147 +17,26 @@
             android:layout_marginTop="0dp"
             android:text="What share of sales/profit came from shoe items versus everything else, for a selectable period." />
 
-        <TextView style="@style/FieldLabel" android:text="Show" />
-
-        <HorizontalScrollView
-            android:layout_width="match_parent"
+        <LinearLayout
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:scrollbars="none">
+            android:orientation="horizontal">
 
-            <LinearLayout
+            <Spinner
+                android:id="@+id/spinner_metric"
+                style="@style/FilterSpinner"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:layout_marginEnd="10dp" />
 
-                <Button
-                    android:id="@+id/btn_metric_sales"
-                    style="@style/AppButton.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Sale" />
-
-                <Button
-                    android:id="@+id/btn_metric_profit"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Profit" />
-
-            </LinearLayout>
-
-        </HorizontalScrollView>
-
-        <TextView style="@style/FieldLabel" android:text="Period" />
-
-        <HorizontalScrollView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:scrollbars="none">
-
-            <LinearLayout
+            <Spinner
+                android:id="@+id/spinner_range"
+                style="@style/FilterSpinner"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:layout_height="wrap_content" />
 
-                <Button
-                    android:id="@+id/btn_range_today"
-                    style="@style/AppButton.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Today" />
-
-                <Button
-                    android:id="@+id/btn_range_yesterday"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Yesterday" />
-
-                <Button
-                    android:id="@+id/btn_range_week"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Week" />
-
-                <Button
-                    android:id="@+id/btn_range_month"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Month" />
-
-                <Button
-                    android:id="@+id/btn_range_quarter"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Quarter" />
-
-                <Button
-                    android:id="@+id/btn_range_year"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Year" />
-
-                <Button
-                    android:id="@+id/btn_range_all_time"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="All Time" />
-
-                <Button
-                    android:id="@+id/btn_range_custom"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Custom Range" />
-
-            </LinearLayout>
-
-        </HorizontalScrollView>
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/container_custom_range"
