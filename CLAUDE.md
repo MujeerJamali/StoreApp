@@ -39,3 +39,11 @@
   a standing app-wide pattern: apply it to every new filter row, and
   when touching an existing screen that still uses a fixed row, convert
   it to match.
+- Charts use `SimpleBarChartView` (plain Canvas drawing, no third-party
+  library) - `build.gradle` has no charting dependency, and AIDE's
+  on-device build has no reliable way to resolve a new Maven dependency,
+  so don't add one (e.g. MPAndroidChart). Adding charts to more reports
+  is an ongoing, incremental effort ("current, past, and future" per the
+  user) - not a one-time checklist item - so pick it up again whenever
+  touching a report that would benefit from one, instead of treating a
+  partial pass as finished.

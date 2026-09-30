@@ -161,6 +161,12 @@ the Party Balances report.
 All period-based reports share the same range selector: Today, Yesterday,
 Week, Month, Quarter, Year, Custom Range.
 
+**Charts**: Net Profit, Stock Worth, Shoes vs Non-Shoes, and Profit: Cash
+Sale vs Party each show a small bar chart alongside their summary figures,
+drawn by a dependency-free custom view (`SimpleBarChartView` - no charting
+library is wired into the project). This is an ongoing pass, not a finished
+one - more reports get charts over time.
+
 ## Building
 
 Open `BusinessERPyh/` in Android Studio (compileSdk 29, minSdk 21) and run the

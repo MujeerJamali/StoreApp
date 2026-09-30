@@ -9,6 +9,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Locale;
@@ -48,6 +49,7 @@ public class ProfitSplitReportActivity extends Activity {
 	private TextView tv_party_percent;
 	private TextView tv_party_profit;
 	private TextView tv_total_profit;
+	private SimpleBarChartView chart_profit_split;
 
 	private DatabaseHelper db;
 
@@ -84,6 +86,7 @@ public class ProfitSplitReportActivity extends Activity {
 		tv_party_percent = findViewById(R.id.tv_party_percent);
 		tv_party_profit = findViewById(R.id.tv_party_profit);
 		tv_total_profit = findViewById(R.id.tv_total_profit);
+		chart_profit_split = findViewById(R.id.chart_profit_split);
 
 		db = new DatabaseHelper(this);
 
@@ -366,5 +369,10 @@ public class ProfitSplitReportActivity extends Activity {
 		tv_total_profit.setTextColor(
 			getResources().getColor(totalProfit >= 0 ? R.color.success : R.color.danger)
 		);
+
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+		chartEntries.add(new SimpleBarChartView.Entry("Cash Sale", cashProfit, getResources().getColor(R.color.mod_sales)));
+		chartEntries.add(new SimpleBarChartView.Entry("Named Party", partyProfit, getResources().getColor(R.color.primary)));
+		chart_profit_split.setEntries(chartEntries);
 	}
 }

@@ -9,6 +9,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Locale;
@@ -59,6 +60,7 @@ public class ShoesVsNonShoesReportActivity extends Activity {
 	private TextView tv_non_shoes_amount;
 	private TextView tv_total_label;
 	private TextView tv_total_amount;
+	private SimpleBarChartView chart_shoes_split;
 
 	private DatabaseHelper db;
 
@@ -101,6 +103,7 @@ public class ShoesVsNonShoesReportActivity extends Activity {
 		tv_non_shoes_amount = findViewById(R.id.tv_non_shoes_amount);
 		tv_total_label = findViewById(R.id.tv_total_label);
 		tv_total_amount = findViewById(R.id.tv_total_amount);
+		chart_shoes_split = findViewById(R.id.chart_shoes_split);
 
 		db = new DatabaseHelper(this);
 
@@ -456,5 +459,10 @@ public class ShoesVsNonShoesReportActivity extends Activity {
 
 			tv_total_amount.setTextColor(getResources().getColor(R.color.text_primary));
 		}
+
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+		chartEntries.add(new SimpleBarChartView.Entry("Shoes", shoesAmount, getResources().getColor(R.color.mod_sales)));
+		chartEntries.add(new SimpleBarChartView.Entry("Non-Shoes", nonShoesAmount, getResources().getColor(R.color.primary)));
+		chart_shoes_split.setEntries(chartEntries);
 	}
 }

@@ -305,6 +305,12 @@
 
         </LinearLayout>
 
+        <com.mujeer.businesserp.SimpleBarChartView
+            android:id="@+id/chart_shoes_split"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" />
+
     </LinearLayout>
 
 </ScrollView>

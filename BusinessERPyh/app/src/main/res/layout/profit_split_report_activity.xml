@@ -244,6 +244,12 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 
+        <com.mujeer.businesserp.SimpleBarChartView
+            android:id="@+id/chart_profit_split"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" />
+
     </LinearLayout>
 
 </LinearLayout>

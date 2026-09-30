@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.widget.TextView;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
 
@@ -20,6 +21,7 @@ public class StockWorthReportActivity extends Activity {
 	private TextView tv_shoes_count;
 	private TextView tv_non_shoes_worth;
 	private TextView tv_non_shoes_count;
+	private SimpleBarChartView chart_stock_worth;
 
 	private DatabaseHelper db;
 
@@ -39,6 +41,7 @@ public class StockWorthReportActivity extends Activity {
 		tv_shoes_count = findViewById(R.id.tv_shoes_count);
 		tv_non_shoes_worth = findViewById(R.id.tv_non_shoes_worth);
 		tv_non_shoes_count = findViewById(R.id.tv_non_shoes_count);
+		chart_stock_worth = findViewById(R.id.chart_stock_worth);
 
 		db = new DatabaseHelper(this);
 	}
@@ -88,5 +91,10 @@ public class StockWorthReportActivity extends Activity {
 
 		tv_shoes_count.setText(shoesCount + (shoesCount == 1 ? " item" : " items"));
 		tv_non_shoes_count.setText(nonShoesCount + (nonShoesCount == 1 ? " item" : " items"));
+
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+		chartEntries.add(new SimpleBarChartView.Entry("Shoes", shoesWorth, getResources().getColor(R.color.mod_sales)));
+		chartEntries.add(new SimpleBarChartView.Entry("Non-Shoes", nonShoesWorth, getResources().getColor(R.color.primary)));
+		chart_stock_worth.setEntries(chartEntries);
 	}
 }

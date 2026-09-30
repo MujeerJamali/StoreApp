@@ -52,6 +52,7 @@ public class NetProfitReportActivity extends Activity {
 	private TextView tv_item_cost;
 	private TextView tv_expenses_total;
 	private TextView tv_net_profit;
+	private SimpleBarChartView chart_net_profit;
 
 	private Button btn_item_sort_profit_desc;
 	private Button btn_item_sort_profit_asc;
@@ -102,6 +103,7 @@ public class NetProfitReportActivity extends Activity {
 		tv_item_cost = findViewById(R.id.tv_item_cost);
 		tv_expenses_total = findViewById(R.id.tv_expenses_total);
 		tv_net_profit = findViewById(R.id.tv_net_profit);
+		chart_net_profit = findViewById(R.id.chart_net_profit);
 
 		btn_item_sort_profit_desc = findViewById(R.id.btn_item_sort_profit_desc);
 		btn_item_sort_profit_asc = findViewById(R.id.btn_item_sort_profit_asc);
@@ -514,5 +516,12 @@ public class NetProfitReportActivity extends Activity {
 		tv_net_profit.setTextColor(
 			getResources().getColor(netProfit >= 0 ? R.color.success : R.color.danger)
 		);
+
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+		chartEntries.add(new SimpleBarChartView.Entry("Sales", salesTotal, getResources().getColor(R.color.mod_sales)));
+		chartEntries.add(new SimpleBarChartView.Entry("Item Cost", itemCost, getResources().getColor(R.color.mod_purchase)));
+		chartEntries.add(new SimpleBarChartView.Entry("Expenses", expensesTotal, getResources().getColor(R.color.mod_expenses)));
+		chartEntries.add(new SimpleBarChartView.Entry("Net Profit", netProfit, getResources().getColor(R.color.primary)));
+		chart_net_profit.setEntries(chartEntries);
 	}
 }

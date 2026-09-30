@@ -237,6 +237,12 @@
 
         </LinearLayout>
 
+        <com.mujeer.businesserp.SimpleBarChartView
+            android:id="@+id/chart_net_profit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" />
+
         <TextView
             style="@style/FieldLabel"
             android:layout_marginTop="20dp"
