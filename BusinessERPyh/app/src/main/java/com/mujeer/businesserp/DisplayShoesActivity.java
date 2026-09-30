@@ -376,11 +376,14 @@ public class DisplayShoesActivity extends Activity {
 				@Override
 				public void onPicked(int itemId, String itemCode, int comboId, String comboLabel) {
 
+					final int finalItemId = itemId;
+					final int finalComboId = comboId;
+
 					new Thread(new Runnable() {
 							@Override
 							public void run() {
 
-								db.addDisplayShoe(itemId, comboId, row, col);
+								db.addDisplayShoe(finalItemId, finalComboId, row, col);
 
 								runOnUiThread(new Runnable() {
 										@Override
