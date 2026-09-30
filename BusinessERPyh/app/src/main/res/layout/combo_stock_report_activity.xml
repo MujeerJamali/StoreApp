@@ -11,41 +11,14 @@
     <TextView
         style="@style/FieldLabel"
         android:layout_marginTop="0dp"
-        android:text="Total stock per variety value (e.g. each Size) across every item that carries it. Tap a row to see which items." />
+        android:text="Every shoe item with its available sizes and stock. Filter by Gender + Size to see only items carrying that size; it's shown first and bold on each row. Tap an item to open it." />
 
-    <HorizontalScrollView
-        android:layout_width="match_parent"
+    <Spinner
+        android:id="@+id/spinner_combo_filter"
+        style="@style/FilterSpinner"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
-        android:scrollbars="none">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/btn_open_value_filter"
-                style="@style/AppButton.Outline.Small"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="0dp"
-                android:paddingStart="18dp"
-                android:paddingEnd="18dp"
-                android:text="Filter Values" />
-
-        </LinearLayout>
-
-    </HorizontalScrollView>
-
-    <TextView
-        android:id="@+id/tv_filter_status"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
-        android:text="Showing all values"
-        android:textColor="@color/text_secondary"
-        android:textSize="12sp" />
+        android:layout_marginBottom="14dp" />
 
     <TextView
         android:id="@+id/tv_empty"
@@ -53,7 +26,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
         android:gravity="center"
-        android:text="No variety values found - add Size/Color groups to items first."
+        android:text="No shoe items with sizes found."
         android:textColor="@color/text_secondary"
         android:textSize="15sp"
         android:visibility="gone" />

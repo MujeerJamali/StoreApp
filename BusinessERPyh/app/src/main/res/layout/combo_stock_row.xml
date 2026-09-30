@@ -4,44 +4,25 @@
     android:layout_height="wrap_content"
     android:background="@drawable/bg_card_ripple"
     android:elevation="@dimen/elevation_card"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:padding="14dp">
 
-    <LinearLayout
-        android:layout_width="0dp"
+    <TextView
+        android:id="@+id/tv_combo_item_name"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical">
-
-        <TextView
-            android:id="@+id/tv_combo_value_label"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Value"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tv_combo_group_name"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Group · 0 items"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
-
-    </LinearLayout>
+        android:text="Item Name"
+        android:textColor="@color/text_primary"
+        android:textSize="16sp"
+        android:textStyle="bold" />
 
     <TextView
-        android:id="@+id/tv_combo_total_stock"
-        android:layout_width="wrap_content"
+        android:id="@+id/tv_combo_item_sizes"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:text="0"
-        android:textColor="@color/mod_items"
-        android:textSize="18sp"
-        android:textStyle="bold" />
+        android:layout_marginTop="4dp"
+        android:text="Sizes"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
 
 </LinearLayout>

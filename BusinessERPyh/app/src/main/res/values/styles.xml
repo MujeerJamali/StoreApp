@@ -92,6 +92,21 @@
         <item name="android:textSize">15sp</item>
     </style>
 
+    <!-- Minimalist filter/sort control - a plain Spinner styled like a
+         form input (not a button), used app-wide in place of a row of
+         toggle buttons for any report filter, sort-by, or Excel-style
+         selection. Deliberately wrap_content (set per usage) rather than
+         filling the row - "not bigger than necessary". -->
+    <style name="FilterSpinner">
+        <item name="android:background">@drawable/bg_input</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:paddingTop">10dp</item>
+        <item name="android:paddingBottom">10dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:popupBackground">@color/surface</item>
+    </style>
+
     <!-- Labels above inputs -->
     <style name="FieldLabel">
         <item name="android:layout_width">wrap_content</item>

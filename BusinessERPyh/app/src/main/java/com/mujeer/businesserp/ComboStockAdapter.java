@@ -1,6 +1,10 @@
 package com.mujeer.businesserp;
 
 import android.app.Activity;
+import android.graphics.Typeface;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.StyleSpan;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,17 +14,27 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-// List adapter for ComboStockReportActivity - each row is one distinct
-// variety value (e.g. one Size) with its total stock across every item
-// that carries it, and how many distinct items that is.
+// List adapter for ComboStockReportActivity's single item list - each
+// row is one shoe item with its name, plus every size it comes in and
+// its stock, with the size matching the current filter selection (if
+// any) moved first and shown in bold.
 public class ComboStockAdapter extends BaseAdapter {
 
 	private final Activity activity;
 	private final ArrayList<HashMap<String, Object>> list;
 
+	// The variety value label (e.g. "9") currently selected in the
+	// filter dropdown, or null when "All Sizes" is selected - either
+	// way every size still shows, this only controls ordering/bolding.
+	private String selectedLabel = null;
+
 	public ComboStockAdapter(Activity activity, ArrayList<HashMap<String, Object>> list) {
 		this.activity = activity;
 		this.list = list;
+	}
+
+	public void setSelectedFilter(String selectedLabel) {
+		this.selectedLabel = selectedLabel;
 	}
 
 	@Override
@@ -39,6 +53,7 @@ public class ComboStockAdapter extends BaseAdapter {
 	}
 
 	@Override
+	@SuppressWarnings("unchecked")
 	public View getView(int position, View convertView, ViewGroup parent) {
 
 		if (convertView == null) {
@@ -48,25 +63,74 @@ public class ComboStockAdapter extends BaseAdapter {
 			);
 		}
 
-		TextView tv_label = convertView.findViewById(R.id.tv_combo_value_label);
-		TextView tv_group = convertView.findViewById(R.id.tv_combo_group_name);
-		TextView tv_stock = convertView.findViewById(R.id.tv_combo_total_stock);
+		TextView tv_name = convertView.findViewById(R.id.tv_combo_item_name);
+		TextView tv_sizes = convertView.findViewById(R.id.tv_combo_item_sizes);
 
 		HashMap<String, Object> row = list.get(position);
 
-		String label = row.get("value_label") == null ? "" : row.get("value_label").toString();
-		String groupName = row.get("group_name") == null ? "" : row.get("group_name").toString();
-		int itemCount = row.get("item_count") == null ? 0 : (Integer) row.get("item_count");
-		double totalStock = row.get("total_stock") == null ? 0 : (Double) row.get("total_stock");
+		tv_name.setText(row.get("name") == null ? "" : row.get("name").toString());
 
-		tv_label.setText(label);
-		tv_group.setText(groupName + " · " + itemCount + (itemCount == 1 ? " item" : " items"));
-		tv_stock.setText(AmountFormat.formatPlain(totalStock));
+		ArrayList<HashMap<String, Object>> combos =
+			(ArrayList<HashMap<String, Object>>) row.get("combos");
 
-		tv_stock.setTextColor(
-			activity.getResources().getColor(totalStock <= 0 ? R.color.danger : R.color.mod_items)
-		);
+		tv_sizes.setText(buildSizesText(combos));
 
 		return convertView;
+	}
+
+	private CharSequence buildSizesText(ArrayList<HashMap<String, Object>> combos) {
+
+		if (combos == null || combos.isEmpty()) {
+			return "No sizes";
+		}
+
+		// The size matching the current filter (if any) goes first; the
+		// rest keep their existing order.
+		HashMap<String, Object> matched = null;
+		ArrayList<HashMap<String, Object>> ordered = new ArrayList<HashMap<String, Object>>();
+
+		for (HashMap<String, Object> combo : combos) {
+
+			String label = combo.get("label") == null ? "" : combo.get("label").toString();
+
+			if (matched == null && selectedLabel != null && label.equals(selectedLabel)) {
+				matched = combo;
+			} else {
+				ordered.add(combo);
+			}
+		}
+
+		if (matched != null) {
+			ordered.add(0, matched);
+		}
+
+		SpannableStringBuilder text = new SpannableStringBuilder();
+
+		for (int i = 0; i < ordered.size(); i++) {
+
+			HashMap<String, Object> combo = ordered.get(i);
+
+			String label = combo.get("label") == null ? "" : combo.get("label").toString();
+			double balance = combo.get("balance") == null ? 0 : (Double) combo.get("balance");
+
+			String entry = label + " (" + AmountFormat.formatPlain(balance) + ")";
+
+			int start = text.length();
+			text.append(entry);
+
+			if (combo == matched) {
+
+				text.setSpan(
+					new StyleSpan(Typeface.BOLD), start, text.length(),
+					Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+				);
+			}
+
+			if (i < ordered.size() - 1) {
+				text.append("   ·   ");
+			}
+		}
+
+		return text;
 	}
 }

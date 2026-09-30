@@ -152,11 +152,11 @@ each party's last Sale/Purchase/Payment/Expense/Transfer) · Item
 Monthly Rank (penalizes months an item didn't sell) · Average Cart
 Size/Amount · Profit: Cash Sale vs Party · Shoes vs Non-Shoes
 (Sale/Profit toggle, same period selector, % split between shoe items
-and everything else) · Combo/Variety Stock (total stock per variety
-value, e.g. each Size, across every item that carries it - an
-Excel-style multi-select filter narrows which values show, and
-tapping one lists the specific items, each with a dropdown of all its
-sizes)
+and everything else) · Combo/Variety Stock (shoes only - a single
+screen: a Gender + Size dropdown filter, built by parsing each item's
+name, narrows the item list below it; each row shows the item's name
+and every size it comes in with stock, the size matching the filter
+shown first and bold; tapping an item opens it directly)
 
 The Parties list itself also sorts (Recent/Oldest Activity, Balance
 High-Low/Low-High, Name A-Z/Z-A) using the same underlying query as

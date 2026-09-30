@@ -31,14 +31,20 @@
   instead of failing. This was missed for an entire session's worth of
   features before being caught and fixed in one pass - don't let it
   drift again and require another catch-up audit later.
-- Every filter/toggle button row (report filters, Show/Sort-by rows,
-  Excel-style multi-select filters, etc.) is a single horizontally-
-  scrollable line - `HorizontalScrollView` (`scrollbars="none"`)
-  wrapping one `wrap_content` horizontal `LinearLayout` of buttons -
-  never a fixed/weighted row that just fills the screen width. This is
-  a standing app-wide pattern: apply it to every new filter row, and
-  when touching an existing screen that still uses a fixed row, convert
-  it to match.
+- SUPERSEDED (see the next rule) - every filter/toggle row used to be a
+  horizontally-scrollable row of buttons; that pattern is being replaced
+  app-wide by plain dropdowns. Left here so the reasoning for the change
+  is on record, not because the button-row pattern should still be used
+  for anything new.
+- Every filter/sort/toggle control (report filters, Show/Sort-by rows,
+  Excel-style multi-select filters, the Parties list's sort, etc.) is a
+  plain `Spinner` styled `@style/FilterSpinner` (a minimalist input-
+  style dropdown, not a button) - never a row of buttons, scrollable or
+  not, and never wider than it needs to be ("not bigger than
+  necessary"). This replaced an earlier button-row convention after the
+  user asked for the whole app to be more minimalist. Apply it to every
+  new filter, and convert an existing button-row filter to match
+  whenever you're touching that screen anyway.
 - Charts use `SimpleBarChartView` (plain Canvas drawing, no third-party
   library) - `build.gradle` has no charting dependency, and AIDE's
   on-device build has no reliable way to resolve a new Maven dependency,
