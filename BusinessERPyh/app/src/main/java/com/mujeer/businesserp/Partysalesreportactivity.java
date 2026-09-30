@@ -4,9 +4,11 @@ import android.app.Activity;
 import android.app.DatePickerDialog;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.Button;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
@@ -25,22 +27,27 @@ public class Partysalesreportactivity extends Activity {
 	private static final int RANGE_YEAR = 5;
 	private static final int RANGE_CUSTOM = 6;
 
-	private Button btn_range_today;
-	private Button btn_range_yesterday;
-	private Button btn_range_week;
-	private Button btn_range_month;
-	private Button btn_range_quarter;
-	private Button btn_range_year;
-	private Button btn_range_custom;
+	private Spinner spinner_range;
+
+	private static final String[] RANGE_LABELS = {
+		"Today", "Yesterday", "This Week", "This Month",
+		"This Quarter", "This Year", "Custom Range"
+	};
 
 	private View container_custom_range;
 	private EditText et_custom_from;
 	private EditText et_custom_to;
 
-	private Button btn_sort_amount_desc;
-	private Button btn_sort_amount_asc;
-	private Button btn_sort_name;
-	private Button btn_sort_count;
+	private Spinner spinner_party_sales_sort;
+
+	private static final int[] SORT_VALUES = {
+		DatabaseHelper.SORT_AMOUNT_DESC, DatabaseHelper.SORT_AMOUNT_ASC,
+		DatabaseHelper.SORT_NAME_ASC, DatabaseHelper.SORT_COUNT_DESC
+	};
+
+	private static final String[] SORT_LABELS = {
+		"Amount: High to Low", "Amount: Low to High", "Party Name", "Number of Sales"
+	};
 
 	private TextView tv_empty;
 	private ListView lv_party_sales;
@@ -70,22 +77,13 @@ public class Partysalesreportactivity extends Activity {
 
 		setTitle("Sales by Party");
 
-		btn_range_today = findViewById(R.id.btn_range_today);
-		btn_range_yesterday = findViewById(R.id.btn_range_yesterday);
-		btn_range_week = findViewById(R.id.btn_range_week);
-		btn_range_month = findViewById(R.id.btn_range_month);
-		btn_range_quarter = findViewById(R.id.btn_range_quarter);
-		btn_range_year = findViewById(R.id.btn_range_year);
-		btn_range_custom = findViewById(R.id.btn_range_custom);
+		spinner_range = findViewById(R.id.spinner_range);
 
 		container_custom_range = findViewById(R.id.container_custom_range);
 		et_custom_from = findViewById(R.id.et_custom_from);
 		et_custom_to = findViewById(R.id.et_custom_to);
 
-		btn_sort_amount_desc = findViewById(R.id.btn_sort_amount_desc);
-		btn_sort_amount_asc = findViewById(R.id.btn_sort_amount_asc);
-		btn_sort_name = findViewById(R.id.btn_sort_name);
-		btn_sort_count = findViewById(R.id.btn_sort_count);
+		spinner_party_sales_sort = findViewById(R.id.spinner_party_sales_sort);
 
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_party_sales = findViewById(R.id.lv_party_sales);
@@ -113,84 +111,44 @@ public class Partysalesreportactivity extends Activity {
 				}
 			});
 
-		btn_range_today.setOnClickListener(new View.OnClickListener() {
+		ArrayAdapter<String> rangeAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, RANGE_LABELS
+		);
+
+		rangeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_range.setAdapter(rangeAdapter);
+
+		spinner_range.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_TODAY);
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectRange(position);
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
-		btn_range_yesterday.setOnClickListener(new View.OnClickListener() {
+		ArrayAdapter<String> sortAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, SORT_LABELS
+		);
+
+		sortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_party_sales_sort.setAdapter(sortAdapter);
+
+		spinner_party_sales_sort.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_YESTERDAY);
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectedSort = SORT_VALUES[position];
+					loadReport();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
-		btn_range_week.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_WEEK);
-				}
-			});
-
-		btn_range_month.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_MONTH);
-				}
-			});
-
-		btn_range_quarter.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_QUARTER);
-				}
-			});
-
-		btn_range_year.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_YEAR);
-				}
-			});
-
-		btn_range_custom.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectRange(RANGE_CUSTOM);
-				}
-			});
-
-		btn_sort_amount_desc.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectSort(DatabaseHelper.SORT_AMOUNT_DESC);
-				}
-			});
-
-		btn_sort_amount_asc.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectSort(DatabaseHelper.SORT_AMOUNT_ASC);
-				}
-			});
-
-		btn_sort_name.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectSort(DatabaseHelper.SORT_NAME_ASC);
-				}
-			});
-
-		btn_sort_count.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					selectSort(DatabaseHelper.SORT_COUNT_DESC);
-				}
-			});
-
-		selectRange(RANGE_TODAY);
+		loadReport();
 	}
 
 	@Override
@@ -235,71 +193,9 @@ public class Partysalesreportactivity extends Activity {
 
 		selectedRange = range;
 
-		Button[] buttons = {
-			btn_range_today,
-			btn_range_yesterday,
-			btn_range_week,
-			btn_range_month,
-			btn_range_quarter,
-			btn_range_year,
-			btn_range_custom
-		};
-
-		int[] ranges = {
-			RANGE_TODAY,
-			RANGE_YESTERDAY,
-			RANGE_WEEK,
-			RANGE_MONTH,
-			RANGE_QUARTER,
-			RANGE_YEAR,
-			RANGE_CUSTOM
-		};
-
-		toggleButtons(buttons, ranges, range);
-
 		container_custom_range.setVisibility(range == RANGE_CUSTOM ? View.VISIBLE : View.GONE);
 
 		loadReport();
-	}
-
-	private void selectSort(int sort) {
-
-		selectedSort = sort;
-
-		Button[] buttons = {
-			btn_sort_amount_desc,
-			btn_sort_amount_asc,
-			btn_sort_name,
-			btn_sort_count
-		};
-
-		int[] sorts = {
-			DatabaseHelper.SORT_AMOUNT_DESC,
-			DatabaseHelper.SORT_AMOUNT_ASC,
-			DatabaseHelper.SORT_NAME_ASC,
-			DatabaseHelper.SORT_COUNT_DESC
-		};
-
-		toggleButtons(buttons, sorts, sort);
-
-		loadReport();
-	}
-
-	private void toggleButtons(Button[] buttons, int[] values, int selected) {
-
-		for (int i = 0; i < buttons.length; i++) {
-
-			if (values[i] == selected) {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_primary);
-				buttons[i].setTextColor(getResources().getColor(R.color.text_on_primary));
-
-			} else {
-
-				buttons[i].setBackgroundResource(R.drawable.bg_button_outline);
-				buttons[i].setTextColor(getResources().getColor(R.color.primary));
-			}
-		}
 	}
 
 	// Same range logic as Salesreportactivity: every range runs from the

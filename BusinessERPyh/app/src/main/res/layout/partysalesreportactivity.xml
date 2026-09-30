@@ -12,100 +12,11 @@
 
         <TextView style="@style/PageTitle" android:text="Sales by Party" />
 
-        <TextView
-            style="@style/FieldLabel"
-            android:layout_marginTop="0dp"
-            android:text="Period" />
-
-        <HorizontalScrollView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:scrollbars="none">
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/btn_range_today"
-                    style="@style/AppButton.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Today" />
-
-                <Button
-                    android:id="@+id/btn_range_yesterday"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Yesterday" />
-
-                <Button
-                    android:id="@+id/btn_range_week"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Week" />
-
-                <Button
-                    android:id="@+id/btn_range_month"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Month" />
-
-                <Button
-                    android:id="@+id/btn_range_quarter"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Quarter" />
-
-                <Button
-                    android:id="@+id/btn_range_year"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Year" />
-
-                <Button
-                    android:id="@+id/btn_range_custom"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Custom Range" />
-
-            </LinearLayout>
-
-        </HorizontalScrollView>
+        <Spinner
+            android:id="@+id/spinner_range"
+            style="@style/FilterSpinner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
 
         <LinearLayout
             android:id="@+id/container_custom_range"
@@ -154,67 +65,13 @@
 
         </LinearLayout>
 
-        <TextView
-            style="@style/FieldLabel"
-            android:text="Sort By" />
-
-        <HorizontalScrollView
-            android:layout_width="match_parent"
+        <Spinner
+            android:id="@+id/spinner_party_sales_sort"
+            style="@style/FilterSpinner"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:scrollbars="none">
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/btn_sort_amount_desc"
-                    style="@style/AppButton.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Amount: High to Low" />
-
-                <Button
-                    android:id="@+id/btn_sort_amount_asc"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Amount: Low to High" />
-
-                <Button
-                    android:id="@+id/btn_sort_name"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Party Name" />
-
-                <Button
-                    android:id="@+id/btn_sort_count"
-                    style="@style/AppButton.Outline.Small"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="0dp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:text="Number of Sales" />
-
-            </LinearLayout>
-
-        </HorizontalScrollView>
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="16dp" />
 
         <TextView
             android:id="@+id/tv_empty"
