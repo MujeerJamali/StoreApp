@@ -29,6 +29,7 @@ public class Expenseeditactivity extends Activity {
 	// "+ Add New Cost Item" row - see loadCostItemAutoComplete()/
 	// openAddCostItem()/onActivityResult().
 	private static final int REQUEST_ADD_COST_ITEM = 6001;
+	private static final int REQUEST_ADD_NEW_PARTY = 6002;
 
 	private TextView tv_code;
 
@@ -69,6 +70,7 @@ public class Expenseeditactivity extends Activity {
 	// a valid "no party" choice, only a non-blank value has to resolve).
 	private Map<String, Integer> partyIdByName;
 	private Map<Integer, String> partyNameById;
+	private TwoLineAutoCompleteAdapter partyAdapter;
 
 	// name -> id for the Cost Item field, same purpose as partyIdByName
 	// above - saveExpense() requires the typed text to resolve to one of
@@ -347,11 +349,29 @@ public class Expenseeditactivity extends Activity {
 			partySubtitles.put(name, "");
 		}
 
-		TwoLineAutoCompleteAdapter adapter =
-			new TwoLineAutoCompleteAdapter(this, partyNames, partySubtitles);
+		partyAdapter =
+			new TwoLineAutoCompleteAdapter(this, partyNames, partySubtitles, "+ Add New Party");
 
-		actv_party.setAdapter(adapter);
+		actv_party.setAdapter(partyAdapter);
 		actv_party.setThreshold(1);
+
+		actv_party.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+				@Override
+				public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+					if (partyAdapter.isAddNewPosition(position)) {
+
+						String typedName = actv_party.getText().toString().trim();
+
+						actv_party.setText("", false);
+
+						Intent intent = new Intent(Expenseeditactivity.this, Addpartyactivity.class);
+						intent.putExtra("party_name", typedName);
+
+						startActivityForResult(intent, REQUEST_ADD_NEW_PARTY);
+					}
+				}
+			});
 	}
 
 	// Item is a reusable Cost Item (Petrol, Shipping, Packaging, ...) -
@@ -409,6 +429,17 @@ public class Expenseeditactivity extends Activity {
 
 			if (newName != null) {
 				et_item.setText(newName, false);
+			}
+		}
+
+		if (requestCode == REQUEST_ADD_NEW_PARTY && resultCode == RESULT_OK && data != null) {
+
+			String newPartyName = data.getStringExtra("party_name");
+
+			loadPartyAutoComplete();
+
+			if (newPartyName != null) {
+				actv_party.setText(newPartyName, false);
 			}
 		}
 	}

@@ -394,6 +394,39 @@
 
         </LinearLayout>
 
+        <!-- Sale mode only - see Transactioneditactivity#updateGrandTotal().
+             Estimated profit/loss for the items on screen so far, using
+             each item's purchase_price + extra_cost_per_unit as cost. -->
+        <LinearLayout
+            android:id="@+id/container_sale_profit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_chip"
+            android:orientation="horizontal"
+            android:padding="14dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_gravity="center_vertical"
+                android:text="Estimated Profit"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tv_sale_profit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0.00"
+                android:textColor="@color/mod_sales"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
         <Button
             android:id="@+id/btn_save_draft"
             style="@style/AppButton.Outline.Small"

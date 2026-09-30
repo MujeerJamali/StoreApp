@@ -1,10 +1,10 @@
 package com.mujeer.businesserp;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
@@ -18,6 +18,9 @@ import java.util.HashMap;
 import java.util.Locale;
 
 public class Paymenteditactivity extends Activity {
+
+	// "+ Add New Party" - see onCreate()'s et_party wiring/onActivityResult().
+	private static final int REQUEST_ADD_NEW_PARTY = 6001;
 
 	private TextView tv_code;
 
@@ -56,7 +59,7 @@ public class Paymenteditactivity extends Activity {
 	private ArrayList<HashMap<String, Object>> partyList =
 	new ArrayList<HashMap<String, Object>>();
 
-	private ArrayAdapter<String> partyAdapter;
+	private TwoLineAutoCompleteAdapter partyAdapter;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -173,36 +176,7 @@ public class Paymenteditactivity extends Activity {
 			}
 		);
 
-		partyList = db.getParties();
-
-		ArrayList<String> partyNames =
-			new ArrayList<String>();
-
-		java.util.Map<String, String> partySubtitles =
-			new java.util.HashMap<String, String>();
-
-		for (HashMap<String, Object> party : partyList) {
-
-			String name = party.get("name").toString();
-
-			partyNames.add(name);
-
-			partySubtitles.put(
-				name,
-				formatPartyBalanceSubtitle(party.get("balance"))
-			);
-		}
-
-		partyAdapter =
-			new TwoLineAutoCompleteAdapter(
-			this,
-			partyNames,
-			partySubtitles
-		);
-
-		et_party.setAdapter(partyAdapter);
-
-		et_party.setThreshold(1);
+		reloadPartyAdapter();
 
 		et_party.setOnItemClickListener(
 			new AdapterView.OnItemClickListener() {
@@ -213,6 +187,23 @@ public class Paymenteditactivity extends Activity {
 					View view,
 					int position,
 					long id) {
+
+					if (partyAdapter.isAddNewPosition(position)) {
+
+						String typedName = et_party.getText().toString().trim();
+
+						et_party.setText("", false);
+
+						Intent intent = new Intent(
+							Paymenteditactivity.this,
+							Addpartyactivity.class
+						);
+
+						intent.putExtra("party_name", typedName);
+
+						startActivityForResult(intent, REQUEST_ADD_NEW_PARTY);
+						return;
+					}
 
 					et_party.setText(
 						parent.getItemAtPosition(position).toString()
@@ -456,6 +447,64 @@ public class Paymenteditactivity extends Activity {
 		}
 
 		return "Balance: 0 (Settled)";
+	}
+
+	// Builds/rebuilds et_party's adapter from the current party list -
+	// called once from onCreate() and again after "+ Add New Party"
+	// returns, so the newly-created party (and its fresh balance
+	// subtitle) is actually selectable.
+	private void reloadPartyAdapter() {
+
+		partyList = db.getParties();
+
+		ArrayList<String> partyNames =
+			new ArrayList<String>();
+
+		java.util.Map<String, String> partySubtitles =
+			new java.util.HashMap<String, String>();
+
+		for (HashMap<String, Object> party : partyList) {
+
+			String name = party.get("name").toString();
+
+			partyNames.add(name);
+
+			partySubtitles.put(
+				name,
+				formatPartyBalanceSubtitle(party.get("balance"))
+			);
+		}
+
+		partyAdapter =
+			new TwoLineAutoCompleteAdapter(
+			this,
+			partyNames,
+			partySubtitles,
+			"+ Add New Party"
+		);
+
+		et_party.setAdapter(partyAdapter);
+
+		et_party.setThreshold(1);
+	}
+
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+		super.onActivityResult(requestCode, resultCode, data);
+
+		if (requestCode == REQUEST_ADD_NEW_PARTY
+			&& resultCode == RESULT_OK
+			&& data != null) {
+
+			String newPartyName = data.getStringExtra("party_name");
+
+			if (newPartyName != null) {
+
+				reloadPartyAdapter();
+
+				et_party.setText(newPartyName, false);
+			}
+		}
 	}
 
 	// =====================

@@ -1098,6 +1098,30 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return map;
 	}
 
+	// purchase_price + extra_cost_per_unit for one item - the same cost
+	// basis Net Profit/Item Monthly Rank/Profit Split already use, in a
+	// single-value form for a live per-line profit preview while
+	// building a Sale (see Transactioneditactivity#updateGrandTotal()).
+	public double getItemCostBasis(int itemId) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT purchase_price + extra_cost_per_unit FROM " + TABLE_ITEMS + " WHERE id=?",
+			new String[]{String.valueOf(itemId)}
+		);
+
+		double result = 0;
+
+		if (cursor.moveToFirst()) {
+			result = cursor.getDouble(0);
+		}
+
+		cursor.close();
+
+		return result;
+	}
+
 	// The current stock figure a sale should be checked against: a
 	// combo's own balance when the line has one, otherwise the item's
 	// own balance. Used to keep stock from ever going negative on a

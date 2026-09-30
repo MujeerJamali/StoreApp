@@ -42,6 +42,9 @@ public class Transactioneditactivity extends Activity {
 	// "+ Select Expenses" - see openSelectExpenses()/onActivityResult().
 	private static final int REQUEST_SELECT_EXPENSES = 5002;
 
+	// "+ Add New Party" - see loadParties()/onActivityResult().
+	private static final int REQUEST_ADD_NEW_PARTY = 5003;
+
 	private int transactionType = TYPE_PURCHASE;
 	private boolean isEditMode = false;
 	private int transactionId = -1;
@@ -68,6 +71,8 @@ public class Transactioneditactivity extends Activity {
     Button btn_select_expenses;
     View tv_add_note;
     TextView tv_grand_total;
+    View container_sale_profit;
+    TextView tv_sale_profit;
     TextView tv_cash_before, tv_cash_after;
     TextView tv_page_title;
     Button btn_add_item, btn_save_transaction, btn_go_dashboard;
@@ -263,6 +268,8 @@ public class Transactioneditactivity extends Activity {
 				}
 			});
         tv_grand_total = findViewById(R.id.tv_grand_total);
+        container_sale_profit = findViewById(R.id.container_sale_profit);
+        tv_sale_profit = findViewById(R.id.tv_sale_profit);
         tv_cash_before = findViewById(R.id.tv_cash_before);
         tv_cash_after = findViewById(R.id.tv_cash_after);
         tv_page_title = findViewById(R.id.tv_page_title);
@@ -584,6 +591,23 @@ public class Transactioneditactivity extends Activity {
 			}
 		}
 
+		if (requestCode == REQUEST_ADD_NEW_PARTY
+			&& resultCode == RESULT_OK
+			&& data != null) {
+
+			String newPartyName = data.getStringExtra("party_name");
+
+			if (newPartyName != null) {
+
+				// Reload first so the new party's balance subtitle (and
+				// the party itself) is actually in the dropdown's list
+				// before selecting it by text.
+				loadParties();
+
+				actv_party.setText(newPartyName, false);
+			}
+		}
+
 		if (requestCode == REQUEST_SELECT_EXPENSES
 			&& resultCode == RESULT_OK
 			&& data != null) {
@@ -766,18 +790,46 @@ public class Transactioneditactivity extends Activity {
 			);
 		}
 
-		TwoLineAutoCompleteAdapter adapter =
+		final TwoLineAutoCompleteAdapter adapter =
 			new TwoLineAutoCompleteAdapter(
             this,
             partyNames,
-            partySubtitles
+            partySubtitles,
+            "+ Add New Party"
         );
 
 
 		actv_party.setAdapter(adapter);
 		actv_party.setThreshold(1);
 
+		actv_party.setOnItemClickListener(
+			new AdapterView.OnItemClickListener() {
 
+				@Override
+				public void onItemClick(
+					AdapterView<?> parent, View view, int position, long id) {
+
+					// Always the dropdown's last row - jumps straight to
+					// Addpartyactivity with whatever was typed, same
+					// pattern as the Item field's own "+ Add New Item".
+					if (adapter.isAddNewPosition(position)) {
+
+						String typedName = actv_party.getText().toString().trim();
+
+						actv_party.setText("", false);
+
+						Intent intent = new Intent(
+							Transactioneditactivity.this,
+							Addpartyactivity.class
+						);
+
+						intent.putExtra("party_name", typedName);
+
+						startActivityForResult(intent, REQUEST_ADD_NEW_PARTY);
+					}
+				}
+			}
+		);
 	}
 
 	private String formatPartyBalanceSubtitle(Object balanceObj) {
@@ -871,6 +923,12 @@ public class Transactioneditactivity extends Activity {
 		final EditText etTotal =
 			view.findViewById(R.id.et_item_total);
 
+		final Button btnQuantityMinus =
+			view.findViewById(R.id.btn_quantity_minus);
+
+		final Button btnQuantityPlus =
+			view.findViewById(R.id.btn_quantity_plus);
+
 		// Defaults Quantity to 1 rather than leaving it blank, so Total
 		// already shows a real quantity*price figure as soon as an item
 		// (and its price) is picked, instead of reading as 0 until the
@@ -879,6 +937,8 @@ public class Transactioneditactivity extends Activity {
 
 		final Double[] exactPriceOverride =
 			wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
+
+		wireQuantityStepper(etQuantity, btnQuantityMinus, btnQuantityPlus);
 
 		final LinearLayout containerVarieties =
 			view.findViewById(R.id.container_dialog_varieties);
@@ -973,6 +1033,8 @@ public class Transactioneditactivity extends Activity {
 					// Add/Add & New buttons).
 					if (adapter.isAddNewPosition(position)) {
 
+						String typedName = actvItem.getText().toString().trim();
+
 						actvItem.setText("", false);
 						dialog.dismiss();
 
@@ -980,6 +1042,8 @@ public class Transactioneditactivity extends Activity {
 							Transactioneditactivity.this,
 							Additemactivity.class
 						);
+
+						intent.putExtra("item_name", typedName);
 
 						startActivityForResult(intent, REQUEST_ADD_NEW_ITEM);
 						return;
@@ -1174,6 +1238,47 @@ public class Transactioneditactivity extends Activity {
 	// actually saves the item. A genuine (non-programmatic) edit to
 	// Price clears it, since the user's typed number then takes over.
 	// =====================
+	// +/- steppers beside the Quantity field - step of 1, floor of 1 (no
+	// point stepping down into 0 or negative), field stays manually
+	// editable either way. Reuses etQuantity's own TextWatcher (see
+	// wireQuantityPriceTotalSync above) to recompute Total - a plain
+	// setText() here is enough, no separate recompute call needed.
+	private void wireQuantityStepper(
+		final EditText etQuantity, Button btnMinus, Button btnPlus) {
+
+		btnMinus.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					double quantity = 0;
+
+					try {
+						quantity = Double.parseDouble(etQuantity.getText().toString().trim());
+					} catch (Exception e) {
+					}
+
+					if (quantity > 1) {
+						etQuantity.setText(AmountFormat.formatPlain(quantity - 1));
+					}
+				}
+			});
+
+		btnPlus.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					double quantity = 0;
+
+					try {
+						quantity = Double.parseDouble(etQuantity.getText().toString().trim());
+					} catch (Exception e) {
+					}
+
+					etQuantity.setText(AmountFormat.formatPlain(quantity + 1));
+				}
+			});
+	}
+
 	private Double[] wireQuantityPriceTotalSync(
 		final EditText etQuantity,
 		final EditText etPurchasePrice,
@@ -2094,6 +2199,12 @@ public class Transactioneditactivity extends Activity {
 		final EditText etTotal =
 			view.findViewById(R.id.et_item_total);
 
+		final Button btnQuantityMinus =
+			view.findViewById(R.id.btn_quantity_minus);
+
+		final Button btnQuantityPlus =
+			view.findViewById(R.id.btn_quantity_plus);
+
 		final LinearLayout containerVarieties =
 			view.findViewById(R.id.container_dialog_varieties);
 
@@ -2140,6 +2251,8 @@ public class Transactioneditactivity extends Activity {
 
 			final Double[] exactPriceOverride =
 				wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
+
+			wireQuantityStepper(etQuantity, btnQuantityMinus, btnQuantityPlus);
 
 			final AlertDialog pendingDialog =
 				new AlertDialog.Builder(this)
@@ -2340,6 +2453,8 @@ public class Transactioneditactivity extends Activity {
 					// onActivityResult().
 					if (adapter.isAddNewPosition(position)) {
 
+						String typedName = actvItem.getText().toString().trim();
+
 						actvItem.setText("", false);
 						dialog.dismiss();
 
@@ -2349,6 +2464,8 @@ public class Transactioneditactivity extends Activity {
 							Transactioneditactivity.this,
 							Additemactivity.class
 						);
+
+						intent.putExtra("item_name", typedName);
 
 						startActivityForResult(intent, REQUEST_ADD_NEW_ITEM);
 						return;
@@ -2403,6 +2520,8 @@ public class Transactioneditactivity extends Activity {
 
 		final Double[] exactPriceOverride =
 			wireQuantityPriceTotalSync(etQuantity, etPurchasePrice, etTotal);
+
+		wireQuantityStepper(etQuantity, btnQuantityMinus, btnQuantityPlus);
 
 		btnCancel.setOnClickListener(
 			new View.OnClickListener() {
@@ -2580,6 +2699,39 @@ public class Transactioneditactivity extends Activity {
 		);
 
 		updateDefaultAmountPaid(total);
+
+		// Sale only - a live estimate as items are added, using each
+		// item's purchase_price + extra_cost_per_unit as cost, same
+		// basis Net Profit/Item Monthly Rank/Profit Split already use.
+		if (container_sale_profit != null) {
+
+			if (transactionType == TYPE_SALE && transactionItemList.size() > 0) {
+
+				double profit = 0;
+
+				for (HashMap<String, Object> map : transactionItemList) {
+
+					Object itemIdObj = map.get("item_id");
+
+					if (itemIdObj == null) {
+						continue;
+					}
+
+					double qty = (Double) map.get("quantity");
+					double lineTotal = (Double) map.get("total");
+					double costBasis = db.getItemCostBasis((Integer) itemIdObj);
+
+					profit += lineTotal - (qty * costBasis);
+				}
+
+				tv_sale_profit.setText(AmountFormat.format(profit));
+				container_sale_profit.setVisibility(View.VISIBLE);
+
+			} else {
+
+				container_sale_profit.setVisibility(View.GONE);
+			}
+		}
 	}
 
 	// =====================
