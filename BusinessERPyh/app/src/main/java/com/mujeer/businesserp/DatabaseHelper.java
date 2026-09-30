@@ -699,6 +699,127 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		return list;
 	}
+
+	// Shared by Partiesactivity's own sort controls and the new Party
+	// Report screen (Partyreportactivity) - "latest transaction" pools
+	// every kind of party-facing money movement (Sale, Purchase,
+	// Payment, an Expense billed to a party, and either side of a Party
+	// Transfer) and takes the most recent date across all of them. A
+	// party with no activity at all sorts as "longest ago"/"last" under
+	// PARTY_SORT_LATEST_TXN regardless of direction, since there's no
+	// real date to compare - not first under ascending.
+	public static final int PARTY_SORT_LATEST_TXN = 0;
+	public static final int PARTY_SORT_BALANCE = 1;
+	public static final int PARTY_SORT_NAME = 2;
+
+	public static final int PARTY_BALANCE_FILTER_ALL = 0;
+	public static final int PARTY_BALANCE_FILTER_ZERO = 1;
+	public static final int PARTY_BALANCE_FILTER_NONZERO = 2;
+
+	public ArrayList<HashMap<String, Object>> getPartiesWithActivity(
+		int sortBy, boolean ascending, int balanceFilter) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		String sql =
+			"SELECT p.id, p.name, p.balance, MAX(t.date) AS last_date " +
+			"FROM " + TABLE_PARTIES + " p " +
+			"LEFT JOIN (" +
+			"SELECT party_id AS pid, date FROM sales " +
+			"UNION ALL SELECT party_id AS pid, date FROM purchases " +
+			"UNION ALL SELECT party_id AS pid, date FROM payments " +
+			"UNION ALL SELECT party_id AS pid, date FROM " + TABLE_EXPENSES +
+			" WHERE party_id IS NOT NULL " +
+			"UNION ALL SELECT from_party_id AS pid, date FROM " + TABLE_PARTY_TRANSFERS + " " +
+			"UNION ALL SELECT to_party_id AS pid, date FROM " + TABLE_PARTY_TRANSFERS +
+			") t ON t.pid = p.id " +
+			"GROUP BY p.id";
+
+		Cursor cursor = db.rawQuery(sql, null);
+
+		String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+
+		while (cursor.moveToNext()) {
+
+			double balance = cursor.getDouble(2);
+
+			if (balanceFilter == PARTY_BALANCE_FILTER_ZERO && balance != 0) {
+				continue;
+			}
+
+			if (balanceFilter == PARTY_BALANCE_FILTER_NONZERO && balance == 0) {
+				continue;
+			}
+
+			String lastDate = cursor.isNull(3) ? null : cursor.getString(3);
+			int daysSince = lastDate == null ? -1 : daysBetweenDates(lastDate, today);
+
+			HashMap<String, Object> row = new HashMap<>();
+
+			row.put("id", cursor.getInt(0));
+			row.put("name", cursor.getString(1));
+			row.put("balance", balance);
+			row.put("last_date", lastDate);
+			row.put("days_since", daysSince);
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		final int sortBy_forCompare = sortBy;
+		final boolean ascending_forCompare = ascending;
+
+		Collections.sort(list, new Comparator<HashMap<String, Object>>() {
+			@Override
+			public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+
+				int result;
+
+				switch (sortBy_forCompare) {
+
+					case PARTY_SORT_BALANCE:
+						result = Double.compare((Double) a.get("balance"), (Double) b.get("balance"));
+						break;
+
+					case PARTY_SORT_NAME:
+						result = ((String) a.get("name")).compareToIgnoreCase((String) b.get("name"));
+						break;
+
+					case PARTY_SORT_LATEST_TXN:
+					default:
+						int daysA = (Integer) a.get("days_since");
+						int daysB = (Integer) b.get("days_since");
+						int effA = daysA == -1 ? Integer.MAX_VALUE : daysA;
+						int effB = daysB == -1 ? Integer.MAX_VALUE : daysB;
+						result = Integer.compare(effA, effB);
+						break;
+				}
+
+				return ascending_forCompare ? result : -result;
+			}
+		});
+
+		return list;
+	}
+
+	private int daysBetweenDates(String fromIso, String toIso) {
+
+		try {
+
+			SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+
+			long diffMillis = format.parse(toIso).getTime() - format.parse(fromIso).getTime();
+
+			return (int) (diffMillis / (24L * 60 * 60 * 1000));
+
+		} catch (Exception e) {
+			return -1;
+		}
+	}
+
 	// =====================
 // GET PARTY BY ID
 // =====================

@@ -14,6 +14,7 @@ public class Reportsactivity extends Activity {
 	Button btn_report_party_ranking;
 	Button btn_report_net_profit;
 	Button btn_report_stock_worth;
+	Button btn_report_party_balances;
 	Button btn_report_item_monthly_rank;
 	Button btn_report_average_cart;
 	Button btn_report_profit_split;
@@ -31,6 +32,7 @@ public class Reportsactivity extends Activity {
 		btn_report_party_ranking = findViewById(R.id.btn_report_party_ranking);
 		btn_report_net_profit = findViewById(R.id.btn_report_net_profit);
 		btn_report_stock_worth = findViewById(R.id.btn_report_stock_worth);
+		btn_report_party_balances = findViewById(R.id.btn_report_party_balances);
 		btn_report_item_monthly_rank = findViewById(R.id.btn_report_item_monthly_rank);
 		btn_report_average_cart = findViewById(R.id.btn_report_average_cart);
 		btn_report_profit_split = findViewById(R.id.btn_report_profit_split);
@@ -107,6 +109,19 @@ public class Reportsactivity extends Activity {
 					Intent intent = new Intent(
 						Reportsactivity.this,
 						StockWorthReportActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_report_party_balances.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						Reportsactivity.this,
+						PartyBalanceReportActivity.class
 					);
 
 					startActivity(intent);

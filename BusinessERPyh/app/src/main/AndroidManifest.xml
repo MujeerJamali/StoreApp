@@ -196,6 +196,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".PartyBalanceReportActivity"
+            android:label="Party Balances"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".StockWorthReportActivity"
             android:label="Stock Worth"
             android:configChanges="orientation|screenSize|keyboardHidden" />

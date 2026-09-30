@@ -51,11 +51,36 @@ public class PartyAdapter extends BaseAdapter implements Filterable {
         }
 
         TextView tv = convertView.findViewById(R.id.tv_party_name);
+        TextView tvMeta = convertView.findViewById(R.id.tv_party_meta);
         TextView tvBalance = convertView.findViewById(R.id.tv_party_balance);
 
         HashMap<String, Object> party = filteredList.get(position);
 
         tv.setText((String) party.get("name"));
+
+        // Only present when this list came from
+        // DatabaseHelper.getPartiesWithActivity() (the sorted view) -
+        // the plain getParties() list has no last_date/days_since, so
+        // the meta line just stays hidden for that case.
+        if (party.containsKey("days_since")) {
+
+            int daysSince = party.get("days_since") == null ? -1 : (Integer) party.get("days_since");
+
+            String meta = daysSince < 0 ?
+                "No activity yet" :
+                daysSince == 0 ?
+                    "Last activity today" :
+                    daysSince == 1 ?
+                        "Last activity yesterday" :
+                        "Last activity " + daysSince + "d ago";
+
+            tvMeta.setText(meta);
+            tvMeta.setVisibility(View.VISIBLE);
+
+        } else {
+
+            tvMeta.setVisibility(View.GONE);
+        }
 
         double balance = 0;
 

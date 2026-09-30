@@ -25,6 +25,13 @@ import java.util.HashMap;
 
     Button btn_add_party;
 
+    Button btn_party_sort_recent;
+    Button btn_party_sort_oldest;
+    Button btn_party_sort_balance_high;
+    Button btn_party_sort_balance_low;
+    Button btn_party_sort_name_asc;
+    Button btn_party_sort_name_desc;
+
     ListView lv_parties;
 
     DatabaseHelper db;
@@ -32,6 +39,9 @@ import java.util.HashMap;
     ArrayList<HashMap<String, Object>> partyList;
 
 		PartyAdapter adapter;
+
+		private int selectedPartySort = DatabaseHelper.PARTY_SORT_LATEST_TXN;
+		private boolean selectedPartySortAscending = false;
 
 		@Override
 		protected void onCreate(Bundle savedInstanceState) {
@@ -43,11 +53,60 @@ import java.util.HashMap;
 
         btn_add_party = findViewById(R.id.btn_add_party);
 
+        btn_party_sort_recent = findViewById(R.id.btn_party_sort_recent);
+        btn_party_sort_oldest = findViewById(R.id.btn_party_sort_oldest);
+        btn_party_sort_balance_high = findViewById(R.id.btn_party_sort_balance_high);
+        btn_party_sort_balance_low = findViewById(R.id.btn_party_sort_balance_low);
+        btn_party_sort_name_asc = findViewById(R.id.btn_party_sort_name_asc);
+        btn_party_sort_name_desc = findViewById(R.id.btn_party_sort_name_desc);
+
         lv_parties = findViewById(R.id.lv_parties);
 
 				lv_parties.setEmptyView(tv_no_parties);
 
 				db = new DatabaseHelper(this);
+
+				btn_party_sort_recent.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						selectPartySort(DatabaseHelper.PARTY_SORT_LATEST_TXN, false);
+					}
+				});
+
+				btn_party_sort_oldest.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						selectPartySort(DatabaseHelper.PARTY_SORT_LATEST_TXN, true);
+					}
+				});
+
+				btn_party_sort_balance_high.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						selectPartySort(DatabaseHelper.PARTY_SORT_BALANCE, false);
+					}
+				});
+
+				btn_party_sort_balance_low.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						selectPartySort(DatabaseHelper.PARTY_SORT_BALANCE, true);
+					}
+				});
+
+				btn_party_sort_name_asc.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						selectPartySort(DatabaseHelper.PARTY_SORT_NAME, true);
+					}
+				});
+
+				btn_party_sort_name_desc.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						selectPartySort(DatabaseHelper.PARTY_SORT_NAME, false);
+					}
+				});
 
 				loadParties();
 
@@ -108,9 +167,47 @@ Partiesactivity.this,
         loadParties();
     }
 
+    private void selectPartySort(int sort, boolean ascending) {
+
+        selectedPartySort = sort;
+        selectedPartySortAscending = ascending;
+
+        Button[] buttons = {
+            btn_party_sort_recent, btn_party_sort_oldest,
+            btn_party_sort_balance_high, btn_party_sort_balance_low,
+            btn_party_sort_name_asc, btn_party_sort_name_desc
+        };
+
+        int[] sorts = {
+            DatabaseHelper.PARTY_SORT_LATEST_TXN, DatabaseHelper.PARTY_SORT_LATEST_TXN,
+            DatabaseHelper.PARTY_SORT_BALANCE, DatabaseHelper.PARTY_SORT_BALANCE,
+            DatabaseHelper.PARTY_SORT_NAME, DatabaseHelper.PARTY_SORT_NAME
+        };
+
+        boolean[] ascendings = {false, true, false, true, true, false};
+
+        for (int i = 0; i < buttons.length; i++) {
+
+            if (sorts[i] == sort && ascendings[i] == ascending) {
+
+                buttons[i].setBackgroundResource(R.drawable.bg_button_primary);
+                buttons[i].setTextColor(getResources().getColor(R.color.text_on_primary));
+
+            } else {
+
+                buttons[i].setBackgroundResource(R.drawable.bg_button_outline);
+                buttons[i].setTextColor(getResources().getColor(R.color.primary));
+            }
+        }
+
+        loadParties();
+    }
+
     private void loadParties() {
 
-        partyList = db.getParties();
+        partyList = db.getPartiesWithActivity(
+            selectedPartySort, selectedPartySortAscending, DatabaseHelper.PARTY_BALANCE_FILTER_ALL
+        );
 
         adapter = new PartyAdapter(
                 this,
