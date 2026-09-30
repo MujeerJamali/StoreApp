@@ -1,0 +1,88 @@
+package com.mujeer.businesserp;
+
+import android.app.Activity;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
+import android.widget.TextView;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+
+// List adapter for NetProfitReportActivity's per-item breakdown - each
+// row is one item with at least one sale in the selected period,
+// showing its quantity sold, sales total, and profit (sales minus item
+// cost - see DatabaseHelper.getNetProfitByItem()).
+public class ItemProfitAdapter extends BaseAdapter {
+
+	private final Activity activity;
+	private final ArrayList<HashMap<String, Object>> list;
+
+	public ItemProfitAdapter(Activity activity, ArrayList<HashMap<String, Object>> list) {
+		this.activity = activity;
+		this.list = list;
+	}
+
+	@Override
+	public int getCount() {
+		return list.size();
+	}
+
+	@Override
+	public Object getItem(int position) {
+		return list.get(position);
+	}
+
+	@Override
+	public long getItemId(int position) {
+		return position;
+	}
+
+	@Override
+	public View getView(int position, View convertView, ViewGroup parent) {
+
+		if (convertView == null) {
+
+			convertView = LayoutInflater.from(activity).inflate(
+				R.layout.item_profit_row, parent, false
+			);
+		}
+
+		TextView tv_name = convertView.findViewById(R.id.tv_item_profit_name);
+		TextView tv_meta = convertView.findViewById(R.id.tv_item_profit_meta);
+		TextView tv_amount = convertView.findViewById(R.id.tv_item_profit_amount);
+
+		HashMap<String, Object> row = list.get(position);
+
+		String name = row.get("item_name") == null ? "" : row.get("item_name").toString();
+		String code = row.get("item_code") == null ? "" : row.get("item_code").toString();
+
+		double qty = toDouble(row.get("qty"));
+		double salesAmount = toDouble(row.get("sales_amount"));
+		double profit = toDouble(row.get("profit"));
+
+		tv_name.setText(name);
+
+		tv_meta.setText(
+			code + " · Qty " + AmountFormat.format(qty) + " · Sales " + AmountFormat.format(salesAmount)
+		);
+
+		tv_amount.setText(AmountFormat.format(profit));
+
+		tv_amount.setTextColor(
+			activity.getResources().getColor(profit >= 0 ? R.color.success : R.color.danger)
+		);
+
+		return convertView;
+	}
+
+	private double toDouble(Object value) {
+
+		if (value == null) {
+			return 0;
+		}
+
+		return Double.parseDouble(value.toString());
+	}
+}

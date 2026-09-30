@@ -120,9 +120,11 @@ re-blend it.
 
 ## Reports
 
-Total Sales · Sales by Party · Item Ranking · Party Ranking · Net Profit ·
-Stock Worth · Item Monthly Rank (penalizes months an item didn't sell) ·
-Average Cart Size/Amount · Profit: Cash Sale vs Party
+Total Sales · Sales by Party · Item Ranking · Party Ranking · Net Profit
+(with a per-item profit/loss breakdown, sortable high-to-low or
+low-to-high, for every item with a sale in the period) · Stock Worth ·
+Item Monthly Rank (penalizes months an item didn't sell) · Average Cart
+Size/Amount · Profit: Cash Sale vs Party
 
 All period-based reports share the same range selector: Today, Yesterday,
 Week, Month, Quarter, Year, Custom Range.

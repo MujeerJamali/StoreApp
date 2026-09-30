@@ -6,9 +6,11 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ListView;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Locale;
@@ -51,9 +53,20 @@ public class NetProfitReportActivity extends Activity {
 	private TextView tv_expenses_total;
 	private TextView tv_net_profit;
 
+	private Button btn_item_sort_profit_desc;
+	private Button btn_item_sort_profit_asc;
+	private TextView tv_item_profit_empty;
+	private ListView lv_item_profit;
+
+	private final ArrayList<HashMap<String, Object>> itemProfitList =
+		new ArrayList<HashMap<String, Object>>();
+
+	private ItemProfitAdapter itemProfitAdapter;
+
 	private DatabaseHelper db;
 
 	private int selectedRange = RANGE_TODAY;
+	private boolean itemSortAscending = false;
 
 	// Bumped on every loadReport() call; a background result is only
 	// applied if it's still the most recent request by the time it
@@ -89,6 +102,28 @@ public class NetProfitReportActivity extends Activity {
 		tv_item_cost = findViewById(R.id.tv_item_cost);
 		tv_expenses_total = findViewById(R.id.tv_expenses_total);
 		tv_net_profit = findViewById(R.id.tv_net_profit);
+
+		btn_item_sort_profit_desc = findViewById(R.id.btn_item_sort_profit_desc);
+		btn_item_sort_profit_asc = findViewById(R.id.btn_item_sort_profit_asc);
+		tv_item_profit_empty = findViewById(R.id.tv_item_profit_empty);
+		lv_item_profit = findViewById(R.id.lv_item_profit);
+
+		itemProfitAdapter = new ItemProfitAdapter(this, itemProfitList);
+		lv_item_profit.setAdapter(itemProfitAdapter);
+
+		btn_item_sort_profit_desc.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					selectItemSort(false);
+				}
+			});
+
+		btn_item_sort_profit_asc.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					selectItemSort(true);
+				}
+			});
 
 		db = new DatabaseHelper(this);
 
@@ -301,10 +336,33 @@ public class NetProfitReportActivity extends Activity {
 		};
 	}
 
+	private void selectItemSort(boolean ascending) {
+
+		itemSortAscending = ascending;
+
+		if (ascending) {
+
+			btn_item_sort_profit_asc.setBackgroundResource(R.drawable.bg_button_primary);
+			btn_item_sort_profit_asc.setTextColor(getResources().getColor(R.color.text_on_primary));
+			btn_item_sort_profit_desc.setBackgroundResource(R.drawable.bg_button_outline);
+			btn_item_sort_profit_desc.setTextColor(getResources().getColor(R.color.primary));
+
+		} else {
+
+			btn_item_sort_profit_desc.setBackgroundResource(R.drawable.bg_button_primary);
+			btn_item_sort_profit_desc.setTextColor(getResources().getColor(R.color.text_on_primary));
+			btn_item_sort_profit_asc.setBackgroundResource(R.drawable.bg_button_outline);
+			btn_item_sort_profit_asc.setTextColor(getResources().getColor(R.color.primary));
+		}
+
+		loadReport();
+	}
+
 	private void loadReport() {
 
 		final String[] range = computeRange(selectedRange);
 		final int range_forLabel = selectedRange;
+		final boolean ascending_forQuery = itemSortAscending;
 		final long myGeneration = ++loadGeneration;
 
 		new Thread(new Runnable() {
@@ -313,6 +371,9 @@ public class NetProfitReportActivity extends Activity {
 
 					final HashMap<String, Object> summary =
 						db.getNetProfitSummary(range[0], range[1]);
+
+					final ArrayList<HashMap<String, Object>> byItem =
+						db.getNetProfitByItem(range[0], range[1], ascending_forQuery);
 
 					runOnUiThread(new Runnable() {
 							@Override
@@ -323,10 +384,73 @@ public class NetProfitReportActivity extends Activity {
 								}
 
 								applyReport(summary, range, range_forLabel);
+								applyItemProfitList(byItem);
 							}
 						});
 				}
 			}).start();
+	}
+
+	private void applyItemProfitList(ArrayList<HashMap<String, Object>> byItem) {
+
+		itemProfitList.clear();
+		itemProfitList.addAll(byItem);
+
+		itemProfitAdapter.notifyDataSetChanged();
+
+		if (itemProfitList.isEmpty()) {
+
+			tv_item_profit_empty.setVisibility(View.VISIBLE);
+			lv_item_profit.setVisibility(View.GONE);
+
+		} else {
+
+			tv_item_profit_empty.setVisibility(View.GONE);
+			lv_item_profit.setVisibility(View.VISIBLE);
+
+			setListViewHeightBasedOnChildren(lv_item_profit);
+		}
+	}
+
+	// A ListView inside a ScrollView doesn't scroll on its own, so it
+	// needs to be sized to wrap all of its rows (measured at the list's
+	// real width) instead of clipping - same fix used in
+	// Itemrankingreportactivity, Partysalesreportactivity, etc.
+	private void setListViewHeightBasedOnChildren(ListView listView) {
+
+		android.widget.ListAdapter listAdapter = listView.getAdapter();
+
+		if (listAdapter == null || listAdapter.getCount() == 0) {
+			return;
+		}
+
+		int listViewWidth = listView.getWidth();
+
+		if (listViewWidth <= 0) {
+
+			android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
+			int paddingPx = (int) (32 * metrics.density);
+			listViewWidth = metrics.widthPixels - paddingPx;
+		}
+
+		int widthSpec = View.MeasureSpec.makeMeasureSpec(listViewWidth, View.MeasureSpec.EXACTLY);
+		int heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+
+		int totalHeight = 0;
+
+		for (int i = 0; i < listAdapter.getCount(); i++) {
+
+			View listItem = listAdapter.getView(i, null, listView);
+			listItem.measure(widthSpec, heightSpec);
+			totalHeight += listItem.getMeasuredHeight();
+		}
+
+		android.view.ViewGroup.LayoutParams params = listView.getLayoutParams();
+
+		params.height = totalHeight + (listView.getDividerHeight() * (listAdapter.getCount() - 1));
+
+		listView.setLayoutParams(params);
+		listView.requestLayout();
 	}
 
 	private void applyReport(

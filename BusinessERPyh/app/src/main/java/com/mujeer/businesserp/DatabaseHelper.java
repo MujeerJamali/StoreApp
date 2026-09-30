@@ -4076,6 +4076,61 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// REPORT: NET PROFIT BY ITEM - the same Net Profit period, broken
+	// down per item (only items with at least one sale in the period -
+	// the INNER JOINs below drop everything else on their own). Same
+	// cost-basis simplification as getNetProfitSummary() (current
+	// purchase_price + extra_cost_per_unit, not a historical snapshot),
+	// and the same "expenses aren't attributable to one item" reasoning
+	// - this is sales minus item cost only, with no expense share
+	// subtracted per item.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getNetProfitByItem(
+		String fromDate, String toDate, boolean ascending) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		boolean allTime = fromDate == null || toDate == null;
+
+		String[] args = allTime ? null : new String[]{fromDate, toDate};
+
+		String sql =
+			"SELECT i.id, i.code, i.name, SUM(si.qty) AS qty, " +
+			"SUM(si.amount) AS sales_amount, " +
+			"SUM(si.qty * (i.purchase_price + i.extra_cost_per_unit)) AS item_cost, " +
+			"SUM(si.amount) - SUM(si.qty * (i.purchase_price + i.extra_cost_per_unit)) AS profit " +
+			"FROM sale_items si " +
+			"INNER JOIN sales s ON s.id = si.sale_id " +
+			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = si.item_id " +
+			(allTime ? "" : "WHERE s.date BETWEEN ? AND ? ") +
+			"GROUP BY i.id " +
+			"ORDER BY profit " + (ascending ? "ASC" : "DESC");
+
+		Cursor cursor = db.rawQuery(sql, args);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<>();
+
+			row.put("item_id", cursor.getInt(0));
+			row.put("item_code", cursor.getString(1));
+			row.put("item_name", cursor.getString(2));
+			row.put("qty", cursor.getDouble(3));
+			row.put("sales_amount", cursor.getDouble(4));
+			row.put("item_cost", cursor.getDouble(5));
+			row.put("profit", cursor.getDouble(6));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// =====================
 	// REPORT: STOCK WORTH - current stock quantity times purchase_price,
 	// split into shoes/non-shoes by the same name-prefix rule as
 	// everywhere else. This is always a snapshot of right now: the app
