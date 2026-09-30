@@ -1,20 +1,27 @@
 package com.mujeer.businesserp;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
 
 public class Expensesactivity extends Activity {
 
@@ -25,6 +32,9 @@ public class Expensesactivity extends Activity {
 	private Button btn_filter;
 
 	private ListView lv_expenses;
+
+	private LinearLayout row_top_expenses_1;
+	private LinearLayout row_top_expenses_2;
 
 	private DatabaseHelper db;
 
@@ -47,7 +57,9 @@ public class Expensesactivity extends Activity {
 		btn_filter = findViewById(R.id.btn_filter);
 
 		lv_expenses = findViewById(R.id.lv_expenses);
-		
+
+		row_top_expenses_1 = findViewById(R.id.row_top_expenses_1);
+		row_top_expenses_2 = findViewById(R.id.row_top_expenses_2);
 
 		db = new DatabaseHelper(this);
 
@@ -236,6 +248,7 @@ public class Expensesactivity extends Activity {
 		super.onResume();
 
 		loadExpenses();
+		loadTopExpenseBoxes();
 	}
 
 	private void loadExpenses() {
@@ -258,5 +271,89 @@ public class Expensesactivity extends Activity {
 		adapter.filter(
 			et_search.getText().toString()
 		);
+	}
+
+	// =====================
+	// Six quick-add boxes for the most frequently logged expense items -
+	// tapping one confirms via a dialog, then adds a new Expense dated
+	// today with that item's own last-used amount, fully paid, no
+	// navigation to the full editor. Boxes are rebuilt every onResume()
+	// so a newly-added expense can reshuffle the ranking.
+	// =====================
+	private void loadTopExpenseBoxes() {
+
+		row_top_expenses_1.removeAllViews();
+		row_top_expenses_2.removeAllViews();
+
+		ArrayList<HashMap<String, Object>> topItems = db.getTopExpenseItems(6);
+
+		LayoutInflater inflater = LayoutInflater.from(this);
+
+		for (int i = 0; i < topItems.size(); i++) {
+
+			final HashMap<String, Object> entry = topItems.get(i);
+			final String item = String.valueOf(entry.get("item"));
+			final double amount = (Double) entry.get("amount");
+
+			LinearLayout targetRow = i < 3 ? row_top_expenses_1 : row_top_expenses_2;
+
+			View box = inflater.inflate(R.layout.top_expense_box, targetRow, false);
+
+			TextView label = box.findViewById(R.id.tv_top_expense_label);
+			label.setText(item + " - " + AmountFormat.format(amount));
+
+			box.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						confirmAddTopExpense(item, amount);
+					}
+				});
+
+			targetRow.addView(box);
+		}
+	}
+
+	private void confirmAddTopExpense(final String item, final double amount) {
+
+		new AlertDialog.Builder(this)
+			.setTitle("Add Expense")
+			.setMessage(item + " - " + AmountFormat.format(amount) + "?")
+			.setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+
+						if (amount > db.getCashBalance()) {
+
+							Toast.makeText(
+								Expensesactivity.this,
+								"This would take cash balance below 0 - reduce the amount or add cash first",
+								Toast.LENGTH_LONG
+							).show();
+
+							return;
+						}
+
+						String today = new SimpleDateFormat(
+							"yyyy-MM-dd", Locale.getDefault()
+						).format(new Date());
+
+						String now = new SimpleDateFormat(
+							"HH:mm", Locale.getDefault()
+						).format(new Date());
+
+						int cashExpensePartyId = (int) db.getOrCreatePartyId("Cash Expenses");
+
+						db.insertExpense(item, today, now, amount, amount, null, cashExpensePartyId);
+
+						Toast.makeText(
+							Expensesactivity.this, "Expense added", Toast.LENGTH_SHORT
+						).show();
+
+						loadExpenses();
+						loadTopExpenseBoxes();
+					}
+				})
+			.setNegativeButton("Cancel", null)
+			.show();
 	}
 }

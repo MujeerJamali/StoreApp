@@ -20,7 +20,14 @@
             android:orientation="vertical"
             android:padding="18dp">
 
-            <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Item Name" />
+            <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Item Code" />
+            <EditText
+                android:id="@+id/et_item_code"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="text|textNoSuggestions|textCapCharacters" />
+
+            <TextView style="@style/FieldLabel" android:text="Item Name" />
             <EditText
                 android:id="@+id/et_item_name"
                 android:layout_width="match_parent"

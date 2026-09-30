@@ -48,6 +48,7 @@ public class MonthlyRankAdapter extends BaseAdapter {
 		TextView tvNumber = convertView.findViewById(R.id.tv_rank_number);
 		TextView tvName = convertView.findViewById(R.id.tv_rank_name);
 		TextView tvMonths = convertView.findViewById(R.id.tv_rank_months);
+		TextView tvFigures = convertView.findViewById(R.id.tv_rank_figures);
 		TextView tvSum = convertView.findViewById(R.id.tv_rank_sum);
 
 		tvNumber.setText(String.valueOf(position + 1));
@@ -57,6 +58,13 @@ public class MonthlyRankAdapter extends BaseAdapter {
 
 		tvMonths.setText(
 			"Ranked in " + monthsCounted + (monthsCounted == 1 ? " month" : " months")
+		);
+
+		double totalSales = row.get("total_sales") == null ? 0.0 : (Double) row.get("total_sales");
+		double totalProfit = row.get("total_profit") == null ? 0.0 : (Double) row.get("total_profit");
+
+		tvFigures.setText(
+			"Sale " + AmountFormat.format(totalSales) + " - Profit " + AmountFormat.format(totalProfit)
 		);
 
 		tvSum.setText(String.valueOf(row.get("rank_sum")));

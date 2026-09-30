@@ -10,6 +10,7 @@ import android.widget.Toast;
 
 public class Additemactivity extends Activity {
 
+    EditText et_item_code;
     EditText et_item_name;
     EditText et_purchase_price;
     EditText et_sale_price;
@@ -23,6 +24,7 @@ public class Additemactivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.additemactivityv);
 
+        et_item_code = findViewById(R.id.et_item_code);
         et_item_name = findViewById(R.id.et_item_name);
         et_purchase_price = findViewById(R.id.et_purchase_price);
         et_sale_price = findViewById(R.id.et_sale_price);
@@ -30,6 +32,10 @@ public class Additemactivity extends Activity {
         btn_save_item = findViewById(R.id.btn_save_item);
 
         db = new DatabaseHelper(this);
+
+        // Pre-filled with what would be auto-assigned if left alone -
+        // the user can still type a different one before saving.
+        et_item_code.setText(db.peekNextItemCode());
 
         // Lets a caller (e.g. the item picker in Transactioneditactivity)
         // pre-fill the name when the user typed something that didn't
@@ -46,11 +52,12 @@ public class Additemactivity extends Activity {
 				@Override
 				public void onClick(View v) {
 
+					String code = et_item_code.getText().toString().trim();
 					String name = et_item_name.getText().toString().trim();
 					String purchase = et_purchase_price.getText().toString().trim();
 					String sale = et_sale_price.getText().toString().trim();
 
-					if (name.isEmpty() || purchase.isEmpty() || sale.isEmpty()) {
+					if (code.isEmpty() || name.isEmpty() || purchase.isEmpty() || sale.isEmpty()) {
 
 						Toast.makeText(
                             Additemactivity.this,
@@ -61,13 +68,26 @@ public class Additemactivity extends Activity {
 						return;
 					}
 
+					if (db.isItemCodeTaken(code)) {
+
+						Toast.makeText(
+                            Additemactivity.this,
+                            "That item code is already in use",
+                            Toast.LENGTH_SHORT
+						).show();
+
+						return;
+					}
+
 					double purchasePrice = Double.parseDouble(purchase);
 					double salePrice = Double.parseDouble(sale);
 
 					long result = db.insertItem(
+                        code,
                         name,
                         purchasePrice,
-                        salePrice
+                        salePrice,
+                        0
 					);
 
 					if (result != -1) {

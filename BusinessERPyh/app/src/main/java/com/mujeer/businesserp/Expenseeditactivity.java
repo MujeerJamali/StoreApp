@@ -125,6 +125,17 @@ public class Expenseeditactivity extends Activity {
 
 						et_item.setText("", false);
 						openAddCostItem();
+						return;
+					}
+
+					// Pre-fill Amount with whatever this exact item was
+					// last recorded for - a plain convenience, the user
+					// can still change it before saving.
+					Double lastAmount =
+						db.getLastExpenseAmountForItem(et_item.getText().toString().trim());
+
+					if (lastAmount != null) {
+						et_amount.setText(AmountFormat.formatPlain(lastAmount));
 					}
 				}
 			});

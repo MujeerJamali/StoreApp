@@ -50,7 +50,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // party_id, unchanged) - only its landed-cost share is new, and it
     // drops out of the plain Expenses list/totals so it isn't double
     // counted.
-    public static final int DATABASE_VERSION = 19;
+    // Bumped 19 -> 20 to add: items.active (a simple label filterable
+    // everywhere an item list/picker appears app-wide, not a behavior
+    // change on its own), and two brand-new tables, display_shoes/
+    // sample_shoes (one physical shoe each - Display=right, Sample=left
+    // - placed as a reference overlay that never reserves/removes
+    // stock; see Transactioneditactivity's sale-save flow for how a
+    // matching sale offers to remove a row).
+    public static final int DATABASE_VERSION = 20;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -151,6 +158,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// plain-expense totals (see their own comments).
 	public static final String TABLE_PURCHASE_EXPENSE_LINKS = "purchase_expense_links";
 
+	// One physical shoe (not a pair) placed on the shop's physical
+	// display or kept as a sample - Display = right shoe, Sample = left
+	// shoe. Multiple rows can share the same item_id+combo_id (you can
+	// have more than one physical unit of the same model+size out at
+	// once) - they're interchangeable, so nothing here tracks which
+	// specific row corresponds to which physical unit beyond that.
+	// Placing a shoe here does NOT reserve/remove it from sellable stock
+	// - it's a reference overlay only; see Transactioneditactivity's
+	// sale-save flow for how a matching sale removes a row here.
+	// Display additionally carries a free-form grid position (row_pos/
+	// col_pos) the user arranges manually, mirroring their physical
+	// shelf layout - Sample has no such position, it's a plain list.
+	public static final String TABLE_DISPLAY_SHOES = "display_shoes";
+	public static final String TABLE_SAMPLE_SHOES = "sample_shoes";
+
 	public static final int RECURRING_DAILY = 1;
 	public static final int RECURRING_WEEKLY = 2;
 	public static final int RECURRING_MONTHLY = 3;
@@ -188,7 +210,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"purchase_price REAL NOT NULL DEFAULT 0, " +
 			"sale_price REAL NOT NULL DEFAULT 0, " +
 			"balance REAL NOT NULL DEFAULT 0, " +
-			"extra_cost_per_unit REAL NOT NULL DEFAULT 0" +
+			"extra_cost_per_unit REAL NOT NULL DEFAULT 0, " +
+			"active INTEGER NOT NULL DEFAULT 1" +
 			");"
 		);
 
@@ -413,6 +436,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			")"
 		);
 
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_DISPLAY_SHOES + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"item_id INTEGER NOT NULL, " +
+			"combo_id INTEGER NOT NULL, " +
+			"row_pos INTEGER NOT NULL, " +
+			"col_pos INTEGER NOT NULL" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_SAMPLE_SHOES + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"item_id INTEGER NOT NULL, " +
+			"combo_id INTEGER NOT NULL" +
+			")"
+		);
 
     }
 	@Override
@@ -453,6 +493,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		}
 
 		addColumnIfMissing(db, TABLE_ITEMS, "extra_cost_per_unit", "REAL NOT NULL DEFAULT 0");
+		addColumnIfMissing(db, TABLE_ITEMS, "active", "INTEGER NOT NULL DEFAULT 1");
 		addColumnIfMissing(db, TABLE_PURCHASES, "other_charges", "REAL NOT NULL DEFAULT 0");
 		addColumnIfMissing(db, TABLE_PURCHASES, "other_charges_to_party", "INTEGER NOT NULL DEFAULT 1");
 
@@ -781,11 +822,28 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 						   double salePrice,
 						   double balance) {
 
+		return insertItem(null, name, purchasePrice, salePrice, balance);
+	}
+
+	// code is the auto-assigned value the Add Item screen pre-fills and
+	// the user can now override (see isItemCodeUsedBulk-style check
+	// below) - null or blank falls back to the same auto-generated code
+	// as before, for every other caller that never had a code to pass.
+	public long insertItem(String code,
+						   String name,
+						   double purchasePrice,
+						   double salePrice,
+						   double balance) {
+
 		SQLiteDatabase db = this.getWritableDatabase();
+
+		String finalCode = (code == null || code.trim().length() == 0)
+			? generateNextItemCode()
+			: code.trim();
 
 		ContentValues values = new ContentValues();
 
-		values.put("code", generateNextItemCode());
+		values.put("code", finalCode);
 		values.put("name", name);
 		values.put("purchase_price", purchasePrice);
 		values.put("sale_price", salePrice);
@@ -795,6 +853,33 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 
 		return id;
+	}
+
+	// Lets the Add Item screen show (and the user edit) the code that
+	// would be auto-assigned, before actually saving - a plain preview,
+	// same value insertItem() would fall back to if left unchanged.
+	public String peekNextItemCode() {
+		return generateNextItemCode();
+	}
+
+	public boolean isItemCodeTaken(String code) {
+
+		if (code == null || code.trim().length() == 0) {
+			return false;
+		}
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT 1 FROM " + TABLE_ITEMS + " WHERE code=? LIMIT 1",
+			new String[]{code.trim()}
+		);
+
+		boolean taken = cursor.moveToFirst();
+
+		cursor.close();
+
+		return taken;
 	}
 
 // =====================
@@ -3394,11 +3479,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 	// =====================
 	// REPORT: AVERAGE CART SIZE/AMOUNT FOR A DATE RANGE
-	// "Cart size" is the total quantity of items on a sale (not the
-	// number of distinct products), averaged across every sale in
-	// range - a sale with no line items (an edge case, not a normal
-	// one) counts as size 0 rather than being left out, so it still
-	// pulls the average down like it should.
+	// "Cart size" is the count of DISTINCT items on a sale (not total
+	// quantity) - 2 units of item B716 plus 3 units of item B719 is a
+	// cart size of 2, and 2+3 units of the SAME item across two size/
+	// combo lines is still 1. COUNT(DISTINCT si.item_id) already reads
+	// 0 for a sale with no line items (COUNT DISTINCT ignores the NULL
+	// a LEFT JOIN with no matches produces), so that edge case still
+	// pulls the average down like it should with no extra handling.
 	// =====================
 	public HashMap<String, Object> getCartStatsSummary(String fromDate, String toDate) {
 
@@ -3407,9 +3494,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		SQLiteDatabase db = this.getReadableDatabase();
 
 		Cursor cursor = db.rawQuery(
-			"SELECT COUNT(*), COALESCE(AVG(item_qty), 0), COALESCE(AVG(grand_total), 0) " +
+			"SELECT COUNT(*), COALESCE(AVG(item_count), 0), COALESCE(AVG(grand_total), 0) " +
 			"FROM (" +
-			"SELECT s.id, s.grand_total, COALESCE(SUM(si.qty), 0) AS item_qty " +
+			"SELECT s.id, s.grand_total, COUNT(DISTINCT si.item_id) AS item_count " +
 			"FROM sales s LEFT JOIN sale_items si ON si.sale_id = s.id " +
 			"WHERE s.date BETWEEN ? AND ? " +
 			"GROUP BY s.id" +
@@ -4058,6 +4145,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		java.util.LinkedHashMap<String, ArrayList<Object[]>> byMonth =
 			new java.util.LinkedHashMap<String, ArrayList<Object[]>>();
 
+		// Summed across the WHOLE range (not per-month like the rank
+		// calculation below needs) - the list row's own profit/sale
+		// figures, independent of which metric is being ranked by.
+		HashMap<Integer, Double> totalSalesById = new HashMap<Integer, Double>();
+		HashMap<Integer, Double> totalProfitById = new HashMap<Integer, Double>();
+
 		while (cursor.moveToNext()) {
 
 			int itemId = cursor.getInt(0);
@@ -4076,6 +4169,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			}
 
 			monthRows.add(new Object[]{itemId, itemName, value});
+
+			totalSalesById.put(
+				itemId, (totalSalesById.containsKey(itemId) ? totalSalesById.get(itemId) : 0) + salesTotal);
+			totalProfitById.put(
+				itemId,
+				(totalProfitById.containsKey(itemId) ? totalProfitById.get(itemId) : 0)
+					+ (salesTotal - costTotal));
 		}
 
 		cursor.close();
@@ -4162,6 +4262,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			row.put("item_name", nameById.get(itemId));
 			row.put("rank_sum", rankSumById.get(itemId));
 			row.put("months_counted", monthsCountedById.get(itemId));
+			row.put("total_sales", totalSalesById.containsKey(itemId) ? totalSalesById.get(itemId) : 0.0);
+			row.put("total_profit", totalProfitById.containsKey(itemId) ? totalProfitById.get(itemId) : 0.0);
 
 			result.add(row);
 		}
@@ -5221,6 +5323,73 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 
 		return id;
+	}
+
+// =====================
+// LAST EXPENSE AMOUNT FOR AN ITEM
+// =====================
+
+	// The N most frequently logged expense items (by how many times
+	// each distinct item text has been used, not by total amount spent)
+	// - each paired with its own most recent amount, for the Expenses
+	// screen's quick-add boxes.
+	public ArrayList<HashMap<String, Object>> getTopExpenseItems(int limit) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT item, COUNT(*) AS uses FROM " + TABLE_EXPENSES +
+			" GROUP BY item ORDER BY uses DESC, item ASC LIMIT ?",
+			new String[]{String.valueOf(limit)}
+		);
+
+		while (cursor.moveToNext()) {
+
+			String item = cursor.getString(0);
+			Double amount = getLastExpenseAmountForItem(item);
+
+			HashMap<String, Object> row = new HashMap<>();
+			row.put("item", item);
+			row.put("amount", amount == null ? 0.0 : amount);
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// Most recent amount an Expense with this exact item text was
+	// recorded for - used to pre-fill the Amount field the moment that
+	// item is picked from the dropdown (Expenseeditactivity), and to
+	// label the Expenses screen's "top items" quick-add boxes. Null when
+	// this item has never been used before.
+	public Double getLastExpenseAmountForItem(String item) {
+
+		if (item == null || item.trim().length() == 0) {
+			return null;
+		}
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT amount FROM " + TABLE_EXPENSES +
+			" WHERE item=? ORDER BY date DESC, time DESC, id DESC LIMIT 1",
+			new String[]{item.trim()}
+		);
+
+		Double result = null;
+
+		if (cursor.moveToFirst()) {
+			result = cursor.getDouble(0);
+		}
+
+		cursor.close();
+
+		return result;
 	}
 
 // =====================
