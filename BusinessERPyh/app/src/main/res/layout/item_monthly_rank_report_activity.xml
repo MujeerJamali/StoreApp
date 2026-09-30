@@ -19,30 +19,41 @@
 
         <TextView style="@style/FieldLabel" android:text="Rank By" />
 
-        <LinearLayout
+        <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:orientation="horizontal">
+            android:scrollbars="none">
 
-            <Button
-                android:id="@+id/btn_metric_sales"
-                style="@style/AppButton.Small"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                android:text="Sales" />
+                android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/btn_metric_profit"
-                style="@style/AppButton.Outline.Small"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Profit" />
+                <Button
+                    android:id="@+id/btn_metric_sales"
+                    style="@style/AppButton.Small"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:minWidth="0dp"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:text="Sales" />
 
-        </LinearLayout>
+                <Button
+                    android:id="@+id/btn_metric_profit"
+                    style="@style/AppButton.Outline.Small"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:text="Profit" />
+
+            </LinearLayout>
+
+        </HorizontalScrollView>
 
         <TextView style="@style/FieldLabel" android:text="Period" />
 

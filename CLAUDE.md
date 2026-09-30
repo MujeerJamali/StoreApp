@@ -31,3 +31,11 @@
   instead of failing. This was missed for an entire session's worth of
   features before being caught and fixed in one pass - don't let it
   drift again and require another catch-up audit later.
+- Every filter/toggle button row (report filters, Show/Sort-by rows,
+  Excel-style multi-select filters, etc.) is a single horizontally-
+  scrollable line - `HorizontalScrollView` (`scrollbars="none"`)
+  wrapping one `wrap_content` horizontal `LinearLayout` of buttons -
+  never a fixed/weighted row that just fills the screen width. This is
+  a standing app-wide pattern: apply it to every new filter row, and
+  when touching an existing screen that still uses a fixed row, convert
+  it to match.
