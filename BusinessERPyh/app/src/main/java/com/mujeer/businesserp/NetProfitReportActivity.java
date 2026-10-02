@@ -2,6 +2,7 @@ package com.mujeer.businesserp;
 
 import android.app.Activity;
 import android.app.DatePickerDialog;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
@@ -115,6 +116,19 @@ public class NetProfitReportActivity extends Activity {
 
 		itemProfitAdapter = new ItemProfitAdapter(this, itemProfitList);
 		lv_item_profit.setAdapter(itemProfitAdapter);
+
+		lv_item_profit.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+				@Override
+				public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+					HashMap<String, Object> row = itemProfitList.get(position);
+
+					Intent intent = new Intent(NetProfitReportActivity.this, Itemviewactivity.class);
+					intent.putExtra("item_id", (Integer) row.get("item_id"));
+
+					startActivity(intent);
+				}
+			});
 
 		ArrayAdapter<String> itemSortAdapter = new ArrayAdapter<String>(
 			this, android.R.layout.simple_spinner_item,

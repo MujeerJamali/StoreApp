@@ -1,6 +1,7 @@
 package com.mujeer.businesserp;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
@@ -72,6 +73,19 @@ public class Partyrankingreportactivity extends Activity {
 
 		adapter = new RankingAdapter(this, rankingList, "party_name");
 		lv_ranking.setAdapter(adapter);
+
+		lv_ranking.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+				@Override
+				public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+					HashMap<String, Object> row = rankingList.get(position);
+
+					Intent intent = new Intent(Partyrankingreportactivity.this, Partyviewactivity.class);
+					intent.putExtra("party_id", (Integer) row.get("entity_id"));
+
+					startActivity(intent);
+				}
+			});
 
 		ArrayAdapter<String> sortAdapter = new ArrayAdapter<String>(
 			this, android.R.layout.simple_spinner_item, SORT_LABELS

@@ -2,6 +2,7 @@ package com.mujeer.businesserp;
 
 import android.app.Activity;
 import android.app.DatePickerDialog;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
@@ -92,6 +93,19 @@ public class Partysalesreportactivity extends Activity {
 
 		adapter = new PartySalesAdapter(this, partySalesList);
 		lv_party_sales.setAdapter(adapter);
+
+		lv_party_sales.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+				@Override
+				public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+					HashMap<String, Object> row = partySalesList.get(position);
+
+					Intent intent = new Intent(Partysalesreportactivity.this, Partyviewactivity.class);
+					intent.putExtra("party_id", (Integer) row.get("party_id"));
+
+					startActivity(intent);
+				}
+			});
 
 		String today = dateFormat.format(new java.util.Date());
 		et_custom_from.setText(today);

@@ -163,6 +163,11 @@ matching the filter shown first, bold, and (when a size is selected)
 used to sort items highest-stock-first; tapping an item opens it
 directly)
 
+Every report list row that represents an item or a party is tappable
+and opens that item's or party's own screen (Net Profit, Item Ranking,
+Party Ranking, Sales by Party, Item Monthly Rank, Party Balances,
+Combo/Variety Stock).
+
 The Parties list itself also sorts (Recent/Oldest Activity, Balance
 High-Low/Low-High, Name A-Z/Z-A) using the same underlying query as
 the Party Balances report.
