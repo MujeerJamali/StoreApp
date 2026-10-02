@@ -171,8 +171,9 @@ item with a sale in the period) · Stock Worth ·
 Party Balances (zero/non-zero balance filter, same 6-way sort as the
 Parties screen - Recent/Oldest Activity, Balance High-Low/Low-High,
 Name A-Z/Z-A) · Credit Due (every unpaid/partially-paid Sale whose
-Due Date falls in the selected period - Overdue/Today/Next 7 Days/
-This Month/All/Custom Range, default Today, forward-looking unlike
+Due Date falls in the selected period - Overdue/Today/Tomorrow/
+Next 3 Days/Next 7 Days/This Month/All/Custom Range, default Today,
+forward-looking unlike
 every other report's period selector since a due date is something
 still coming rather than something that already happened; tapping a
 row opens that sale) · Item

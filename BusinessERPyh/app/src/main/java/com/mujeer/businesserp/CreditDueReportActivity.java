@@ -39,16 +39,19 @@ public class CreditDueReportActivity extends Activity {
 	// WIDGET convention is unchanged, only its option semantics are.
 	private static final int RANGE_OVERDUE = 0;
 	private static final int RANGE_TODAY = 1;
-	private static final int RANGE_NEXT_7_DAYS = 2;
-	private static final int RANGE_THIS_MONTH = 3;
-	private static final int RANGE_ALL = 4;
-	private static final int RANGE_CUSTOM = 5;
+	private static final int RANGE_TOMORROW = 2;
+	private static final int RANGE_NEXT_3_DAYS = 3;
+	private static final int RANGE_NEXT_7_DAYS = 4;
+	private static final int RANGE_THIS_MONTH = 5;
+	private static final int RANGE_ALL = 6;
+	private static final int RANGE_CUSTOM = 7;
 
 	private Spinner spinner_range;
 
 	// Positioned to match the RANGE_* constants above exactly.
 	private static final String[] RANGE_LABELS = {
-		"Overdue", "Today", "Next 7 Days", "This Month", "All", "Custom Range"
+		"Overdue", "Today", "Tomorrow", "Next 3 Days", "Next 7 Days",
+		"This Month", "All", "Custom Range"
 	};
 
 	private View container_custom_range;
@@ -201,10 +204,11 @@ public class CreditDueReportActivity extends Activity {
 
 	// Forward-looking, unlike every other report's period selector -
 	// "Overdue" is everything already past its due date, "Today" is due
-	// today, "Next 7 Days"/"This Month" look ahead from today instead of
-	// back from it, and "All" is every outstanding due date regardless
-	// of direction. See the RANGE_* comment above for why this can't
-	// just reuse the app-wide range set.
+	// today, "Tomorrow" is due exactly tomorrow, "Next 3/7 Days"/
+	// "This Month" look ahead from today instead of back from it (each
+	// an inclusive window starting today), and "All" is every
+	// outstanding due date regardless of direction. See the RANGE_*
+	// comment above for why this can't just reuse the app-wide range set.
 	private String[] computeRange(int range) {
 
 		if (range == RANGE_ALL) {
@@ -238,6 +242,15 @@ public class CreditDueReportActivity extends Activity {
 		from.set(Calendar.MILLISECOND, 0);
 
 		switch (range) {
+
+			case RANGE_TOMORROW:
+				from.add(Calendar.DAY_OF_YEAR, 1);
+				to.add(Calendar.DAY_OF_YEAR, 1);
+				break;
+
+			case RANGE_NEXT_3_DAYS:
+				to.add(Calendar.DAY_OF_YEAR, 2);
+				break;
 
 			case RANGE_NEXT_7_DAYS:
 				to.add(Calendar.DAY_OF_YEAR, 6);
