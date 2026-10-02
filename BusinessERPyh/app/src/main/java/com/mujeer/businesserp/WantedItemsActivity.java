@@ -198,7 +198,7 @@ public class WantedItemsActivity extends Activity {
             builder.setNeutralButton("Delete", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
-                    deleteWantedItem((Integer) existing.get("id"));
+                    confirmDeleteWantedItem((Integer) existing.get("id"));
                 }
             });
         }
@@ -261,6 +261,21 @@ public class WantedItemsActivity extends Activity {
         }
 
         loadList();
+    }
+
+    private void confirmDeleteWantedItem(final int wantedItemId) {
+
+        new AlertDialog.Builder(this)
+            .setTitle("Delete Wanted Item")
+            .setMessage("Are you sure you want to delete this wanted item?")
+            .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    deleteWantedItem(wantedItemId);
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 
     private void deleteWantedItem(final int wantedItemId) {

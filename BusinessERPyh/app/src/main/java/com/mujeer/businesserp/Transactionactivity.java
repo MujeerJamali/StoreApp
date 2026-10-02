@@ -1,6 +1,8 @@
 package com.mujeer.businesserp;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
@@ -163,26 +165,45 @@ public class Transactionactivity extends Activity {
 					final HashMap<String, Object> transaction =
 						(HashMap<String, Object>) adapter.getItem(position);
 
+					final int transactionId =
+						Integer.parseInt(transaction.get("id").toString());
+
 					if (transactionType == TYPE_PURCHASE) {
 
-						if (db.deletePurchase(
-								Integer.parseInt(
-									transaction.get("id").toString()
-								)
-							)) {
+						new AlertDialog.Builder(Transactionactivity.this)
+							.setTitle("Delete Purchase")
+							.setMessage("Are you sure you want to delete this purchase?")
+							.setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+									@Override
+									public void onClick(DialogInterface dialog, int which) {
 
-							loadTransactions();
-						}
+										if (db.deletePurchase(transactionId)) {
+											loadTransactions();
+										}
+									}
+								})
+							.setNegativeButton("Cancel", null)
+							.show();
 
 					} else {
 
-						String saleId =
-							transaction.get("id").toString();
+						new AlertDialog.Builder(Transactionactivity.this)
+							.setTitle("Delete Sale")
+							.setMessage("Are you sure you want to delete this sale?")
+							.setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+									@Override
+									public void onClick(DialogInterface dialog, int which) {
 
-						db.deleteSaleItems(saleId);
-						db.deleteSale(saleId);
+										String saleId = String.valueOf(transactionId);
 
-						loadTransactions();
+										db.deleteSaleItems(saleId);
+										db.deleteSale(saleId);
+
+										loadTransactions();
+									}
+								})
+							.setNegativeButton("Cancel", null)
+							.show();
 					}
 
 					return true;

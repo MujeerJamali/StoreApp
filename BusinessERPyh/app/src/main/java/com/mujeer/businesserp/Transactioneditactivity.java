@@ -733,8 +733,22 @@ public class Transactioneditactivity extends Activity {
 						@Override
 						public void onClick(View v) {
 
-							db.deletePurchaseExpenseLink(linkId);
-							refreshLinkedExpensesDisplay();
+							new AlertDialog.Builder(Transactioneditactivity.this)
+								.setTitle("Remove Linked Expense")
+								.setMessage("Remove this expense link from the purchase?")
+								.setPositiveButton("Remove",
+								new android.content.DialogInterface.OnClickListener() {
+
+									@Override
+									public void onClick(
+										android.content.DialogInterface dialog, int which) {
+
+										db.deletePurchaseExpenseLink(linkId);
+										refreshLinkedExpensesDisplay();
+									}
+								})
+								.setNegativeButton("Cancel", null)
+								.show();
 						}
 					});
 
