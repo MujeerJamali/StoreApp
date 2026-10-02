@@ -90,6 +90,16 @@
             android:background="@color/stroke" />
 
         <Button
+            android:id="@+id/btn_report_credit_due"
+            style="@style/ToolRow"
+            android:text="Credit Due" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
             android:id="@+id/btn_report_item_monthly_rank"
             style="@style/ToolRow"
             android:text="Item Monthly Rank (Sales/Profit)" />

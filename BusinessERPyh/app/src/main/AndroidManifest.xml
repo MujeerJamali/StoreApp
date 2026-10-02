@@ -201,6 +201,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".CreditDueReportActivity"
+            android:label="Credit Due"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".ShoesVsNonShoesReportActivity"
             android:label="Shoes vs Non-Shoes"
             android:configChanges="orientation|screenSize|keyboardHidden" />

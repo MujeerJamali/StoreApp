@@ -153,7 +153,9 @@ low-to-high, and an All/Shoes Only/Non-Shoes Only filter, for every
 item with a sale in the period) · Stock Worth ·
 Party Balances (zero/non-zero balance filter, same 6-way sort as the
 Parties screen - Recent/Oldest Activity, Balance High-Low/Low-High,
-Name A-Z/Z-A) · Item
+Name A-Z/Z-A) · Credit Due (every unpaid/partially-paid Sale whose
+Due Date falls in the selected period, default Today; tapping a row
+opens that sale) · Item
 Monthly Rank (penalizes months an item didn't sell) · Average Cart
 Size/Amount · Profit: Cash Sale vs Party · Shoes vs Non-Shoes
 (Sale/Profit toggle, same period selector, % split between shoe items

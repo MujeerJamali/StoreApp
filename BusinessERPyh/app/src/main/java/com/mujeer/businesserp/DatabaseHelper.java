@@ -4216,6 +4216,48 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// REPORT: CREDIT DUE - every not-fully-paid Sale whose Due Date
+	// (see Transactioneditactivity's Due Date field) falls within the
+	// given period - only a Sale carries a due date in this app, so
+	// Purchases/Payments/Expenses have nothing to show here. A sale
+	// saved before this column existed has no due date at all and is
+	// left out, since there's no date to filter it by.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getCreditDueSales(String fromDate, String toDate) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT s.id, s.invoice_no, p.name, s.due_date, s.balance " +
+			"FROM sales s " +
+			"LEFT JOIN parties p ON s.party_id = p.id " +
+			"WHERE s.balance > 0.01 AND s.due_date IS NOT NULL " +
+			"AND s.due_date BETWEEN ? AND ? " +
+			"ORDER BY s.due_date ASC",
+			new String[]{fromDate, toDate}
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<>();
+
+			row.put("sale_id", cursor.getInt(0));
+			row.put("invoice_no", cursor.getString(1));
+			row.put("party_name", cursor.getString(2));
+			row.put("due_date", cursor.getString(3));
+			row.put("balance", cursor.getDouble(4));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// =====================
 	// REPORTS: INDEX RANKING (WEEK + MONTH + QUARTER + 6 MONTH +
 	// 9 MONTH + YEAR + ALL TIME) FOR ITEMS AND PARTIES
 	//
