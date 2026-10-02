@@ -104,7 +104,10 @@ BusinessERPyh/                  Gradle project root
   entry; tapping one reopens the right editor prefilled from it, and
   the draft is deleted once it's actually saved for real.
 - **Generate Entries** — bulk-create sale/purchase/payment/expense entries
-  across a date range via a calendar tap UI.
+  across a date range via a calendar tap UI. A generated Sale is always
+  a 100% credit sale (no paid-amount concept in this bulk tool), so it
+  gets the same "sale date + 3 days" default Due Date a manually-entered
+  credit sale does.
 - **Wanted Items** — log something a customer asked for that's out of
   stock or not in the catalog; not tied to a transaction. Tapping a row
   reopens the same Add dialog prefilled for editing, with a Delete

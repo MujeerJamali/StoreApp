@@ -1113,6 +1113,14 @@ public class GenerateEntriesActivity extends Activity {
 					saleData.put("balance", grandTotal);
 					saleData.put("notes", notes);
 
+					// Always a 100% credit sale (paid_amount is always 0
+					// above) - give it the same "sale date + 3 days"
+					// default due date Transactioneditactivity's
+					// updateDueDateVisibility() sets for a manually-entered
+					// credit sale, or every sale this tool generates would
+					// silently have no due date at all.
+					saleData.put("due_date", addDaysToDateString(date, 3));
+
 					long saleId = db.insertSaleBulk(conn, saleData, "Generate Entries");
 
 					for (Object[] pair : entries) {
@@ -1137,6 +1145,36 @@ public class GenerateEntriesActivity extends Activity {
 		}
 
 		return recordCount;
+	}
+
+	// "yyyy-MM-dd" in, "yyyy-MM-dd" + days out - see generatePurchasesOrSales()'s
+	// due_date default for the one caller.
+	private String addDaysToDateString(String dateStr, int days) {
+
+		java.util.Calendar calendar = java.util.Calendar.getInstance();
+
+		try {
+
+			String[] parts = dateStr.split("-");
+
+			calendar.set(
+				Integer.parseInt(parts[0]),
+				Integer.parseInt(parts[1]) - 1,
+				Integer.parseInt(parts[2])
+			);
+
+		} catch (Exception e) {
+		}
+
+		calendar.add(java.util.Calendar.DAY_OF_YEAR, days);
+
+		return String.format(
+			Locale.US,
+			"%04d-%02d-%02d",
+			calendar.get(java.util.Calendar.YEAR),
+			calendar.get(java.util.Calendar.MONTH) + 1,
+			calendar.get(java.util.Calendar.DAY_OF_MONTH)
+		);
 	}
 
 	private int generatePayments(SQLiteDatabase conn, String time, String notes) {
