@@ -29,21 +29,26 @@ public class CreditDueReportActivity extends Activity {
 
 	private static final int TYPE_SALE = 1;
 
-	private static final int RANGE_TODAY = 0;
-	private static final int RANGE_YESTERDAY = 1;
-	private static final int RANGE_WEEK = 2;
-	private static final int RANGE_MONTH = 3;
-	private static final int RANGE_QUARTER = 4;
-	private static final int RANGE_YEAR = 5;
-	private static final int RANGE_ALL_TIME = 6;
-	private static final int RANGE_CUSTOM = 7;
+	// Deliberately NOT the app-wide "start of period through today"
+	// range set every other report uses (Today/Yesterday/Week/Month/...)
+	// - a due date is forward-looking (it's the whole point of this
+	// screen: what's coming due so it can be collected), so a backward-
+	// looking range would only ever be able to show things already due
+	// today or earlier, never anything due tomorrow onward. These
+	// options are its own, purpose-built set instead; the Spinner
+	// WIDGET convention is unchanged, only its option semantics are.
+	private static final int RANGE_OVERDUE = 0;
+	private static final int RANGE_TODAY = 1;
+	private static final int RANGE_NEXT_7_DAYS = 2;
+	private static final int RANGE_THIS_MONTH = 3;
+	private static final int RANGE_ALL = 4;
+	private static final int RANGE_CUSTOM = 5;
 
 	private Spinner spinner_range;
 
 	// Positioned to match the RANGE_* constants above exactly.
 	private static final String[] RANGE_LABELS = {
-		"Today", "Yesterday", "This Week", "This Month",
-		"This Quarter", "This Year", "All Time", "Custom Range"
+		"Overdue", "Today", "Next 7 Days", "This Month", "All", "Custom Range"
 	};
 
 	private View container_custom_range;
@@ -194,14 +199,15 @@ public class CreditDueReportActivity extends Activity {
 		loadReport();
 	}
 
-	// Same semantics as every other report's period selector (start of
-	// period through today), applied to due_date instead of the
-	// transaction date - "Today" means "due today", "This Week" means
-	// "due Monday through today", and so on. It does not look forward
-	// into the rest of the period, matching the app-wide convention.
+	// Forward-looking, unlike every other report's period selector -
+	// "Overdue" is everything already past its due date, "Today" is due
+	// today, "Next 7 Days"/"This Month" look ahead from today instead of
+	// back from it, and "All" is every outstanding due date regardless
+	// of direction. See the RANGE_* comment above for why this can't
+	// just reuse the app-wide range set.
 	private String[] computeRange(int range) {
 
-		if (range == RANGE_ALL_TIME) {
+		if (range == RANGE_ALL) {
 			return new String[]{"0000-01-01", "9999-12-31"};
 		}
 
@@ -210,6 +216,17 @@ public class CreditDueReportActivity extends Activity {
 				et_custom_from.getText().toString().trim(),
 				et_custom_to.getText().toString().trim()
 			};
+		}
+
+		// Same "0000-01-01" epoch sentinel RANGE_ALL uses, so "yesterday
+		// or earlier" rather than fighting Calendar's BC/AD normalization
+		// around year 0.
+		if (range == RANGE_OVERDUE) {
+
+			Calendar yesterday = Calendar.getInstance();
+			yesterday.add(Calendar.DAY_OF_YEAR, -1);
+
+			return new String[]{"0000-01-01", dateFormat.format(yesterday.getTime())};
 		}
 
 		Calendar from = Calendar.getInstance();
@@ -222,28 +239,12 @@ public class CreditDueReportActivity extends Activity {
 
 		switch (range) {
 
-			case RANGE_YESTERDAY:
-				from.add(Calendar.DAY_OF_YEAR, -1);
-				to.add(Calendar.DAY_OF_YEAR, -1);
+			case RANGE_NEXT_7_DAYS:
+				to.add(Calendar.DAY_OF_YEAR, 6);
 				break;
 
-			case RANGE_WEEK:
-				from.setFirstDayOfWeek(Calendar.MONDAY);
-				from.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
-				break;
-
-			case RANGE_MONTH:
-				from.set(Calendar.DAY_OF_MONTH, 1);
-				break;
-
-			case RANGE_QUARTER:
-				int quarterStartMonth = (from.get(Calendar.MONTH) / 3) * 3;
-				from.set(Calendar.MONTH, quarterStartMonth);
-				from.set(Calendar.DAY_OF_MONTH, 1);
-				break;
-
-			case RANGE_YEAR:
-				from.set(Calendar.DAY_OF_YEAR, 1);
+			case RANGE_THIS_MONTH:
+				to.set(Calendar.DAY_OF_MONTH, to.getActualMaximum(Calendar.DAY_OF_MONTH));
 				break;
 
 			case RANGE_TODAY:

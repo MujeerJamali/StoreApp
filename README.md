@@ -124,6 +124,14 @@ BusinessERPyh/                  Gradle project root
   entry, the entry is removed automatically (there's no stock left for
   it to reference); if stock remains, the app asks "was this the
   Display/Sample one?" for each board that has an entry.
+- **Notifications** — once per calendar day, on the app's first open that
+  day (tracked in its own SharedPreferences, not the business database -
+  see `CreditDueNotifier`/`BusinessERPApplication`), checks for any
+  credit Sale whose Due Date is today and, if there's at least one,
+  posts a single system notification listing each one's party and
+  balance. Tapping it opens that Sale directly when there's exactly
+  one, or the Credit Due report (already defaulted to Today) when
+  there's more than one.
 - **Data tools** — bulk Excel import for purchases and items; full backup
   export/import in Vyapar's `.vyb` format. Alongside standard Vyapar data
   (parties, items, purchases, sales, payments, expenses, party transfers),
@@ -163,8 +171,11 @@ item with a sale in the period) · Stock Worth ·
 Party Balances (zero/non-zero balance filter, same 6-way sort as the
 Parties screen - Recent/Oldest Activity, Balance High-Low/Low-High,
 Name A-Z/Z-A) · Credit Due (every unpaid/partially-paid Sale whose
-Due Date falls in the selected period, default Today; tapping a row
-opens that sale) · Item
+Due Date falls in the selected period - Overdue/Today/Next 7 Days/
+This Month/All/Custom Range, default Today, forward-looking unlike
+every other report's period selector since a due date is something
+still coming rather than something that already happened; tapping a
+row opens that sale) · Item
 Monthly Rank (penalizes months an item didn't sell) · Average Cart
 Size/Amount · Profit: Cash Sale vs Party · Shoes vs Non-Shoes
 (Sale/Profit toggle, same period selector, % split between shoe items
