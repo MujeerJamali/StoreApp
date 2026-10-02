@@ -306,6 +306,35 @@
 
             </LinearLayout>
 
+            <!-- Sale mode only, and only while the sale is not fully paid
+                 (see Transactioneditactivity#updateDueDateVisibility()) -
+                 defaults to the sale date + 3 days the moment it becomes
+                 relevant, but stays a normal tappable date field after
+                 that. -->
+            <LinearLayout
+                android:id="@+id/container_due_date"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    style="@style/FieldLabel"
+                    android:layout_marginTop="0dp"
+                    android:text="Due Date" />
+
+                <EditText
+                    android:id="@+id/et_due_date"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clickable="true"
+                    android:focusable="false"
+                    android:hint="Due date"
+                    android:inputType="text|textNoSuggestions" />
+
+            </LinearLayout>
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

@@ -63,7 +63,8 @@ public class Transactioneditactivity extends Activity {
 	private int pendingEditPositionForNewItem = -1;
 	
 	AutoCompleteTextView actv_party;
-    EditText et_date, et_time, et_invoice_number, et_amount_paid, et_notes;
+    EditText et_date, et_time, et_invoice_number, et_amount_paid, et_notes, et_due_date;
+    View container_due_date;
     EditText et_search_transaction_items;
     CheckBox cb_full_paid;
     View container_purchase_costs;
@@ -196,6 +197,18 @@ public class Transactioneditactivity extends Activity {
 				public void onClick(View v) {
 
 					showDatePicker();
+				}
+			});
+
+		container_due_date = findViewById(R.id.container_due_date);
+		et_due_date = findViewById(R.id.et_due_date);
+
+		et_due_date.setOnClickListener(new View.OnClickListener() {
+
+				@Override
+				public void onClick(View v) {
+
+					showDueDatePicker();
 				}
 			});
         et_time = findViewById(R.id.et_time);
@@ -1633,6 +1646,14 @@ public class Transactioneditactivity extends Activity {
 			et_amount_paid.setText((String) data.get("amount_paid"));
 		}
 
+		// Sale only - see saveDraft()/updateDueDateVisibility(). Read
+		// back before updateGrandTotal() runs below (triggered once the
+		// items list is restored a few lines down) so the default-due-
+		// date logic sees it already filled in.
+		if (data.get("due_date") != null) {
+			et_due_date.setText((String) data.get("due_date"));
+		}
+
 		ArrayList<HashMap<String, Object>> pendingFromDraft =
 			(ArrayList<HashMap<String, Object>>) data.get("pending_linked_expenses");
 
@@ -1684,6 +1705,13 @@ public class Transactioneditactivity extends Activity {
 		data.put("notes", et_notes.getText().toString());
 		data.put("amount_paid", et_amount_paid.getText().toString());
 		data.put("items", new ArrayList<HashMap<String, Object>>(transactionItemList));
+
+		if (
+			transactionType == TYPE_SALE && container_due_date != null &&
+			container_due_date.getVisibility() == View.VISIBLE
+		) {
+			data.put("due_date", et_due_date.getText().toString());
+		}
 
 		if (transactionType == TYPE_PURCHASE) {
 			data.put(
@@ -2731,6 +2759,7 @@ public class Transactioneditactivity extends Activity {
 		);
 
 		updateDefaultAmountPaid(total);
+		updateDueDateVisibility(total);
 
 		// Sale only - a live estimate as items are added, using each
 		// item's purchase_price + extra_cost_per_unit as cost, same
@@ -2763,6 +2792,67 @@ public class Transactioneditactivity extends Activity {
 
 				container_sale_profit.setVisibility(View.GONE);
 			}
+		}
+	}
+
+	// =====================
+	// Sale only - a credit sale (anything not fully paid) gets a Due
+	// Date field; a fully-paid one has nothing to be due, so the field
+	// is hidden (not cleared - switching back to partial/unpaid later
+	// brings back whatever was there). The field defaults to the sale
+	// date + 3 days only the moment it first becomes relevant and is
+	// still empty - editing an existing credit sale's already-saved due
+	// date, or one the user already picked, is never overwritten.
+	// =====================
+	private void updateDueDateVisibility(double grandTotal) {
+
+		if (transactionType != TYPE_SALE || container_due_date == null) {
+			return;
+		}
+
+		double paid;
+
+		try {
+
+			paid = Double.parseDouble(et_amount_paid.getText().toString().trim());
+
+		} catch (Exception e) {
+
+			paid = 0;
+		}
+
+		boolean isCredit = paid < grandTotal - 0.01;
+
+		container_due_date.setVisibility(isCredit ? View.VISIBLE : View.GONE);
+
+		if (isCredit && et_due_date.getText().toString().trim().isEmpty()) {
+
+			java.util.Calendar calendar = java.util.Calendar.getInstance();
+
+			try {
+
+				String[] parts = et_date.getText().toString().trim().split("-");
+
+				calendar.set(
+					Integer.parseInt(parts[0]),
+					Integer.parseInt(parts[1]) - 1,
+					Integer.parseInt(parts[2])
+				);
+
+			} catch (Exception e) {
+			}
+
+			calendar.add(java.util.Calendar.DAY_OF_YEAR, 3);
+
+			et_due_date.setText(
+				String.format(
+					Locale.getDefault(),
+					"%04d-%02d-%02d",
+					calendar.get(java.util.Calendar.YEAR),
+					calendar.get(java.util.Calendar.MONTH) + 1,
+					calendar.get(java.util.Calendar.DAY_OF_MONTH)
+				)
+			);
 		}
 	}
 
@@ -2824,6 +2914,14 @@ public class Transactioneditactivity extends Activity {
 		tv_cash_after.setText(
 			AmountFormat.format(cashBaseline + impact)
 		);
+
+		double total = 0;
+
+		for (HashMap<String, Object> map : transactionItemList) {
+			total += (Double) map.get("total");
+		}
+
+		updateDueDateVisibility(total);
 	}
 
 	// =====================
@@ -3364,6 +3462,58 @@ public class Transactioneditactivity extends Activity {
 
 		).show();
 	}
+
+	// Same tappable-date-picker pattern as showDatePicker() above, for
+	// a credit Sale's due date (see updateDueDateVisibility()).
+	private void showDueDatePicker() {
+
+		java.util.Calendar calendar = java.util.Calendar.getInstance();
+
+		try {
+
+			String[] parts = et_due_date.getText().toString().split("-");
+
+			calendar.set(
+				Integer.parseInt(parts[0]),
+				Integer.parseInt(parts[1]) - 1,
+				Integer.parseInt(parts[2])
+			);
+
+		} catch (Exception e) {
+		}
+
+		new android.app.DatePickerDialog(
+			this,
+			R.style.AppAlertDialogTheme,
+
+			new android.app.DatePickerDialog.OnDateSetListener() {
+
+				@Override
+				public void onDateSet(
+					android.widget.DatePicker view,
+					int year,
+					int month,
+					int dayOfMonth) {
+
+					et_due_date.setText(
+						String.format(
+							Locale.getDefault(),
+							"%04d-%02d-%02d",
+							year,
+							month + 1,
+							dayOfMonth
+						)
+					);
+				}
+			},
+
+			calendar.get(java.util.Calendar.YEAR),
+			calendar.get(java.util.Calendar.MONTH),
+			calendar.get(java.util.Calendar.DAY_OF_MONTH)
+
+		).show();
+	}
+
 	private void showTimePicker() {
 
 		java.util.Calendar calendar =
@@ -3699,6 +3849,13 @@ public class Transactioneditactivity extends Activity {
 			Double.parseDouble(sale.get("grand_total").toString())
 		);
 
+		// Read back before updateGrandTotal() runs below, so
+		// updateDueDateVisibility() sees it already filled in and
+		// doesn't overwrite it with a freshly-computed default.
+		if (sale.get("due_date") != null) {
+			et_due_date.setText(sale.get("due_date").toString());
+		}
+
 		int partyId =
 			Integer.parseInt(
 			sale.get("party_id").toString()
@@ -3844,6 +4001,11 @@ public class Transactioneditactivity extends Activity {
 		saleMap.put("paid_amount", paidAmount);
 		saleMap.put("balance", balance);
 		saleMap.put("notes", et_notes.getText().toString());
+
+		saleMap.put(
+			"due_date",
+			balance > 0.01 ? et_due_date.getText().toString().trim() : null
+		);
 
 		saleMap.put(
 			"invoice_no",
@@ -4137,6 +4299,11 @@ public class Transactioneditactivity extends Activity {
 		saleMap.put("paid_amount", paidAmount);
 		saleMap.put("balance", subtotal - paidAmount);
 		saleMap.put("notes", et_notes.getText().toString());
+
+		saleMap.put(
+			"due_date",
+			(subtotal - paidAmount) > 0.01 ? et_due_date.getText().toString().trim() : null
+		);
 
 		db.updateSale(
 			transactionId,

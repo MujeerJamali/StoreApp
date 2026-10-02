@@ -257,7 +257,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"paid_amount REAL DEFAULT 0, " +
 			"balance REAL DEFAULT 0, " +
 			"notes TEXT, " +
-			"source TEXT" +
+			"source TEXT, " +
+			"due_date TEXT" +
 			")"
 		);
 
@@ -496,6 +497,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		addColumnIfMissing(db, TABLE_ITEMS, "active", "INTEGER NOT NULL DEFAULT 1");
 		addColumnIfMissing(db, TABLE_PURCHASES, "other_charges", "REAL NOT NULL DEFAULT 0");
 		addColumnIfMissing(db, TABLE_PURCHASES, "other_charges_to_party", "INTEGER NOT NULL DEFAULT 1");
+
+		// A credit sale's due date - a Sale only ever had an implicit,
+		// unenforced "whenever" before this existed, so an existing
+		// unpaid/partial sale from before this column was added simply
+		// has no due date rather than one getting invented for it.
+		addColumnIfMissing(db, "sales", "due_date", "TEXT");
 
 		// cost_items (created above by onCreate(db)) is brand new as of
 		// this version - every expense/recurring-expense rule recorded
@@ -3856,6 +3863,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("notes", saleData.get("notes").toString());
 		values.put("source", "Manual");
 
+		values.put(
+			"due_date",
+			saleData.get("due_date") == null ? null : saleData.get("due_date").toString()
+		);
+
 		long id = db.insert("sales", null, values);
 
 		int partyId = Integer.parseInt(saleData.get("party_id").toString());
@@ -5369,6 +5381,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("balance", saleData.get("balance").toString());
 		values.put("notes", saleData.get("notes").toString());
 		values.put("source", "Manual");
+
+		values.put(
+			"due_date",
+			saleData.get("due_date") == null ? null : saleData.get("due_date").toString()
+		);
 
 		int rows = db.update(
 			"sales",
@@ -6973,6 +6990,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("balance", (Double) saleData.get("balance"));
 		values.put("notes", (String) saleData.get("notes"));
 		values.put("source", source);
+		values.put("due_date", (String) saleData.get("due_date"));
 
 		long id = db.insert("sales", null, values);
 

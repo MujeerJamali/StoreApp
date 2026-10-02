@@ -396,7 +396,13 @@ public class ExportVyaparActivity extends Activity {
 			"txn_description TEXT, " +
 			"txn_discount_amount REAL, " +
 			"txn_tax_amount REAL, " +
-			"txn_category_id INTEGER" +
+			"txn_category_id INTEGER, " +
+			// This app's own extension, same reasoning as kb_items'
+			// item_extra_cost_per_unit/item_active above - a credit
+			// Sale's due date, absent from a real Vyapar backup or one
+			// exported before this existed (and meaningless for every
+			// other txn_type, which just leaves it null).
+			"txn_due_date TEXT" +
 			")"
 		);
 
@@ -866,7 +872,7 @@ public class ExportVyaparActivity extends Activity {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, party_id, date, time, invoice_no, discount, other_charges, " +
-			"grand_total, paid_amount, balance, notes FROM sales", null);
+			"grand_total, paid_amount, balance, notes, due_date FROM sales", null);
 
 		while (c.moveToNext()) {
 
@@ -881,6 +887,7 @@ public class ExportVyaparActivity extends Activity {
 			double paidAmount = c.getDouble(8);
 			double balance = c.getDouble(9);
 			String notes = c.getString(10);
+			String dueDate = c.getString(11);
 
 			ContentValues values = new ContentValues();
 			values.put("txn_id", OFFSET_SALE_TXN + id);
@@ -899,6 +906,7 @@ public class ExportVyaparActivity extends Activity {
 			values.put("txn_description", notes == null ? "" : notes);
 			values.put("txn_discount_amount", discount);
 			values.put("txn_tax_amount", otherCharges);
+			values.put("txn_due_date", dueDate);
 			// grand_total is intentionally not stored separately, mirroring
 			// how the importer derives it as cash+balance on the way in.
 

@@ -51,15 +51,16 @@ import java.util.zip.ZipInputStream;
 //
 // Everything in [brackets] is this app's own extension with no equivalent
 // in Vyapar's own schema - see ExportVyaparActivity's businesserp_* tables
-// (and kb_items.item_extra_cost_per_unit/kb_lineitems.combo_id, two extra
-// columns on otherwise Vyapar-shaped tables). Every one of them is entirely
-// optional: a real Vyapar backup, or an export made before this app had
-// that feature, simply won't have the table/column, which
+// (and kb_items.item_extra_cost_per_unit/kb_lineitems.combo_id/
+// kb_transactions.txn_due_date, extra columns on otherwise Vyapar-shaped
+// tables). Every one of them is entirely optional: a real Vyapar backup,
+// or an export made before this app had that feature, simply won't have
+// the table/column, which
 // hasVarietyTables/lineItemsHaveComboId/itemsHaveExtraCost/
-// hasCostItemsTable/hasPurchaseExpenseLinksTable/hasRecurringExpensesTable/
-// hasDraftsTable below detect up front so that whole step is just skipped
-// (or, for the two extra columns, defaults to 0/null) rather than failing
-// the import.
+// salesHaveDueDate/hasCostItemsTable/hasPurchaseExpenseLinksTable/
+// hasRecurringExpensesTable/hasDraftsTable below detect up front so that
+// whole step is just skipped (or, for the extra columns, defaults to
+// 0/null) rather than failing the import.
 // =====================
 public class ImportVyaparActivity extends Activity {
 
@@ -298,6 +299,7 @@ public class ImportVyaparActivity extends Activity {
             // exported before each one existed.
             boolean itemsHaveExtraCost = columnExists(vyaparDb, "kb_items", "item_extra_cost_per_unit");
             boolean itemsHaveActive = columnExists(vyaparDb, "kb_items", "item_active");
+            boolean salesHaveDueDate = columnExists(vyaparDb, "kb_transactions", "txn_due_date");
             boolean hasCostItemsTable = tableExists(vyaparDb, "businesserp_cost_items");
             boolean hasPurchaseExpenseLinksTable = tableExists(vyaparDb, "businesserp_purchase_expense_links");
             boolean hasRecurringExpensesTable = tableExists(vyaparDb, "businesserp_recurring_expenses");
@@ -360,7 +362,7 @@ public class ImportVyaparActivity extends Activity {
                 lineItemsHaveComboId, skipped, counts);
 
             setStatus("Importing sales...");
-            importSales(vyaparDb, helper, db, partyIdMap, saleIdMap, skipped, counts);
+            importSales(vyaparDb, helper, db, partyIdMap, saleIdMap, salesHaveDueDate, skipped, counts);
 
             setStatus("Importing sale line items...");
             importSaleLineItems(
@@ -1404,12 +1406,14 @@ public class ImportVyaparActivity extends Activity {
         SQLiteDatabase db,
         HashMap<Long, Integer> partyIdMap,
         HashMap<Long, Long> saleIdMap,
+        boolean salesHaveDueDate,
         ArrayList<SkippedRow> skipped,
         Counts counts) {
 
         Cursor c = vyaparDb.rawQuery(
             "SELECT txn_id, txn_name_id, txn_date, txn_time, txn_cash_amount, txn_balance_amount, " +
-            "txn_invoice_prefix, txn_ref_number_char, txn_description, txn_discount_amount, txn_tax_amount " +
+            "txn_invoice_prefix, txn_ref_number_char, txn_description, txn_discount_amount, txn_tax_amount" +
+            (salesHaveDueDate ? ", txn_due_date" : "") + " " +
             "FROM kb_transactions WHERE txn_type=1", null);
 
         while (c.moveToNext()) {
@@ -1425,6 +1429,8 @@ public class ImportVyaparActivity extends Activity {
             String description = c.getString(8);
             double discount = c.getDouble(9);
             double tax = c.getDouble(10);
+
+            String dueDate = (salesHaveDueDate && !c.isNull(11)) ? c.getString(11) : null;
 
             String importKey = "vyb_sale_" + txnId;
 
@@ -1472,6 +1478,7 @@ public class ImportVyaparActivity extends Activity {
             saleData.put("paid_amount", cash);
             saleData.put("balance", balance);
             saleData.put("notes", description == null ? "" : description);
+            saleData.put("due_date", dueDate);
 
             long localId = helper.insertSaleBulk(db, saleData, "Vyapar Import");
 
