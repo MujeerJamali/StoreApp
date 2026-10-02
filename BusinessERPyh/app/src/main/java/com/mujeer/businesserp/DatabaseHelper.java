@@ -57,7 +57,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // - placed as a reference overlay that never reserves/removes
     // stock; see Transactioneditactivity's sale-save flow for how a
     // matching sale offers to remove a row).
-    public static final int DATABASE_VERSION = 20;
+    // Bumped 20 -> 21 to add sales.due_date (a credit sale's due date -
+    // this got missed when the column was first added, so onUpgrade()
+    // never ran on any install already at 20 and every getSaleById()/
+    // getCreditDueSales()/export call hit "no such column: due_date".
+    public static final int DATABASE_VERSION = 21;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
