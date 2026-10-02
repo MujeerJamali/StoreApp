@@ -99,6 +99,11 @@ public class TransactionAdapter extends BaseAdapter {
 
 					tv_type.setText("Payment Out");
 					tv_type.setTextColor(activity.getResources().getColor(R.color.danger));
+
+				} else if (type == DatabaseHelper.TRANSACTION_TYPE_EXPENSE) {
+
+					tv_type.setText("Expense");
+					tv_type.setTextColor(activity.getResources().getColor(R.color.mod_expenses));
 				}
 
 				tv_type.setVisibility(View.VISIBLE);

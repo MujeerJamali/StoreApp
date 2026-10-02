@@ -87,6 +87,15 @@ public class Partyviewactivity extends Activity {
 
                         intent.putExtra("payment_id", transactionId);
 
+                    } else if (transactionType == DatabaseHelper.TRANSACTION_TYPE_EXPENSE) {
+
+                        intent = new Intent(
+                            Partyviewactivity.this,
+                            Expenseviewactivity.class
+                        );
+
+                        intent.putExtra("expense_id", transactionId);
+
                     } else {
 
                         intent = new Intent(

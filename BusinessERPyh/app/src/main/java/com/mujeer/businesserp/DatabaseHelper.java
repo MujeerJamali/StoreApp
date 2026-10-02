@@ -2696,6 +2696,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	public static final int TRANSACTION_TYPE_SALE = 1;
 	public static final int TRANSACTION_TYPE_PAYMENT_IN = 2;
 	public static final int TRANSACTION_TYPE_PAYMENT_OUT = 3;
+	public static final int TRANSACTION_TYPE_EXPENSE = 4;
 
 	public ArrayList<HashMap<String, Object>> getTransactionsByParty(int partyId) {
 
@@ -2732,9 +2733,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"LEFT JOIN " + TABLE_PARTIES + " pa4 " +
 			"ON py2.party_id = pa4.id " +
 			"WHERE py2.party_id = ? AND py2.type = " + PAYMENT_OUT + " " +
+			"UNION ALL " +
+			"SELECT e.id, e.code, pa5.name, e.date, e.amount, " +
+			TRANSACTION_TYPE_EXPENSE + " AS transaction_type " +
+			"FROM " + TABLE_EXPENSES + " e " +
+			"LEFT JOIN " + TABLE_PARTIES + " pa5 " +
+			"ON e.party_id = pa5.id " +
+			"WHERE e.party_id = ? " +
 			"ORDER BY date DESC",
 
 			new String[]{
+				String.valueOf(partyId),
 				String.valueOf(partyId),
 				String.valueOf(partyId),
 				String.valueOf(partyId),
@@ -3374,6 +3383,28 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		db.beginTransaction();
 
 		try {
+
+			// This purchase's unpaid portion (if any) shifted its
+			// party's balance when it was saved - reverse that before
+			// the row disappears, same reversal updatePurchase() already
+			// does on edit, or the party's balance would be left
+			// stranded with an adjustment for a purchase that no longer
+			// exists.
+			Cursor oldCursor = db.rawQuery(
+				"SELECT party_id, grand_total, amount_paid FROM " +
+				TABLE_PURCHASES + " WHERE id=?",
+				new String[]{String.valueOf(purchaseId)}
+			);
+
+			if (oldCursor.moveToFirst()) {
+
+				int oldPartyId = oldCursor.getInt(0);
+				double oldDue = oldCursor.getDouble(1) - oldCursor.getDouble(2);
+
+				adjustPartyBalance(db, oldPartyId, oldDue);
+			}
+
+			oldCursor.close();
 
 			// This purchase's line items added stock when they were
 			// inserted - reverse that before the rows disappear, or the
@@ -5135,6 +5166,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	public void deleteSale(String saleId) {
 		SQLiteDatabase db = this.getWritableDatabase();
 
+		// This sale's unpaid portion (if any) shifted its party's
+		// balance when it was saved - reverse that before the row
+		// disappears, same reversal updateSale() already does on edit,
+		// or the party's balance would be left stranded with an
+		// adjustment for a sale that no longer exists.
+		Cursor oldCursor = db.rawQuery(
+			"SELECT party_id, balance FROM sales WHERE id=?",
+			new String[]{saleId}
+		);
+
+		if (oldCursor.moveToFirst()) {
+
+			int oldPartyId = oldCursor.getInt(0);
+			double oldDue = oldCursor.getDouble(1);
+
+			adjustPartyBalance(db, oldPartyId, -oldDue);
+		}
+
+		oldCursor.close();
+
 		db.delete(
 			"sales",
 			"id=?",
@@ -6070,6 +6121,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			values
 		);
 
+		// Any unpaid portion of this expense is money we now owe the
+		// party (petrol station, landlord, ...) it was billed to - same
+		// convention as a Purchase. "Cash Expenses" and any other party
+		// still gets this call; it's just always a no-op for them since
+		// they're required to be paid in full.
+		if (partyId != null) {
+
+			double due = amount - paidAmount;
+			adjustPartyBalance(db, partyId, -due);
+		}
 
 		return id;
 	}
@@ -6333,6 +6394,29 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		Integer partyId
 	) {
 
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		// Reverse this expense's previous effect on its old party's
+		// balance before applying the new one below - same
+		// "reverse-old-then-apply-new" pattern as updatePurchase(), so
+		// editing an expense (amount, paid amount, or even the party
+		// itself) doesn't double up or strand the earlier adjustment.
+		Cursor oldCursor = db.rawQuery(
+			"SELECT party_id, amount, paid_amount FROM " +
+			TABLE_EXPENSES + " WHERE id=?",
+			new String[]{String.valueOf(expenseId)}
+		);
+
+		if (oldCursor.moveToFirst() && !oldCursor.isNull(0)) {
+
+			int oldPartyId = oldCursor.getInt(0);
+			double oldDue = oldCursor.getDouble(1) - oldCursor.getDouble(2);
+
+			adjustPartyBalance(db, oldPartyId, oldDue);
+		}
+
+		oldCursor.close();
+
 		ContentValues values = new ContentValues();
 
 		values.put("item", item);
@@ -6344,8 +6428,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("party_id", partyId);
 		values.put("source", "Manual");
 
-		SQLiteDatabase db = this.getWritableDatabase();
-
 		int rows = db.update(
 			TABLE_EXPENSES,
 			values,
@@ -6355,6 +6437,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			}
 		);
 
+		if (partyId != null) {
+			adjustPartyBalance(db, partyId, -(amount - paidAmount));
+		}
 
 		return rows > 0;
 	}
@@ -6369,6 +6454,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db =
 			this.getWritableDatabase();
+
+		// This expense's unpaid portion (if any) shifted its party's
+		// balance when it was saved - reverse that before the row
+		// disappears, same as updateExpense()'s reversal, or the
+		// party's balance would be left stranded.
+		Cursor oldCursor = db.rawQuery(
+			"SELECT party_id, amount, paid_amount FROM " +
+			TABLE_EXPENSES + " WHERE id=?",
+			new String[]{String.valueOf(expenseId)}
+		);
+
+		if (oldCursor.moveToFirst() && !oldCursor.isNull(0)) {
+
+			int oldPartyId = oldCursor.getInt(0);
+			double oldDue = oldCursor.getDouble(1) - oldCursor.getDouble(2);
+
+			adjustPartyBalance(db, oldPartyId, oldDue);
+		}
+
+		oldCursor.close();
 
 		// Cleans up a dangling link if this expense was linked to a
 		// purchase - same "not retroactively corrected" simplification
@@ -7160,7 +7265,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("party_id", partyId);
 		values.put("source", source);
 
-		return db.insert(TABLE_EXPENSES, null, values);
+		long id = db.insert(TABLE_EXPENSES, null, values);
+
+		// Same balance effect as insertExpense() - a bulk/import source
+		// expense with a party still owes that party for its unpaid
+		// portion, same as a manually-entered one.
+		if (partyId != null) {
+
+			double due = amount - paidAmount;
+			adjustPartyBalance(db, partyId, -due);
+		}
+
+		return id;
 	}
 
 	// =====================

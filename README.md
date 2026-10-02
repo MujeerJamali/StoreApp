@@ -84,7 +84,13 @@ BusinessERPyh/                  Gradle project root
   text — it must resolve to an existing Cost Item, typing an
   unrecognized name and saving anyway is rejected (see "+ Add New" row
   above). Any Expense can later be linked to a Purchase as its landed
-  cost (see above).
+  cost (see above). The Party field is mandatory (defaults to "Cash
+  Expenses" when there's no real party to bill it to) and is fully
+  functional, not decorative — an unpaid/paid Expense affects that
+  party's balance exactly like a Sale/Purchase (paid in full is a
+  no-op; an unpaid portion makes the shop owe the party, same
+  direction as an unpaid Purchase), and a party-linked Expense shows
+  up alongside their Sales/Purchases on that party's own screen.
 - **Cash** — a single ledger of all cash movement (sales, purchases,
   payments, expenses, manual adjustments); tapping a row opens its real
   source transaction. **A transaction is rejected if it would take the

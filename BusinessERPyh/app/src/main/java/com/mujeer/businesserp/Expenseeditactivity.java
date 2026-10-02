@@ -66,8 +66,12 @@ public class Expenseeditactivity extends Activity {
 	private boolean updatingAmountPaidProgrammatically = false;
 
 	// name -> id, for resolving whatever the user typed/picked in
-	// actv_party back to a party row (the field is optional - blank is
-	// a valid "no party" choice, only a non-blank value has to resolve).
+	// actv_party back to a party row - mandatory, defaulting to "Cash
+	// Expenses" for a new expense (see saveExpense()); an unpaid/paid
+	// expense affects that party's balance exactly like a Sale/Purchase
+	// (see insertExpense()/updateExpense()/deleteExpense() in
+	// DatabaseHelper), and shows up alongside their sales/purchases on
+	// the Party screen.
 	private Map<String, Integer> partyIdByName;
 	private Map<Integer, String> partyNameById;
 	private TwoLineAutoCompleteAdapter partyAdapter;
@@ -332,10 +336,9 @@ public class Expenseeditactivity extends Activity {
 		);
 	}
 
-	// Optional "who was this paid to" field - not every expense has one
-	// worth tracking (e.g. a cash purchase from an untracked vendor), so
-	// leaving it blank is valid; only a non-blank value has to resolve
-	// to a real party (see saveExpense()).
+	// "Who was this paid to" field - mandatory (see saveExpense()),
+	// defaulting to "Cash Expenses" for a new expense when there's no
+	// real party to bill it to.
 	private void loadPartyAutoComplete() {
 
 		ArrayList<HashMap<String, Object>> parties = db.getParties();
