@@ -156,9 +156,12 @@ Size/Amount · Profit: Cash Sale vs Party · Shoes vs Non-Shoes
 (Sale/Profit toggle, same period selector, % split between shoe items
 and everything else) · Combo/Variety Stock (shoes only - a single
 screen: a Gender + Size dropdown filter, built by parsing each item's
-name, narrows the item list below it; each row shows the item's name
-and every size it comes in with stock, the size matching the filter
-shown first and bold; tapping an item opens it directly)
+name, narrows the item list below it and shows the total stock of the
+selected size across every item just under the filter; each row shows
+the item's name and every size it comes in with stock, the size
+matching the filter shown first, bold, and (when a size is selected)
+used to sort items highest-stock-first; tapping an item opens it
+directly)
 
 The Parties list itself also sorts (Recent/Oldest Activity, Balance
 High-Low/Low-High, Name A-Z/Z-A) using the same underlying query as

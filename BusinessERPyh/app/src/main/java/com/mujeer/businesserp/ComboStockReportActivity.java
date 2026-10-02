@@ -51,6 +51,7 @@ public class ComboStockReportActivity extends Activity {
 	}
 
 	private Spinner spinner_combo_filter;
+	private TextView tv_total_stock;
 	private TextView tv_empty;
 	private ListView lv_combo_stock;
 
@@ -76,6 +77,7 @@ public class ComboStockReportActivity extends Activity {
 		setTitle("Combo/Variety Stock");
 
 		spinner_combo_filter = findViewById(R.id.spinner_combo_filter);
+		tv_total_stock = findViewById(R.id.tv_total_stock);
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_combo_stock = findViewById(R.id.lv_combo_stock);
 
@@ -273,13 +275,27 @@ public class ComboStockReportActivity extends Activity {
 			position >= 0 && position < filterOptions.size() ?
 			filterOptions.get(position) : null;
 
+		final String selectedLabel = selected == null ? null : selected.label;
+
 		filteredList.clear();
+
+		double totalStock = 0;
 
 		for (HashMap<String, Object> item : fullList) {
 
+			ArrayList<HashMap<String, Object>> combos =
+				(ArrayList<HashMap<String, Object>>) item.get("combos");
+
 			if (selected == null || selected.gender == null) {
 
+				// "All Sizes" - every item counts, and the total is every
+				// size's stock across the whole catalog.
 				filteredList.add(item);
+
+				for (HashMap<String, Object> combo : combos) {
+					totalStock += balanceOf(combo);
+				}
+
 				continue;
 			}
 
@@ -289,22 +305,43 @@ public class ComboStockReportActivity extends Activity {
 				continue;
 			}
 
-			ArrayList<HashMap<String, Object>> combos =
-				(ArrayList<HashMap<String, Object>>) item.get("combos");
+			HashMap<String, Object> matchedCombo = findComboByLabel(combos, selected.label);
 
-			for (HashMap<String, Object> combo : combos) {
+			if (matchedCombo != null) {
 
-				String label = combo.get("label") == null ? "" : combo.get("label").toString();
-
-				if (label.equals(selected.label)) {
-					filteredList.add(item);
-					break;
-				}
+				filteredList.add(item);
+				totalStock += balanceOf(matchedCombo);
 			}
 		}
 
-		adapter.setSelectedFilter(selected == null ? null : selected.label);
+		// With a specific size selected, items carrying the most stock in
+		// that size float to the top - there's no single "stock" figure
+		// to sort "All Sizes" by, so that case keeps the name order the
+		// query already returned.
+		if (selected != null && selected.gender != null) {
+
+			Collections.sort(filteredList, new Comparator<HashMap<String, Object>>() {
+					@Override
+					@SuppressWarnings("unchecked")
+					public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+
+						double balanceA = balanceOf(findComboByLabel(
+							(ArrayList<HashMap<String, Object>>) a.get("combos"), selectedLabel
+						));
+
+						double balanceB = balanceOf(findComboByLabel(
+							(ArrayList<HashMap<String, Object>>) b.get("combos"), selectedLabel
+						));
+
+						return Double.compare(balanceB, balanceA);
+					}
+				});
+		}
+
+		adapter.setSelectedFilter(selectedLabel);
 		adapter.notifyDataSetChanged();
+
+		tv_total_stock.setText("Total Stock: " + AmountFormat.formatPlain(totalStock));
 
 		if (filteredList.isEmpty()) {
 
@@ -316,5 +353,36 @@ public class ComboStockReportActivity extends Activity {
 			tv_empty.setVisibility(View.GONE);
 			lv_combo_stock.setVisibility(View.VISIBLE);
 		}
+	}
+
+	// First combo (if any) whose variety-value label matches - same
+	// "first match wins" rule ComboStockAdapter uses to pick the bolded
+	// size, so sorting/totals agree with what the row itself highlights.
+	private static HashMap<String, Object> findComboByLabel(
+		ArrayList<HashMap<String, Object>> combos, String label) {
+
+		if (combos == null || label == null) {
+			return null;
+		}
+
+		for (HashMap<String, Object> combo : combos) {
+
+			String comboLabel = combo.get("label") == null ? "" : combo.get("label").toString();
+
+			if (comboLabel.equals(label)) {
+				return combo;
+			}
+		}
+
+		return null;
+	}
+
+	private static double balanceOf(HashMap<String, Object> combo) {
+
+		if (combo == null || combo.get("balance") == null) {
+			return 0;
+		}
+
+		return (Double) combo.get("balance");
 	}
 }

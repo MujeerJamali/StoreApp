@@ -18,7 +18,17 @@
         style="@style/FilterSpinner"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="14dp" />
+        android:layout_marginBottom="10dp" />
+
+    <TextView
+        android:id="@+id/tv_total_stock"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="14dp"
+        android:text="Total Stock: 0"
+        android:textColor="@color/text_primary"
+        android:textSize="16sp"
+        android:textStyle="bold" />
 
     <TextView
         android:id="@+id/tv_empty"
