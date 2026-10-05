@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView style="@style/PageTitle" android:text="Search" />
+
+        <EditText
+            android:id="@+id/et_global_search"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:hint="Search parties, items, invoice numbers..."
+            android:inputType="text|textNoSuggestions" />
+
+        <TextView
+            android:id="@+id/tv_global_search_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="Start typing to search."
+            android:textColor="@color/text_secondary"
+            android:textSize="15sp" />
+
+        <LinearLayout
+            android:id="@+id/container_results"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tv_parties_label"
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:text="Parties"
+                android:visibility="gone" />
+
+            <ListView
+                android:id="@+id/lv_parties"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:clipToPadding="false"
+                android:divider="@android:color/transparent"
+                android:dividerHeight="10dp"
+                android:scrollbars="none" />
+
+            <TextView
+                android:id="@+id/tv_items_label"
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:text="Items"
+                android:visibility="gone" />
+
+            <ListView
+                android:id="@+id/lv_items"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:clipToPadding="false"
+                android:divider="@android:color/transparent"
+                android:dividerHeight="10dp"
+                android:scrollbars="none" />
+
+            <TextView
+                android:id="@+id/tv_invoices_label"
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:text="Invoices"
+                android:visibility="gone" />
+
+            <ListView
+                android:id="@+id/lv_invoices"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clipToPadding="false"
+                android:divider="@android:color/transparent"
+                android:dividerHeight="10dp"
+                android:scrollbars="none" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

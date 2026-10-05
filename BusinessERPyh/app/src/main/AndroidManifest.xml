@@ -232,6 +232,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".GlobalSearchActivity"
+            android:label="Search"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".ShoesVsNonShoesReportActivity"
             android:label="Shoes vs Non-Shoes"
             android:configChanges="orientation|screenSize|keyboardHidden" />

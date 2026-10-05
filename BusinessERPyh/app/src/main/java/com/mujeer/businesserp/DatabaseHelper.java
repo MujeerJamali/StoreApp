@@ -8639,6 +8639,59 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// GLOBAL SEARCH - invoice numbers only (Parties/Items reuse their
+	// own existing full-list methods, filtered client-side the same way
+	// every other list screen's search box already does via
+	// SearchUtils - there's no separate "search" query for those).
+	// Invoices get their own query instead of a client-side filter
+	// because they live across two tables (sales/purchases) with no
+	// single existing full-list method to reuse.
+	// =====================
+	public ArrayList<HashMap<String, Object>> searchTransactionsByInvoice(String query) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		String likeQuery = "%" + query + "%";
+
+		Cursor cursor = db.rawQuery(
+			"SELECT 'sale', s.id, s.invoice_no, COALESCE(pa.name, 'Cash Sale'), s.date, s.grand_total " +
+			"FROM sales s LEFT JOIN " + TABLE_PARTIES + " pa ON s.party_id = pa.id " +
+			"WHERE s.invoice_no LIKE ? " +
+
+			"UNION ALL " +
+
+			"SELECT 'purchase', p.id, p.invoice_number, pa2.name, p.date, p.grand_total " +
+			"FROM " + TABLE_PURCHASES + " p " +
+			"INNER JOIN " + TABLE_PARTIES + " pa2 ON p.party_id = pa2.id " +
+			"WHERE p.invoice_number LIKE ? " +
+
+			"ORDER BY date DESC",
+
+			new String[]{likeQuery, likeQuery}
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+
+			row.put("transaction_type", cursor.getString(0));
+			row.put("transaction_id", cursor.getInt(1));
+			row.put("invoice", cursor.isNull(2) ? "" : cursor.getString(2));
+			row.put("party_name", cursor.getString(3));
+			row.put("date", cursor.getString(4));
+			row.put("grand_total", cursor.getDouble(5));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// =====================
 	// WANTED ITEMS - a customer asked for something not currently in
 	// stock (an existing catalog item that's out, or something not in
 	// the catalog at all).

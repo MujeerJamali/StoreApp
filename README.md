@@ -279,6 +279,19 @@ order is preserved across app opens (`DashboardFavorites`,
 `SharedPreferences`); the Favorites card and its label are hidden
 entirely when nothing is pinned.
 
+**Global Search**: a tappable search box at the top of the Dashboard
+opens a dedicated Search screen rather than searching inline on an
+already-busy Dashboard. One box searches Parties, Items, and invoice
+numbers (Sale or Purchase) at once, each in its own section, hidden
+independently when it has no matches; tapping a result opens that
+party/item/transaction directly. Parties and Items reuse their own
+existing full-list DB methods, filtered client-side with the same
+`SearchUtils` token-matching every other list screen's search box
+already uses; invoice numbers get their own query
+(`DatabaseHelper.searchTransactionsByInvoice()`) since Sales and
+Purchases are two separate tables with no existing combined list to
+filter.
+
 ## Building
 
 Open `BusinessERPyh/` in Android Studio (compileSdk 29, minSdk 21) and run the

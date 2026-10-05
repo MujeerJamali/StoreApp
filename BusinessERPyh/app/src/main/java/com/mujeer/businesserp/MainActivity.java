@@ -9,6 +9,7 @@ import android.view.MenuItem;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.Spinner;
@@ -64,6 +65,8 @@ public class MainActivity extends Activity {
 	// A background result is only applied if it's still the most
 	// recent request by the time it comes back.
 	private long trendLoadGeneration = 0;
+
+	EditText et_dashboard_search;
 
 	TextView tv_favorites_label;
 	LinearLayout card_favorites;
@@ -128,10 +131,20 @@ public class MainActivity extends Activity {
 		spinner_sales_trend_horizon = findViewById(R.id.spinner_sales_trend_horizon);
 		chart_sales_trend = findViewById(R.id.chart_sales_trend);
 
+		et_dashboard_search = findViewById(R.id.et_dashboard_search);
+
 		tv_favorites_label = findViewById(R.id.tv_favorites_label);
 		card_favorites = findViewById(R.id.card_favorites);
 
 		db = new DatabaseHelper(this);
+
+		et_dashboard_search.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					startActivity(new Intent(MainActivity.this, GlobalSearchActivity.class));
+				}
+			});
 
 		attachFavoriteLongPress(btn_parties, "btn_parties");
 		attachFavoriteLongPress(btn_items, "btn_items");

@@ -34,6 +34,19 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
 
+            <!-- Global search: tapping it opens GlobalSearchActivity
+                 rather than searching inline on an already-busy
+                 Dashboard - see MainActivity's click listener below. -->
+            <EditText
+                android:id="@+id/et_dashboard_search"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:clickable="true"
+                android:focusable="false"
+                android:hint="Search parties, items, invoice numbers..."
+                android:inputType="text|textNoSuggestions" />
+
             <!-- Favorites: long-press any Tool Row below (Modules or
                  Tools card) to pin/unpin it here - long-pressing a
                  pinned row here unpins it too. Hidden entirely when
