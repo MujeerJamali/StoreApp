@@ -237,7 +237,11 @@ unchanged; a Next 7/14/30/60 Days horizon spinner, default 30 Days) ·
 Slow-Moving Stock (every active item still carrying stock that hasn't
 sold within a 30/60/90/180 Days window, oldest/never-sold first - a
 never-sold item always qualifies regardless of how young it is; tapping
-a row opens that item)
+a row opens that item) · Month-over-Month (This Month, 1st through
+today, vs the full previous calendar month, for Sales/Net Profit/
+Expenses - each with its change and % change, colored green/red by
+whether that change is actually an improvement; Expenses is the one
+metric where a decrease is the improvement)
 
 Every report list row that represents an item or a party is tappable
 and opens that item's or party's own screen (Net Profit, Item Ranking,

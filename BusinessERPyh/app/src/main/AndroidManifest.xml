@@ -227,6 +227,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".MonthOverMonthReportActivity"
+            android:label="Month-over-Month"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".ShoesVsNonShoesReportActivity"
             android:label="Shoes vs Non-Shoes"
             android:configChanges="orientation|screenSize|keyboardHidden" />

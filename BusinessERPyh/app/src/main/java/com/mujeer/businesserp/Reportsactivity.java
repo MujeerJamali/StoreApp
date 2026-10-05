@@ -20,6 +20,7 @@ public class Reportsactivity extends Activity {
 	Button btn_report_day_close;
 	Button btn_report_cash_flow_forecast;
 	Button btn_report_slow_moving_stock;
+	Button btn_report_month_over_month;
 	Button btn_report_item_monthly_rank;
 	Button btn_report_average_cart;
 	Button btn_report_profit_split;
@@ -45,6 +46,7 @@ public class Reportsactivity extends Activity {
 		btn_report_day_close = findViewById(R.id.btn_report_day_close);
 		btn_report_cash_flow_forecast = findViewById(R.id.btn_report_cash_flow_forecast);
 		btn_report_slow_moving_stock = findViewById(R.id.btn_report_slow_moving_stock);
+		btn_report_month_over_month = findViewById(R.id.btn_report_month_over_month);
 		btn_report_item_monthly_rank = findViewById(R.id.btn_report_item_monthly_rank);
 		btn_report_average_cart = findViewById(R.id.btn_report_average_cart);
 		btn_report_profit_split = findViewById(R.id.btn_report_profit_split);
@@ -201,6 +203,19 @@ public class Reportsactivity extends Activity {
 					Intent intent = new Intent(
 						Reportsactivity.this,
 						SlowMovingStockReportActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_report_month_over_month.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						Reportsactivity.this,
+						MonthOverMonthReportActivity.class
 					);
 
 					startActivity(intent);
