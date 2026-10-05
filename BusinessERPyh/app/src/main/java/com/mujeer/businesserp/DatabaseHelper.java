@@ -8399,6 +8399,67 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// CASH FLOW FORECAST - today's real cash balance (getCashBalance())
+	// projected forward day by day using only what's already committed
+	// and dated: each not-fully-paid Sale's Due Date as money expected
+	// IN that day, each not-fully-paid Purchase's Due Date as money
+	// expected OUT that day. Nothing here is predicted or averaged from
+	// history - a day with no due Sale/Purchase simply carries the
+	// running balance forward unchanged, which is why this can only
+	// look as far ahead as the furthest Due Date actually entered.
+	//
+	// Purchases have no stored "balance" column the way sales.balance
+	// is kept in sync (see getCreditDueSales()'s own comment on it), so
+	// its due amount is computed here as grand_total - amount_paid
+	// instead of selecting a column.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getCashFlowForecast(int daysAhead) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		double runningBalance = getCashBalance();
+
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+		Calendar cal = Calendar.getInstance();
+
+		for (int i = 0; i < daysAhead; i++) {
+
+			String date = sdf.format(cal.getTime());
+
+			String[] dateArg = new String[]{date};
+
+			double expectedIn = sumColumn(
+				db,
+				"SELECT SUM(balance) FROM sales WHERE balance > 0.01 AND due_date=?",
+				dateArg
+			);
+
+			double expectedOut = sumColumn(
+				db,
+				"SELECT SUM(grand_total - amount_paid) FROM " + TABLE_PURCHASES +
+				" WHERE (grand_total - amount_paid) > 0.01 AND due_date=?",
+				dateArg
+			);
+
+			runningBalance += expectedIn - expectedOut;
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+			row.put("date", date);
+			row.put("expected_in", expectedIn);
+			row.put("expected_out", expectedOut);
+			row.put("running_balance", runningBalance);
+
+			list.add(row);
+
+			cal.add(Calendar.DAY_OF_MONTH, 1);
+		}
+
+		return list;
+	}
+
+	// =====================
 	// WANTED ITEMS - a customer asked for something not currently in
 	// stock (an existing catalog item that's out, or something not in
 	// the catalog at all).

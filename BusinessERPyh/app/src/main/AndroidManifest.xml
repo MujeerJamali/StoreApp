@@ -217,6 +217,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".CashFlowForecastReportActivity"
+            android:label="Cash Flow Forecast"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".ShoesVsNonShoesReportActivity"
             android:label="Shoes vs Non-Shoes"
             android:configChanges="orientation|screenSize|keyboardHidden" />

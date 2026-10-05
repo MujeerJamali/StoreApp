@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView style="@style/PageTitle" android:text="Cash Flow Forecast" />
+
+    <TextView
+        style="@style/FieldLabel"
+        android:layout_marginTop="0dp"
+        android:text="Today's real cash balance projected forward using only Sales and Purchases already due on a future date - not a prediction, so a day with nothing due just carries the balance forward unchanged." />
+
+    <Spinner
+        android:id="@+id/spinner_horizon"
+        style="@style/FilterSpinner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp" />
+
+    <ListView
+        android:id="@+id/lv_cash_flow_forecast"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="10dp"
+        android:scrollbars="none" />
+
+</LinearLayout>

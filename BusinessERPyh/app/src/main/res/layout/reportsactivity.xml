@@ -129,6 +129,16 @@
             android:background="@color/stroke" />
 
         <Button
+            android:id="@+id/btn_report_cash_flow_forecast"
+            style="@style/ToolRow"
+            android:text="Cash Flow Forecast" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
             android:id="@+id/btn_report_item_monthly_rank"
             style="@style/ToolRow"
             android:text="Item Monthly Rank (Sales/Profit)" />
