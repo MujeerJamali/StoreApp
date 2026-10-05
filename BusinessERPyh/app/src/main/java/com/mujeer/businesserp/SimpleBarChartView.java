@@ -133,6 +133,18 @@ public class SimpleBarChartView extends View {
 		float slotWidth = width / (float) count;
 		float barWidth = slotWidth * 0.5f;
 
+		// A handful of entries (every report so far) always gets a
+		// value above and a label below each bar, as before. A
+		// sparkline-style chart with many entries (e.g. 30 daily
+		// points) would make every bar's value/label overlap its
+		// neighbors, so past this threshold only every few bars gets a
+		// label (never the value - with this many bars the point is the
+		// shape, not reading off individual numbers) - existing callers
+		// never pass more than a handful of entries, so this never
+		// changes their rendering.
+		boolean sparse = count > 10;
+		int labelInterval = sparse ? Math.max(1, (int) Math.ceil(count / 6.0)) : 1;
+
 		for (int i = 0; i < count; i++) {
 
 			Entry e = entries.get(i);
@@ -157,11 +169,16 @@ public class SimpleBarChartView extends View {
 
 			canvas.drawRect(centerX - barWidth / 2f, top, centerX + barWidth / 2f, bottom, barPaint);
 
-			float valueY = e.value >= 0 ? Math.max(top - 4 * density, topPadding + valueHeight - 2 * density) : bottom + valueHeight - 2 * density;
+			if (!sparse) {
 
-			canvas.drawText(AmountFormat.format(e.value), centerX, valueY, valuePaint);
+				float valueY = e.value >= 0 ? Math.max(top - 4 * density, topPadding + valueHeight - 2 * density) : bottom + valueHeight - 2 * density;
 
-			canvas.drawText(e.label, centerX, height - 2 * density, labelPaint);
+				canvas.drawText(AmountFormat.format(e.value), centerX, valueY, valuePaint);
+			}
+
+			if (!sparse || i % labelInterval == 0 || i == count - 1) {
+				canvas.drawText(e.label, centerX, height - 2 * density, labelPaint);
+			}
 		}
 	}
 }

@@ -5,12 +5,17 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.view.MenuItem;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.PopupMenu;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.Locale;
 
 public class MainActivity extends Activity {
@@ -44,6 +49,18 @@ public class MainActivity extends Activity {
 	TextView tv_expense_today;
 	TextView tv_expense_week;
 	TextView tv_expense_month;
+
+	Spinner spinner_sales_trend_horizon;
+	SimpleBarChartView chart_sales_trend;
+
+	private static final int[] TREND_HORIZON_DAYS = {7, 30};
+	private static final String[] TREND_HORIZON_LABELS = {"7 Days", "30 Days"};
+
+	private int selectedTrendHorizonDays = TREND_HORIZON_DAYS[0];
+
+	// A background result is only applied if it's still the most
+	// recent request by the time it comes back.
+	private long trendLoadGeneration = 0;
 
 	DatabaseHelper db;
 
@@ -82,7 +99,29 @@ public class MainActivity extends Activity {
 		tv_expense_week = findViewById(R.id.tv_expense_week);
 		tv_expense_month = findViewById(R.id.tv_expense_month);
 
+		spinner_sales_trend_horizon = findViewById(R.id.spinner_sales_trend_horizon);
+		chart_sales_trend = findViewById(R.id.chart_sales_trend);
+
 		db = new DatabaseHelper(this);
+
+		ArrayAdapter<String> trendHorizonAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, TREND_HORIZON_LABELS
+		);
+
+		trendHorizonAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_sales_trend_horizon.setAdapter(trendHorizonAdapter);
+
+		spinner_sales_trend_horizon.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+				@Override
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectedTrendHorizonDays = TREND_HORIZON_DAYS[position];
+					loadSalesTrend();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
+				}
+			});
 
 
 		btn_expenses.setOnClickListener(
@@ -366,6 +405,7 @@ public class MainActivity extends Activity {
 	protected void onResume() {
 		super.onResume();
 		loadCashSummary();
+		loadSalesTrend();
 	}
 
 	// Computed off the main thread - a handful of SUM queries, but still
@@ -444,5 +484,61 @@ public class MainActivity extends Activity {
 						});
 				}
 			}).start();
+	}
+
+	// Last N days' daily sales total, including a day with zero sales
+	// - a quick "is the shop busy lately" glance, not another profit
+	// report (see DatabaseHelper.getDailySalesTrend()).
+	private void loadSalesTrend() {
+
+		final long myGeneration = ++trendLoadGeneration;
+		final int days = selectedTrendHorizonDays;
+
+		new Thread(new Runnable() {
+				@Override
+				public void run() {
+
+					final ArrayList<HashMap<String, Object>> trend = db.getDailySalesTrend(days);
+
+					runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
+
+								if (myGeneration != trendLoadGeneration || isFinishing()) {
+									return;
+								}
+
+								applySalesTrend(trend);
+							}
+						});
+				}
+			}).start();
+	}
+
+	private void applySalesTrend(ArrayList<HashMap<String, Object>> trend) {
+
+		SimpleDateFormat dayFormat = new SimpleDateFormat("d", Locale.getDefault());
+		SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+
+		int salesColor = getResources().getColor(R.color.mod_sales);
+
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+
+		for (HashMap<String, Object> row : trend) {
+
+			String date = (String) row.get("date");
+			double total = (Double) row.get("total");
+
+			String label = date;
+
+			try {
+				label = dayFormat.format(isoFormat.parse(date));
+			} catch (Exception e) {
+			}
+
+			chartEntries.add(new SimpleBarChartView.Entry(label, total, salesColor));
+		}
+
+		chart_sales_trend.setEntries(chartEntries);
 	}
 }

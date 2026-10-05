@@ -255,11 +255,20 @@ the Party Balances report.
 All period-based reports share the same range selector: Today, Yesterday,
 Week, Month, Quarter, Year, Custom Range.
 
-**Charts**: Net Profit, Stock Worth, Shoes vs Non-Shoes, and Profit: Cash
-Sale vs Party each show a small bar chart alongside their summary figures,
-drawn by a dependency-free custom view (`SimpleBarChartView` - no charting
-library is wired into the project). This is an ongoing pass, not a finished
-one - more reports get charts over time.
+**Charts**: Net Profit, Stock Worth, Shoes vs Non-Shoes, Profit: Cash
+Sale vs Party, and Month-over-Month each show a small bar chart
+alongside their summary figures, drawn by a dependency-free custom view
+(`SimpleBarChartView` - no charting library is wired into the project).
+This is an ongoing pass, not a finished one - more reports get charts
+over time.
+
+The Dashboard also has a Sales Trend sparkline (daily sales total for
+the last 7/30 days, including a day with zero sales - a quick "is the
+shop busy lately" glance, not a profit report) using the same
+`SimpleBarChartView`. Past 10 entries it switches to a sparser
+rendering (no per-bar value text, only every few bars labeled) so a
+30-point chart doesn't turn into overlapping text - every other chart
+above has far fewer entries and renders exactly as before.
 
 ## Building
 

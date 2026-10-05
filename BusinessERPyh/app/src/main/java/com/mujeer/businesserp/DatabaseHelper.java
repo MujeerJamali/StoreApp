@@ -8602,6 +8602,43 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// DAILY SALES TREND - one row per day for the last N days (oldest
+	// first), including a day with zero sales, for the Dashboard's
+	// trend sparkline. Deliberately a plain day-by-day total (not
+	// profit) - a quick "is the shop busy lately" glance, not another
+	// profit report.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getDailySalesTrend(int days) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+		Calendar cal = Calendar.getInstance();
+		cal.add(Calendar.DAY_OF_MONTH, -(days - 1));
+
+		for (int i = 0; i < days; i++) {
+
+			String date = sdf.format(cal.getTime());
+
+			double total = sumColumn(
+				db, "SELECT SUM(grand_total) FROM sales WHERE date=?", new String[]{date}
+			);
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+			row.put("date", date);
+			row.put("total", total);
+
+			list.add(row);
+
+			cal.add(Calendar.DAY_OF_MONTH, 1);
+		}
+
+		return list;
+	}
+
+	// =====================
 	// WANTED ITEMS - a customer asked for something not currently in
 	// stock (an existing catalog item that's out, or something not in
 	// the catalog at all).
