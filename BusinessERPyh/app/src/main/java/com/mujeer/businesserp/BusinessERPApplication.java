@@ -8,12 +8,13 @@ public class BusinessERPApplication extends Application {
 	public void onCreate() {
 		super.onCreate();
 
-		// Once-per-calendar-day check for any credit Sale due today (see
-		// CreditDueNotifier) - lives here, not in a specific Activity's
-		// onCreate()/onResume(), so it fires exactly once per process
-		// start no matter which screen the app actually opens to. The
-		// app's launcher is Transactioneditactivity (straight to Add
-		// Sale), not MainActivity's Dashboard - see AndroidManifest.xml.
+		// Once-per-calendar-day checks (see each notifier's own comment)
+		// - live here, not in a specific Activity's onCreate()/onResume(),
+		// so they fire exactly once per process start no matter which
+		// screen the app actually opens to. The app's launcher is
+		// Transactioneditactivity (straight to Add Sale), not
+		// MainActivity's Dashboard - see AndroidManifest.xml.
 		CreditDueNotifier.checkAndNotifyIfNeeded(getApplicationContext());
+		LowStockNotifier.checkAndNotifyIfNeeded(getApplicationContext());
 	}
 }

@@ -128,13 +128,14 @@ BusinessERPyh/                  Gradle project root
   it to reference); if stock remains, the app asks "was this the
   Display/Sample one?" for each board that has an entry.
 - **Notifications** — once per calendar day, on the app's first open that
-  day (tracked in its own SharedPreferences, not the business database -
-  see `CreditDueNotifier`/`BusinessERPApplication`), checks for any
-  credit Sale whose Due Date is today and, if there's at least one,
-  posts a single system notification listing each one's party and
-  balance. Tapping it opens that Sale directly when there's exactly
-  one, or the Credit Due report (already defaulted to Today) when
-  there's more than one.
+  day (tracked in its own SharedPreferences per notifier, not the
+  business database - see `BusinessERPApplication`), two independent
+  checks each post their own notification when there's something to
+  flag: `CreditDueNotifier` for any credit Sale whose Due Date is today
+  (party + balance per line, opens that Sale directly or the Credit Due
+  report), and `LowStockNotifier` for any active item at or below its
+  own Reorder Threshold (name + current stock per line, opens that item
+  directly or the Low Stock report).
 - **Data tools** — bulk Excel import for purchases and items; full backup
   export/import in Vyapar's `.vyb` format. Alongside standard Vyapar data
   (parties, items, purchases, sales, payments, expenses, party transfers),
@@ -179,7 +180,9 @@ Next 3 Days/Next 7 Days/This Month/All/Custom Range, default Today,
 forward-looking unlike
 every other report's period selector since a due date is something
 still coming rather than something that already happened; tapping a
-row opens that sale) · Item
+row opens that sale) · Low Stock (every active item at or below its
+own Reorder Threshold, lowest stock first, no period selector - always
+right now; tapping a row opens that item) · Item
 Monthly Rank (penalizes months an item didn't sell) · Average Cart
 Size/Amount · Profit: Cash Sale vs Party · Shoes vs Non-Shoes
 (Sale/Profit toggle, same period selector, % split between shoe items
@@ -195,7 +198,7 @@ directly)
 Every report list row that represents an item or a party is tappable
 and opens that item's or party's own screen (Net Profit, Item Ranking,
 Party Ranking, Sales by Party, Item Monthly Rank, Party Balances,
-Combo/Variety Stock).
+Combo/Variety Stock, Low Stock).
 
 The Parties list itself also sorts (Recent/Oldest Activity, Balance
 High-Low/Low-High, Name A-Z/Z-A) using the same underlying query as

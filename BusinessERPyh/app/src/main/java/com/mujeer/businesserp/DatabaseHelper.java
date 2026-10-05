@@ -4924,6 +4924,47 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// REPORT: LOW STOCK - every active item with a reorder_threshold
+	// above 0 (0 means "no alert configured") whose current total
+	// balance (summed across variety sizes already, same figure
+	// Itemseditactivity's Current Stock shows) is at or below it.
+	// Lowest stock first, so the most urgent ones lead. An inactive
+	// item is excluded, same as everywhere else an item picker/alert
+	// filters on active - a discontinued item being "low" isn't
+	// actionable.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getLowStockItems() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, code, name, balance, reorder_threshold FROM " + TABLE_ITEMS +
+			" WHERE active = 1 AND reorder_threshold > 0 AND balance <= reorder_threshold" +
+			" ORDER BY balance ASC, name ASC",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<>();
+
+			row.put("item_id", cursor.getInt(0));
+			row.put("code", cursor.getString(1));
+			row.put("name", cursor.getString(2));
+			row.put("balance", cursor.getDouble(3));
+			row.put("reorder_threshold", cursor.getDouble(4));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// =====================
 	// REPORT: STOCK WORTH - current stock quantity times purchase_price,
 	// split into shoes/non-shoes by the same name-prefix rule as
 	// everywhere else. This is always a snapshot of right now: the app
