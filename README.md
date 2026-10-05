@@ -188,7 +188,12 @@ re-blend it.
 
 ## Reports
 
-Total Sales · Sales by Party · Item Ranking · Party Ranking · Net Profit
+Total Sales · Sales by Party (also doubles as Top Customers - its sort
+spinner has Profit: High to Low/Low to High alongside Amount/Name/
+Number of Sales, ranked by what each party actually contributed to
+profit rather than just how much they spent, and every row always
+shows both amount and profit regardless of which one it's sorted by) ·
+Item Ranking · Party Ranking · Net Profit
 (a merged Item Profitability report - the per-item breakdown has a
 This Period/Standing Margin mode toggle: This Period is actual
 profit/loss for every item with a sale in the period; Standing Margin

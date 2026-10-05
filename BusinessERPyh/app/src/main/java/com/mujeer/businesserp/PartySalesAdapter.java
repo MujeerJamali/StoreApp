@@ -53,6 +53,7 @@ public class PartySalesAdapter extends BaseAdapter {
 
 		TextView tv_party_name = convertView.findViewById(R.id.tv_party_name);
 		TextView tv_party_count = convertView.findViewById(R.id.tv_party_count);
+		TextView tv_party_profit = convertView.findViewById(R.id.tv_party_profit);
 		TextView tv_party_total = convertView.findViewById(R.id.tv_party_total);
 
 		HashMap<String, Object> row = list.get(position);
@@ -79,6 +80,18 @@ public class PartySalesAdapter extends BaseAdapter {
 
 		tv_party_total.setText(
 			AmountFormat.format(total)
+		);
+
+		double profit = row.get("profit") == null ? 0 : Double.parseDouble(
+			row.get("profit").toString()
+		);
+
+		tv_party_profit.setText(
+			"Profit " + AmountFormat.format(profit)
+		);
+
+		tv_party_profit.setTextColor(
+			activity.getResources().getColor(profit >= 0 ? R.color.success : R.color.danger)
 		);
 
 		return convertView;

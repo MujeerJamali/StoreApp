@@ -4278,6 +4278,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	public static final int SORT_NAME_ASC = 2;
 	public static final int SORT_COUNT_DESC = 3;
 
+	// Top Customers ranking - by profit contributed, not just amount
+	// spent (a party that haggles hard on a big-ticket item can spend
+	// more than one who doesn't, while contributing less profit).
+	public static final int SORT_PROFIT_DESC = 4;
+	public static final int SORT_PROFIT_ASC = 5;
+
 	public ArrayList<HashMap<String, Object>> getSalesByParty(
 		String fromDate,
 		String toDate,
@@ -4301,6 +4307,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 				orderBy = "cnt DESC";
 				break;
 
+			case SORT_PROFIT_ASC:
+				orderBy = "profit ASC";
+				break;
+
+			case SORT_PROFIT_DESC:
+				orderBy = "profit DESC";
+				break;
+
 			case SORT_AMOUNT_DESC:
 			default:
 				orderBy = "total DESC";
@@ -4309,10 +4323,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getReadableDatabase();
 
+		// profit is always computed (not only when sorting by it) so a
+		// Top Customers view of this same list can show it alongside
+		// amount without a second query - same item-cost-minus-sales-
+		// amount formula as getNetProfitByItem(), just grouped by party
+		// instead of by item.
 		Cursor cursor = db.rawQuery(
 
 			"SELECT p.id, p.name, COUNT(s.id) AS cnt, " +
-			"COALESCE(SUM(s.grand_total), 0) AS total " +
+			"COALESCE(SUM(s.grand_total), 0) AS total, " +
+			"COALESCE((" +
+			"SELECT SUM(si.amount) - SUM(si.qty * (i.purchase_price + i.extra_cost_per_unit)) " +
+			"FROM sale_items si " +
+			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = si.item_id " +
+			"WHERE si.sale_id IN (" +
+			"SELECT id FROM sales WHERE party_id = p.id AND date BETWEEN ? AND ?" +
+			")" +
+			"), 0) AS profit " +
 			"FROM " + TABLE_PARTIES + " p " +
 			"INNER JOIN sales s " +
 			"ON s.party_id = p.id " +
@@ -4321,6 +4348,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"ORDER BY " + orderBy,
 
 			new String[]{
+				fromDate,
+				toDate,
 				fromDate,
 				toDate
 			}
@@ -4334,6 +4363,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("party_name", cursor.getString(1));
 			map.put("count", cursor.getInt(2));
 			map.put("total", cursor.getDouble(3));
+			map.put("profit", cursor.getDouble(4));
 
 			list.add(map);
 		}

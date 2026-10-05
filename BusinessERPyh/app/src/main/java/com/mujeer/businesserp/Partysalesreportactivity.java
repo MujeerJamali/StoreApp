@@ -43,11 +43,18 @@ public class Partysalesreportactivity extends Activity {
 
 	private static final int[] SORT_VALUES = {
 		DatabaseHelper.SORT_AMOUNT_DESC, DatabaseHelper.SORT_AMOUNT_ASC,
+		DatabaseHelper.SORT_PROFIT_DESC, DatabaseHelper.SORT_PROFIT_ASC,
 		DatabaseHelper.SORT_NAME_ASC, DatabaseHelper.SORT_COUNT_DESC
 	};
 
+	// Profit: High to Low is the "Top Customers" view - ranked by what
+	// a party actually contributed to profit, not just how much they
+	// spent (a party that haggles hard on a big-ticket item can spend
+	// more while contributing less profit than one who doesn't).
 	private static final String[] SORT_LABELS = {
-		"Amount: High to Low", "Amount: Low to High", "Party Name", "Number of Sales"
+		"Amount: High to Low", "Amount: Low to High",
+		"Profit: High to Low", "Profit: Low to High",
+		"Party Name", "Number of Sales"
 	};
 
 	private TextView tv_empty;
