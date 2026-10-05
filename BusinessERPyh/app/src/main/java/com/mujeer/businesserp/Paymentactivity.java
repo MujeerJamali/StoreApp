@@ -256,9 +256,35 @@ public class Paymentactivity extends Activity {
 
 		paymentList.clear();
 
-		paymentList.addAll(
-			db.getPayments()
-		);
+		// Set only when launched from DayCloseReportActivity's Payments
+		// In/Out cards - pins the list to that one type and day.
+		int filterType = getIntent().getIntExtra("payment_type", -1);
+		String filterDate = getIntent().getStringExtra("date");
+
+		if (filterType != -1 && filterDate != null) {
+
+			paymentList.addAll(
+				db.getPaymentsByType(filterType, filterDate, filterDate)
+			);
+
+		} else if (filterDate != null) {
+
+			paymentList.addAll(
+				db.getPayments(filterDate, filterDate)
+			);
+
+		} else if (filterType != -1) {
+
+			paymentList.addAll(
+				db.getPaymentsByType(filterType)
+			);
+
+		} else {
+
+			paymentList.addAll(
+				db.getPayments()
+			);
+		}
 
 		adapter = new PaymentAdapter(
 			this,

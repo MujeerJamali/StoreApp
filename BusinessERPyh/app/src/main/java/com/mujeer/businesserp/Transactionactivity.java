@@ -25,6 +25,13 @@ public class Transactionactivity extends Activity {
 
 	private int transactionType = TYPE_PURCHASE;
 
+	// Set only when launched from DayCloseReportActivity's Sales/
+	// Purchases cards - when present, every load (onCreate's and every
+	// onResume's) stays pinned to this one day instead of the normal
+	// unfiltered list, exactly like a manually-applied Custom Range.
+	private String filterFromDate;
+	private String filterToDate;
+
 	private EditText et_search;
 	private TextView tv_empty;
 	private TextView tv_page_title;
@@ -50,6 +57,9 @@ public class Transactionactivity extends Activity {
 			"transaction_type",
 			TYPE_PURCHASE
 		);
+
+		filterFromDate = getIntent().getStringExtra("from_date");
+		filterToDate = getIntent().getStringExtra("to_date");
 
 		et_search = findViewById(R.id.et_search);
 		tv_empty = findViewById(R.id.tv_empty);
@@ -250,6 +260,11 @@ public class Transactionactivity extends Activity {
 	}
 
 	private void loadTransactions() {
+
+		if (filterFromDate != null && filterToDate != null) {
+			loadTransactions(filterFromDate, filterToDate);
+			return;
+		}
 
 		transactionList.clear();
 

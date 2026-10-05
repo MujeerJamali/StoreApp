@@ -268,9 +268,23 @@ public class Expensesactivity extends Activity {
 
 		lv_expenses.setEmptyView(tv_empty);
 
-		adapter.filter(
-			et_search.getText().toString()
-		);
+		// Set only when launched from DayCloseReportActivity's Expenses
+		// card - pins the list to that one day, same mechanism as the
+		// Filter Expenses dialog's own From/To fields.
+		String filterDate = getIntent().getStringExtra("date");
+
+		if (filterDate != null) {
+
+			adapter.filter(
+				et_search.getText().toString(), filterDate, filterDate
+			);
+
+		} else {
+
+			adapter.filter(
+				et_search.getText().toString()
+			);
+		}
 	}
 
 	// =====================

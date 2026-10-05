@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView style="@style/PageTitle" android:text="Day Close" />
+
+        <TextView
+            style="@style/FieldLabel"
+            android:layout_marginTop="0dp"
+            android:layout_marginBottom="12dp"
+            android:text="One day's Sales, Purchases, Expenses and Payments at a glance, plus how much that day actually moved the cash balance. Tap any row to see what's behind it." />
+
+        <EditText
+            android:id="@+id/et_date"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:clickable="true"
+            android:focusable="false"
+            android:hint="Date"
+            android:inputType="text|textNoSuggestions" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/row_sales"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:background="?android:attr/selectableItemBackground"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Sales" />
+
+                <TextView
+                    android:id="@+id/tv_sales_total"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0.00"
+                    android:textColor="@color/mod_sales"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_sales_count"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0 sales"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/stroke" />
+
+            <LinearLayout
+                android:id="@+id/row_purchases"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:background="?android:attr/selectableItemBackground"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Purchases" />
+
+                <TextView
+                    android:id="@+id/tv_purchases_total"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0.00"
+                    android:textColor="@color/mod_purchase"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_purchases_count"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0 purchases"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/stroke" />
+
+            <LinearLayout
+                android:id="@+id/row_expenses"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:background="?android:attr/selectableItemBackground"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Expenses" />
+
+                <TextView
+                    android:id="@+id/tv_expenses_total"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0.00"
+                    android:textColor="@color/mod_expenses"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/stroke" />
+
+            <LinearLayout
+                android:id="@+id/row_payments_in"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:background="?android:attr/selectableItemBackground"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Payments In" />
+
+                <TextView
+                    android:id="@+id/tv_payments_in_total"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0.00"
+                    android:textColor="@color/mod_payments"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/stroke" />
+
+            <LinearLayout
+                android:id="@+id/row_payments_out"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:background="?android:attr/selectableItemBackground"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Payments Out" />
+
+                <TextView
+                    android:id="@+id/tv_payments_out_total"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0.00"
+                    android:textColor="@color/mod_payments"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/stroke" />
+
+            <LinearLayout
+                android:id="@+id/row_net_cash"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:background="?android:attr/selectableItemBackground"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Net Cash Movement" />
+
+                <TextView
+                    android:id="@+id/tv_net_cash"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0.00"
+                    android:textColor="@color/text_primary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

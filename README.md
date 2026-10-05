@@ -213,7 +213,13 @@ selected size across every item just under the filter; each row shows
 the item's name and every size it comes in with stock, the size
 matching the filter shown first, bold, and (when a size is selected)
 used to sort items highest-stock-first; tapping an item opens it
-directly)
+directly) · Day Close (one day's Sales/Purchases/Expenses/Payments In/
+Payments Out totals plus how much that day actually moved the running
+cash balance, a date picker defaulting to today but able to review any
+past day; each row taps through to that category's own list,
+pre-filtered to that one date - Sales/Purchases open Transactionactivity,
+Expenses opens Expensesactivity, Payments In/Out open Paymentactivity,
+and Net Cash Movement opens the Cash ledger)
 
 Every report list row that represents an item or a party is tappable
 and opens that item's or party's own screen (Net Profit, Item Ranking,

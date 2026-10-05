@@ -6210,6 +6210,55 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return list;
 	}
 
+	// Type + date-range combined - DayCloseReportActivity's Payments In/
+	// Out cards open here scoped to just the one day they're showing.
+	public ArrayList<HashMap<String, Object>> getPaymentsByType(
+		int type, String fromDate, String toDate
+	) {
+
+		ArrayList<HashMap<String, Object>> list =
+			new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db =
+			this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+
+			"SELECT py.id, py.code, py.type, p.name, " +
+			"py.date, py.amount " +
+			"FROM " + TABLE_PAYMENTS + " py " +
+			"INNER JOIN " + TABLE_PARTIES + " p " +
+			"ON py.party_id = p.id " +
+			"WHERE py.type=? AND py.date BETWEEN ? AND ? " +
+			"ORDER BY py.date DESC, py.time DESC",
+
+			new String[]{
+				String.valueOf(type),
+				fromDate,
+				toDate
+			}
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> map =
+				new HashMap<String, Object>();
+
+			map.put("id", cursor.getInt(0));
+			map.put("code", cursor.getString(1));
+			map.put("type", cursor.getInt(2));
+			map.put("party_name", cursor.getString(3));
+			map.put("date", cursor.getString(4));
+			map.put("amount", cursor.getDouble(5));
+
+			list.add(map);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
 	// =====================
 // INSERT EXPENSE
 // =====================
@@ -8035,16 +8084,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// credit purchase) are left out - there's nothing to show for them
 	// here.
 	public ArrayList<HashMap<String, Object>> getCashLedger() {
+		return getCashLedger(null);
+	}
+
+	// One date's slice of the same ledger - DayCloseReportActivity's
+	// "net cash movement" card opens here with today's date so the user
+	// can see exactly what moved the running balance that day, without
+	// losing the plain, unfiltered ledger the Cash screen normally shows.
+	public ArrayList<HashMap<String, Object>> getCashLedger(String date) {
 
 		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
 
 		SQLiteDatabase db = this.getReadableDatabase();
 
+		String dateFilter = date != null ? "AND date=? " : "";
+
 		Cursor cursor = db.rawQuery(
 			"SELECT date, time, paid_amount AS amount, " +
 			"('Sale - ' || COALESCE(pa.name, 'Cash Sale')) AS label, source, 0, NULL, 'sale', s.id " +
 			"FROM sales s LEFT JOIN " + TABLE_PARTIES + " pa ON s.party_id = pa.id " +
-			"WHERE paid_amount != 0 " +
+			"WHERE paid_amount != 0 " + dateFilter +
 
 			"UNION ALL " +
 
@@ -8052,26 +8111,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"('Purchase - ' || pa.name), source, 0, NULL, 'purchase', p.id " +
 			"FROM " + TABLE_PURCHASES + " p " +
 			"INNER JOIN " + TABLE_PARTIES + " pa ON p.party_id = pa.id " +
-			"WHERE amount_paid != 0 " +
+			"WHERE amount_paid != 0 " + dateFilter +
 
 			"UNION ALL " +
 
 			"SELECT date, time, amount, ('Payment In - ' || pa.name), source, 0, NULL, 'payment', pm.id " +
 			"FROM " + TABLE_PAYMENTS + " pm " +
 			"INNER JOIN " + TABLE_PARTIES + " pa ON pm.party_id = pa.id " +
-			"WHERE type=" + PAYMENT_IN + " " +
+			"WHERE type=" + PAYMENT_IN + " " + dateFilter +
 
 			"UNION ALL " +
 
 			"SELECT date, time, -amount, ('Payment Out - ' || pa.name), source, 0, NULL, 'payment', pm.id " +
 			"FROM " + TABLE_PAYMENTS + " pm " +
 			"INNER JOIN " + TABLE_PARTIES + " pa ON pm.party_id = pa.id " +
-			"WHERE type=" + PAYMENT_OUT + " " +
+			"WHERE type=" + PAYMENT_OUT + " " + dateFilter +
 
 			"UNION ALL " +
 
 			"SELECT date, time, -paid_amount, ('Expense - ' || item), source, 0, NULL, 'expense', id " +
-			"FROM " + TABLE_EXPENSES + " WHERE paid_amount != 0 " +
+			"FROM " + TABLE_EXPENSES + " WHERE paid_amount != 0 " + dateFilter +
 
 			"UNION ALL " +
 
@@ -8079,10 +8138,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"('Adjustment' || CASE WHEN notes IS NOT NULL AND notes != '' " +
 			"THEN ' - ' || notes ELSE '' END), source, id, notes, 'adjustment', id " +
 			"FROM " + TABLE_CASH_ADJUSTMENTS +
+			(date != null ? " WHERE date=? " : " ") +
 
 			" ORDER BY date DESC, time DESC",
 
-			null
+			date != null ? new String[]{date, date, date, date, date, date} : null
 		);
 
 		while (cursor.moveToNext()) {
@@ -8256,6 +8316,86 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			" AND id NOT IN (SELECT expense_id FROM " + TABLE_PURCHASE_EXPENSE_LINKS + ")",
 			new String[]{fromDate, toDate}
 		);
+	}
+
+	// =====================
+	// DAY CLOSE SUMMARY - one date's Sales/Purchases/Expenses/Payments
+	// totals plus how much the cash balance actually moved that day, for
+	// DayCloseReportActivity's end-of-day review screen.
+	//
+	// "Expenses" here matches getExpenseTotalForRange()'s own convention
+	// (SUM(amount), purchase-linked expenses excluded) so it agrees with
+	// the same date's Expenses list total rather than introducing a
+	// second, differently-scoped expense figure.
+	//
+	// net_cash_movement instead mirrors getCashBalance()'s formula
+	// exactly (paid_amount/amount_paid, nothing excluded) but scoped to
+	// this one date, so it reads as "how much today moved the running
+	// cash balance" - a purchase-linked expense's cash still left the
+	// till today whether or not it's shown separately as an "expense".
+	// =====================
+	public HashMap<String, Object> getDayCloseSummary(String date) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		HashMap<String, Object> summary = new HashMap<String, Object>();
+
+		String[] dateArg = new String[]{date};
+
+		Cursor salesCursor = db.rawQuery(
+			"SELECT COUNT(*), COALESCE(SUM(grand_total), 0), COALESCE(SUM(paid_amount), 0) " +
+			"FROM sales WHERE date=?",
+			dateArg
+		);
+		salesCursor.moveToFirst();
+		summary.put("sales_count", salesCursor.getInt(0));
+		summary.put("sales_total", salesCursor.getDouble(1));
+		double salesPaid = salesCursor.getDouble(2);
+		salesCursor.close();
+
+		Cursor purchasesCursor = db.rawQuery(
+			"SELECT COUNT(*), COALESCE(SUM(grand_total), 0), COALESCE(SUM(amount_paid), 0) " +
+			"FROM " + TABLE_PURCHASES + " WHERE date=?",
+			dateArg
+		);
+		purchasesCursor.moveToFirst();
+		summary.put("purchases_count", purchasesCursor.getInt(0));
+		summary.put("purchases_total", purchasesCursor.getDouble(1));
+		double purchasesPaid = purchasesCursor.getDouble(2);
+		purchasesCursor.close();
+
+		double expensesTotal = sumColumn(
+			db,
+			"SELECT SUM(amount) FROM " + TABLE_EXPENSES +
+			" WHERE date=?" +
+			" AND id NOT IN (SELECT expense_id FROM " + TABLE_PURCHASE_EXPENSE_LINKS + ")",
+			dateArg
+		);
+		summary.put("expenses_total", expensesTotal);
+
+		double expensesPaid = sumColumn(
+			db, "SELECT SUM(paid_amount) FROM " + TABLE_EXPENSES + " WHERE date=?", dateArg
+		);
+
+		double paymentsIn = sumColumn(
+			db,
+			"SELECT SUM(amount) FROM " + TABLE_PAYMENTS + " WHERE date=? AND type=?",
+			new String[]{date, String.valueOf(PAYMENT_IN)}
+		);
+		summary.put("payments_in_total", paymentsIn);
+
+		double paymentsOut = sumColumn(
+			db,
+			"SELECT SUM(amount) FROM " + TABLE_PAYMENTS + " WHERE date=? AND type=?",
+			new String[]{date, String.valueOf(PAYMENT_OUT)}
+		);
+		summary.put("payments_out_total", paymentsOut);
+
+		double netCashMovement =
+			salesPaid - purchasesPaid + paymentsIn - paymentsOut - expensesPaid;
+		summary.put("net_cash_movement", netCashMovement);
+
+		return summary;
 	}
 
 	// =====================

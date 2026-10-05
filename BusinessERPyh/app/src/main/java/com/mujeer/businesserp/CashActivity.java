@@ -99,8 +99,15 @@ public class CashActivity extends Activity {
             @Override
             public void run() {
 
+                // Set only when launched from DayCloseReportActivity's
+                // Net Cash Movement card - the balance stays the real
+                // running total, only the ledger below is pinned to
+                // that one day so the user sees what moved it.
+                String filterDate = getIntent().getStringExtra("date");
+
                 final double balance = db.getCashBalance();
-                final ArrayList<HashMap<String, Object>> ledger = db.getCashLedger();
+                final ArrayList<HashMap<String, Object>> ledger =
+                    filterDate != null ? db.getCashLedger(filterDate) : db.getCashLedger();
 
                 runOnUiThread(new Runnable() {
                     @Override

@@ -212,6 +212,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".DayCloseReportActivity"
+            android:label="Day Close"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".ShoesVsNonShoesReportActivity"
             android:label="Shoes vs Non-Shoes"
             android:configChanges="orientation|screenSize|keyboardHidden" />
