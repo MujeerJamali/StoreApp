@@ -410,6 +410,16 @@
                     style="@style/ToolRow"
                     android:text="Sample Shoes" />
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <Button
+                    android:id="@+id/btn_recently_deleted"
+                    style="@style/ToolRow"
+                    android:text="Recently Deleted" />
+
             </LinearLayout>
 
         </LinearLayout>

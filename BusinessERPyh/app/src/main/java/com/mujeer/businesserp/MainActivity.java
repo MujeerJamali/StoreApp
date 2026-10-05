@@ -46,6 +46,7 @@ public class MainActivity extends Activity {
 	Button btn_cost_items;
 	Button btn_display_shoes;
 	Button btn_sample_shoes;
+	Button btn_recently_deleted;
 
 	Button btn_quick_add;
 
@@ -80,7 +81,7 @@ public class MainActivity extends Activity {
 		"btn_payments", "btn_expenses", "btn_reports",
 		"btn_import", "btn_generate_entries", "btn_cash", "btn_wanted_items",
 		"btn_recurring_expenses", "btn_drafts", "btn_cost_items",
-		"btn_display_shoes", "btn_sample_shoes"
+		"btn_display_shoes", "btn_sample_shoes", "btn_recently_deleted"
 	};
 
 	private static final String[] SHORTCUT_LABELS = {
@@ -88,7 +89,7 @@ public class MainActivity extends Activity {
 		"Payments", "Expenses", "Reports",
 		"Import", "Generate Entries", "Cash", "Wanted Items",
 		"Recurring Expenses", "Drafts", "Cost Items",
-		"Display Shoes", "Sample Shoes"
+		"Display Shoes", "Sample Shoes", "Recently Deleted"
 	};
 
 	DatabaseHelper db;
@@ -120,6 +121,7 @@ public class MainActivity extends Activity {
 		btn_cost_items = findViewById(R.id.btn_cost_items);
 		btn_display_shoes = findViewById(R.id.btn_display_shoes);
 		btn_sample_shoes = findViewById(R.id.btn_sample_shoes);
+		btn_recently_deleted = findViewById(R.id.btn_recently_deleted);
 
 		btn_quick_add = findViewById(R.id.btn_quick_add);
 
@@ -162,6 +164,7 @@ public class MainActivity extends Activity {
 		attachFavoriteLongPress(btn_cost_items, "btn_cost_items");
 		attachFavoriteLongPress(btn_display_shoes, "btn_display_shoes");
 		attachFavoriteLongPress(btn_sample_shoes, "btn_sample_shoes");
+		attachFavoriteLongPress(btn_recently_deleted, "btn_recently_deleted");
 
 		ArrayAdapter<String> trendHorizonAdapter = new ArrayAdapter<String>(
 			this, android.R.layout.simple_spinner_item, TREND_HORIZON_LABELS
@@ -393,6 +396,19 @@ public class MainActivity extends Activity {
 					Intent intent = new Intent(
 						MainActivity.this,
 						SampleShoesActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_recently_deleted.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						RecentlyDeletedActivity.class
 					);
 
 					startActivity(intent);
@@ -647,6 +663,10 @@ public class MainActivity extends Activity {
 
 			case "btn_sample_shoes":
 				intent = new Intent(this, SampleShoesActivity.class);
+				break;
+
+			case "btn_recently_deleted":
+				intent = new Intent(this, RecentlyDeletedActivity.class);
 				break;
 
 			default:

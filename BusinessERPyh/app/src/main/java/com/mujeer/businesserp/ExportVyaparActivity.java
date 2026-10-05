@@ -219,6 +219,19 @@ public class ExportVyaparActivity extends Activity {
 			exportDisplayShoes(local, vyb);
 			exportSampleShoes(local, vyb);
 
+			// Deliberately NOT exported: TABLE_RECENTLY_DELETED. Unlike
+			// every table above, it holds already-deleted data's
+			// temporary echo (a 30-day undo grace period, auto-purged -
+			// see DatabaseHelper.purgeOldRecentlyDeleted()), not real
+			// standing user data the way Drafts (unsaved future work)
+			// or Wanted Items are. Its snapshot JSON is also keyed to
+			// this exact database's own party_id/item_id/combo_id
+			// values, which a restore-into-a-different-install backup
+			// has no way to remap the way importDrafts() remaps a
+			// draft's embedded ids - carrying it over would risk
+			// restoring a transaction against the wrong party/item in
+			// the destination database.
+
 			vyb.setTransactionSuccessful();
 			vyb.endTransaction();
 

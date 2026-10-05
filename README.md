@@ -59,15 +59,31 @@ BusinessERPyh/                  Gradle project root
   any row enters selection mode (every row gets a checkbox, replacing
   that row's own single-delete confirmation) and a bar appears with a
   live "N selected" count plus Delete/Cancel; Delete confirms once,
-  then loops the exact same per-row delete calls (`deletePurchase()`,
-  or `deleteSaleItems()` + `deleteSale()`) the old single long-press
-  used to make, one call per selected row, so every balance-reversal
-  side effect that already happens for a single delete still happens
-  for each one in the batch. This is the first screen to get it, not
-  the last - every other delete-capable list (Payments, Expenses,
-  Wanted Items, Drafts, ...) is a candidate to pick up the same pattern
-  later, the same way charts and info bubbles are being rolled out
-  incrementally rather than everywhere at once.
+  then loops the same per-row delete call for each selected row (see
+  Recently Deleted below for what that call now does), so every
+  balance-reversal side effect that already happens for a single
+  delete still happens for each one in the batch. This is the first
+  screen to get it, not the last - every other delete-capable list
+  (Payments, Expenses, Wanted Items, Drafts, ...) is a candidate to
+  pick up the same pattern later, the same way charts and info bubbles
+  are being rolled out incrementally rather than everywhere at once.
+- **Recently Deleted / Undo** — deleting a Purchase or Sale (single or
+  bulk) no longer just deletes it: `DatabaseHelper.
+  snapshotAndDeletePurchase()`/`snapshotAndDeleteSale()` first dump
+  the full row plus its line items as one JSON blob into a
+  `recently_deleted` table, then delete exactly as before. The
+  Recently Deleted screen (Dashboard Tools card, pinnable as a
+  Favorite) lists every entry still in the trash; tapping one restores
+  it - re-inserting the row(s) with their *original* ids and
+  re-applying the exact mirror of whatever the delete reversed (stock
+  back out for a Sale/back in for a Purchase, the party balance shift
+  redone) - and long-pressing one purges it immediately. Anything
+  still there after 30 days is auto-purged on app open
+  (`purgeOldRecentlyDeleted()`), so the trash doesn't grow forever.
+  Deliberately **not** part of the Vyapar backup round-trip - it's
+  already-deleted data's temporary echo with no analog in Vyapar, not
+  standing user data like a Draft, and its snapshot's embedded
+  party_id/item_id values are only meaningful in this exact database.
 - **Cost Items / Linking Expenses to Purchases** — Expenses double as the
   source of a purchase's landed costs (petrol, shipping, packaging, ...);
   there's no separate "Purchase Cost" record to create. Cost Items is

@@ -3,6 +3,9 @@ package com.mujeer.businesserp;
 import android.content.*;
 import android.database.*;
 import android.database.sqlite.*;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -68,7 +71,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // works the moment it is.
     // Bumped 22 -> 23 to add items.reorder_threshold (0 = no alert) -
     // backs the Low Stock report/notification.
-    public static final int DATABASE_VERSION = 23;
+    // Bumped 23 -> 24 to add the recently_deleted table - backs the
+    // Recently Deleted/undo screen for Purchases/Sales.
+    public static final int DATABASE_VERSION = 24;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -141,6 +146,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// and actually saved for real, at which point the draft row is
 	// deleted.
 	public static final String TABLE_DRAFTS = "drafts";
+
+	// A deleted Purchase/Sale's full row (plus its line items) as one
+	// JSON snapshot, kept until the user permanently removes it or it
+	// ages out - backs the Recently Deleted/undo screen. See
+	// buildSaleSnapshot()/buildPurchaseSnapshot() and
+	// restoreSaleFromSnapshot()/restorePurchaseFromSnapshot().
+	public static final String TABLE_RECENTLY_DELETED = "recently_deleted";
 
 	public static final String DRAFT_TYPE_SALE = "sale";
 	public static final String DRAFT_TYPE_PURCHASE = "purchase";
@@ -437,6 +449,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"CREATE TABLE IF NOT EXISTS " + TABLE_COST_ITEMS + " (" +
 			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
 			"name TEXT NOT NULL UNIQUE" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_RECENTLY_DELETED + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"type TEXT NOT NULL, " +
+			"label TEXT NOT NULL, " +
+			"data TEXT NOT NULL, " +
+			"deleted_date TEXT NOT NULL, " +
+			"deleted_time TEXT NOT NULL" +
 			")"
 		);
 
@@ -5471,6 +5494,398 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"id=?",
 			new String[]{saleId}
 		);
+	}
+
+	// =====================
+	// RECENTLY DELETED / UNDO - a deleted Purchase/Sale's full row plus
+	// its line items, snapshotted as one JSON blob immediately before
+	// the delete that Transactionactivity's single/bulk delete paths
+	// now take, and restorable from that same blob. Deliberately a raw
+	// row dump (every column, by name, via the cursor's own column
+	// list) rather than hand-picking fields - the snapshot then can't
+	// drift out of sync with the schema the way a hardcoded field list
+	// eventually would.
+	//
+	// Restoring re-inserts the row(s) with their ORIGINAL id (SQLite
+	// allows an explicit id on an INSERT into an AUTOINCREMENT column
+	// as long as it's not currently taken, which it never is right
+	// after that same id was deleted) - this is what lets sale_items/
+	// purchase_items snapshot their original sale_id/purchase_id
+	// straight through with no remapping. Restoring then re-applies the
+	// exact mirror-image of whatever deletePurchase()/deleteSale() +
+	// deleteSaleItems() reversed, so every balance-reversal side effect
+	// of the original delete is itself reversed, the same way an edit
+	// un-does and re-does those effects.
+	// =====================
+
+	private JSONObject rowToJson(Cursor cursor) throws JSONException {
+
+		JSONObject obj = new JSONObject();
+
+		for (int i = 0; i < cursor.getColumnCount(); i++) {
+
+			String name = cursor.getColumnName(i);
+
+			switch (cursor.getType(i)) {
+
+				case Cursor.FIELD_TYPE_INTEGER:
+					obj.put(name, cursor.getLong(i));
+					break;
+
+				case Cursor.FIELD_TYPE_FLOAT:
+					obj.put(name, cursor.getDouble(i));
+					break;
+
+				case Cursor.FIELD_TYPE_NULL:
+					obj.put(name, JSONObject.NULL);
+					break;
+
+				default:
+					obj.put(name, cursor.getString(i));
+					break;
+			}
+		}
+
+		return obj;
+	}
+
+	private ContentValues jsonToContentValues(JSONObject obj) throws JSONException {
+
+		ContentValues values = new ContentValues();
+
+		Iterator<String> keys = obj.keys();
+
+		while (keys.hasNext()) {
+
+			String key = keys.next();
+			Object value = obj.get(key);
+
+			if (value == JSONObject.NULL) {
+				values.putNull(key);
+			} else if (value instanceof Integer) {
+				values.put(key, (Integer) value);
+			} else if (value instanceof Long) {
+				values.put(key, (Long) value);
+			} else if (value instanceof Double) {
+				values.put(key, (Double) value);
+			} else {
+				values.put(key, value.toString());
+			}
+		}
+
+		return values;
+	}
+
+	// Snapshots the sale and its sale_items, writes it to
+	// TABLE_RECENTLY_DELETED, then deletes the sale exactly as
+	// deleteSaleItems()+deleteSale() already did - callers replace
+	// those two calls with this one to get undo for free.
+	public void snapshotAndDeleteSale(String saleId, String label, String date, String time) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		try {
+
+			JSONObject root = new JSONObject();
+
+			Cursor saleCursor = db.rawQuery("SELECT * FROM sales WHERE id=?", new String[]{saleId});
+
+			if (saleCursor.moveToFirst()) {
+				root.put("sale", rowToJson(saleCursor));
+			}
+
+			saleCursor.close();
+
+			JSONArray items = new JSONArray();
+
+			Cursor itemsCursor = db.rawQuery(
+				"SELECT * FROM sale_items WHERE sale_id=?", new String[]{saleId}
+			);
+
+			while (itemsCursor.moveToNext()) {
+				items.put(rowToJson(itemsCursor));
+			}
+
+			itemsCursor.close();
+
+			root.put("items", items);
+
+			insertRecentlyDeleted("sale", label, root.toString(), date, time);
+
+		} catch (JSONException e) {
+			// Never blocks the delete itself - losing undo for this one
+			// row is far better than refusing to let it be deleted.
+		}
+
+		deleteSaleItems(saleId);
+		deleteSale(saleId);
+	}
+
+	// Same idea for a Purchase - mirrors deletePurchase()'s own body
+	// instead of calling it, since deletePurchase() does the item-row
+	// delete and the balance reversal in one transaction that this
+	// needs to snapshot the middle of.
+	public void snapshotAndDeletePurchase(
+		int purchaseId, String label, String date, String time) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		try {
+
+			JSONObject root = new JSONObject();
+
+			Cursor purchaseCursor = db.rawQuery(
+				"SELECT * FROM " + TABLE_PURCHASES + " WHERE id=?",
+				new String[]{String.valueOf(purchaseId)}
+			);
+
+			if (purchaseCursor.moveToFirst()) {
+				root.put("purchase", rowToJson(purchaseCursor));
+			}
+
+			purchaseCursor.close();
+
+			JSONArray items = new JSONArray();
+
+			Cursor itemsCursor = db.rawQuery(
+				"SELECT * FROM " + TABLE_PURCHASE_ITEMS + " WHERE purchase_id=?",
+				new String[]{String.valueOf(purchaseId)}
+			);
+
+			while (itemsCursor.moveToNext()) {
+				items.put(rowToJson(itemsCursor));
+			}
+
+			itemsCursor.close();
+
+			root.put("items", items);
+
+			insertRecentlyDeleted("purchase", label, root.toString(), date, time);
+
+		} catch (JSONException e) {
+			// Never blocks the delete itself.
+		}
+
+		deletePurchase(purchaseId);
+	}
+
+	public long insertRecentlyDeleted(
+		String type, String label, String data, String date, String time) {
+
+		ContentValues values = new ContentValues();
+		values.put("type", type);
+		values.put("label", label);
+		values.put("data", data);
+		values.put("deleted_date", date);
+		values.put("deleted_time", time);
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		return db.insert(TABLE_RECENTLY_DELETED, null, values);
+	}
+
+	public ArrayList<HashMap<String, Object>> getRecentlyDeleted() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, type, label, deleted_date, deleted_time FROM " +
+			TABLE_RECENTLY_DELETED + " ORDER BY deleted_date DESC, deleted_time DESC",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+			row.put("id", cursor.getInt(0));
+			row.put("type", cursor.getString(1));
+			row.put("label", cursor.getString(2));
+			row.put("deleted_date", cursor.getString(3));
+			row.put("deleted_time", cursor.getString(4));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	public void deleteRecentlyDeletedPermanently(int trashId) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.delete(
+			TABLE_RECENTLY_DELETED, "id=?", new String[]{String.valueOf(trashId)}
+		);
+	}
+
+	// Purges every entry older than the given number of days - called
+	// opportunistically (BusinessERPApplication.onCreate()) so Recently
+	// Deleted doesn't grow forever; a row this old was never going to
+	// be restored.
+	public void purgeOldRecentlyDeleted(int days) {
+
+		Calendar cutoff = Calendar.getInstance();
+		cutoff.add(Calendar.DAY_OF_MONTH, -days);
+
+		String cutoffDate =
+			new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cutoff.getTime());
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.delete(
+			TABLE_RECENTLY_DELETED, "deleted_date < ?", new String[]{cutoffDate}
+		);
+	}
+
+	// Returns the raw snapshot JSON for one trash entry, or null if it
+	// was already restored/purged by the time this runs.
+	public String getRecentlyDeletedSnapshot(int trashId) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT data FROM " + TABLE_RECENTLY_DELETED + " WHERE id=?",
+			new String[]{String.valueOf(trashId)}
+		);
+
+		String data = null;
+
+		if (cursor.moveToFirst()) {
+			data = cursor.getString(0);
+		}
+
+		cursor.close();
+
+		return data;
+	}
+
+	// Re-inserts the sale + its sale_items with their original ids,
+	// then re-applies the exact mirror of what deleteSaleItems()/
+	// deleteSale() reversed: sale_items took stock out, so restoring
+	// takes it out again; the sale's due amount shifted the party's
+	// balance, so restoring shifts it again.
+	public boolean restoreSaleFromTrash(int trashId) {
+
+		String json = getRecentlyDeletedSnapshot(trashId);
+
+		if (json == null) {
+			return false;
+		}
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.beginTransaction();
+
+		try {
+
+			JSONObject root = new JSONObject(json);
+			JSONObject saleJson = root.getJSONObject("sale");
+
+			db.insertOrThrow("sales", null, jsonToContentValues(saleJson));
+
+			JSONArray items = root.getJSONArray("items");
+
+			for (int i = 0; i < items.length(); i++) {
+
+				JSONObject itemJson = items.getJSONObject(i);
+
+				db.insertOrThrow("sale_items", null, jsonToContentValues(itemJson));
+
+				int itemId = itemJson.getInt("item_id");
+				double qty = itemJson.getDouble("qty");
+
+				adjustItemBalance(db, itemId, -qty);
+
+				if (!itemJson.isNull("combo_id")) {
+					adjustComboBalance(db, itemJson.getInt("combo_id"), -qty);
+				}
+			}
+
+			int partyId = saleJson.getInt("party_id");
+			double oldDue = saleJson.getDouble("balance");
+
+			adjustPartyBalance(db, partyId, oldDue);
+
+			deleteRecentlyDeletedPermanently(trashId);
+
+			db.setTransactionSuccessful();
+
+			return true;
+
+		} catch (JSONException e) {
+
+			return false;
+
+		} finally {
+
+			db.endTransaction();
+		}
+	}
+
+	// Mirror of restoreSaleFromTrash() for a Purchase - re-applies
+	// what deletePurchase() reversed: purchase_items added stock, so
+	// restoring adds it back; the purchase's due amount shifted the
+	// party's balance, so restoring shifts it back.
+	public boolean restorePurchaseFromTrash(int trashId) {
+
+		String json = getRecentlyDeletedSnapshot(trashId);
+
+		if (json == null) {
+			return false;
+		}
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.beginTransaction();
+
+		try {
+
+			JSONObject root = new JSONObject(json);
+			JSONObject purchaseJson = root.getJSONObject("purchase");
+
+			db.insertOrThrow(TABLE_PURCHASES, null, jsonToContentValues(purchaseJson));
+
+			JSONArray items = root.getJSONArray("items");
+
+			for (int i = 0; i < items.length(); i++) {
+
+				JSONObject itemJson = items.getJSONObject(i);
+
+				db.insertOrThrow(TABLE_PURCHASE_ITEMS, null, jsonToContentValues(itemJson));
+
+				int itemId = itemJson.getInt("item_id");
+				double qty = itemJson.getDouble("quantity");
+
+				adjustItemBalance(db, itemId, qty);
+
+				if (!itemJson.isNull("combo_id")) {
+					adjustComboBalance(db, itemJson.getInt("combo_id"), qty);
+				}
+			}
+
+			int partyId = purchaseJson.getInt("party_id");
+			double oldDue = purchaseJson.getDouble("grand_total") - purchaseJson.getDouble("amount_paid");
+
+			adjustPartyBalance(db, partyId, -oldDue);
+
+			deleteRecentlyDeletedPermanently(trashId);
+
+			db.setTransactionSuccessful();
+
+			return true;
+
+		} catch (JSONException e) {
+
+			return false;
+
+		} finally {
+
+			db.endTransaction();
+		}
 	}
 
 	public int updateSale(String saleId, HashMap<String, Object> saleData) {

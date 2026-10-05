@@ -251,10 +251,18 @@ public class Transactionactivity extends Activity {
 
 					new AlertDialog.Builder(Transactionactivity.this)
 						.setTitle("Delete " + count + " " + noun + "?")
-						.setMessage("This cannot be undone.")
+						.setMessage("Moves to Recently Deleted - restorable from there afterward.")
 						.setPositiveButton("Delete", new DialogInterface.OnClickListener() {
 								@Override
 								public void onClick(DialogInterface dialog, int which) {
+
+									String nowDate = new java.text.SimpleDateFormat(
+										"yyyy-MM-dd", java.util.Locale.getDefault()
+									).format(new java.util.Date());
+
+									String nowTime = new java.text.SimpleDateFormat(
+										"HH:mm:ss", java.util.Locale.getDefault()
+									).format(new java.util.Date());
 
 									// A plain copy, not a live view - deleting a
 									// purchase/sale below has no reason to touch
@@ -263,15 +271,17 @@ public class Transactionactivity extends Activity {
 									// worth avoiding on principle.
 									for (int transactionId : new java.util.ArrayList<Integer>(selectedIds)) {
 
+										String label = labelForTransaction(transactionId);
+
 										if (transactionType == TYPE_PURCHASE) {
 
-											db.deletePurchase(transactionId);
+											db.snapshotAndDeletePurchase(transactionId, label, nowDate, nowTime);
 
 										} else {
 
-											String saleId = String.valueOf(transactionId);
-											db.deleteSaleItems(saleId);
-											db.deleteSale(saleId);
+											db.snapshotAndDeleteSale(
+												String.valueOf(transactionId), label, nowDate, nowTime
+											);
 										}
 									}
 
@@ -338,6 +348,28 @@ public class Transactionactivity extends Activity {
 		bar_bulk_select.setVisibility(selectionMode ? View.VISIBLE : View.GONE);
 
 		tv_bulk_select_count.setText(selectedIds.size() + " selected");
+	}
+
+	// A short label for the Recently Deleted list - looked up from the
+	// currently-loaded transactionList (not re-queried), since the row
+	// is about to be deleted anyway.
+	private String labelForTransaction(int transactionId) {
+
+		for (HashMap<String, Object> row : transactionList) {
+
+			if ((Integer) row.get("id") == transactionId) {
+
+				String code = row.containsKey("code") ?
+					String.valueOf(row.get("code")) : String.valueOf(row.get("invoice_no"));
+
+				String partyName = row.get("party_name") == null ? "" : row.get("party_name").toString();
+
+				return (transactionType == TYPE_PURCHASE ? "Purchase" : "Sale") +
+					" #" + code + (partyName.length() > 0 ? " - " + partyName : "");
+			}
+		}
+
+		return transactionType == TYPE_PURCHASE ? "Purchase" : "Sale";
 	}
 
 	private void exitSelectionMode() {

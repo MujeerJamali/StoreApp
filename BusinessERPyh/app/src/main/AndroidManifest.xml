@@ -288,6 +288,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".RecentlyDeletedActivity"
+            android:label="Recently Deleted"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".DisplayShoesActivity"
             android:label="Display Shoes"
             android:screenOrientation="landscape"

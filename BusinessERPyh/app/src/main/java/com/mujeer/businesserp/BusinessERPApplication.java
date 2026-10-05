@@ -21,5 +21,11 @@ public class BusinessERPApplication extends Application {
 		// Idempotent - re-registering the same alarm on every app open
 		// just replaces its schedule, never stacks duplicates.
 		AutoBackupScheduler.ensureScheduled(getApplicationContext());
+
+		// A single cheap DELETE WHERE - safe to run unconditionally on
+		// every app open rather than gating it to once a day like the
+		// notifiers above, which each show a user-visible notification
+		// that actually needs that throttling.
+		new DatabaseHelper(getApplicationContext()).purgeOldRecentlyDeleted(30);
 	}
 }
