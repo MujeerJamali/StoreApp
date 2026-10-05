@@ -151,7 +151,14 @@
         <TextView
             style="@style/FieldLabel"
             android:layout_marginTop="20dp"
-            android:text="By Item" />
+            android:text="By Item - This Period's actual profit, or every active item's own current Standing Margin regardless of period" />
+
+        <Spinner
+            android:id="@+id/spinner_item_mode"
+            style="@style/FilterSpinner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp" />
 
         <LinearLayout
             android:layout_width="wrap_content"

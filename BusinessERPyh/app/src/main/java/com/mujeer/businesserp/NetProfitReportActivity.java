@@ -64,6 +64,10 @@ public class NetProfitReportActivity extends Activity {
 	private TextView tv_net_profit;
 	private SimpleBarChartView chart_net_profit;
 
+	private static final int ITEM_MODE_THIS_PERIOD = 0;
+	private static final int ITEM_MODE_STANDING_MARGIN = 1;
+
+	private Spinner spinner_item_mode;
 	private Spinner spinner_item_sort;
 	private Spinner spinner_item_shoes_filter;
 	private TextView tv_item_profit_empty;
@@ -79,6 +83,7 @@ public class NetProfitReportActivity extends Activity {
 	private int selectedRange = RANGE_TODAY;
 	private boolean itemSortAscending = false;
 	private int selectedShoesFilter = DatabaseHelper.SHOES_FILTER_ALL;
+	private int selectedItemMode = ITEM_MODE_THIS_PERIOD;
 
 	// Bumped on every loadReport() call; a background result is only
 	// applied if it's still the most recent request by the time it
@@ -109,6 +114,7 @@ public class NetProfitReportActivity extends Activity {
 		tv_net_profit = findViewById(R.id.tv_net_profit);
 		chart_net_profit = findViewById(R.id.chart_net_profit);
 
+		spinner_item_mode = findViewById(R.id.spinner_item_mode);
 		spinner_item_sort = findViewById(R.id.spinner_item_sort);
 		spinner_item_shoes_filter = findViewById(R.id.spinner_item_shoes_filter);
 		tv_item_profit_empty = findViewById(R.id.tv_item_profit_empty);
@@ -127,6 +133,29 @@ public class NetProfitReportActivity extends Activity {
 					intent.putExtra("item_id", (Integer) row.get("item_id"));
 
 					startActivity(intent);
+				}
+			});
+
+		ArrayAdapter<String> itemModeAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item,
+			new String[]{"This Period", "Standing Margin"}
+		);
+
+		itemModeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_item_mode.setAdapter(itemModeAdapter);
+
+		spinner_item_mode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+				@Override
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+
+					selectedItemMode = position;
+					itemProfitAdapter.setStandingMarginMode(selectedItemMode == ITEM_MODE_STANDING_MARGIN);
+
+					loadReport();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
 
@@ -330,6 +359,7 @@ public class NetProfitReportActivity extends Activity {
 		final int range_forLabel = selectedRange;
 		final boolean ascending_forQuery = itemSortAscending;
 		final int shoesFilter_forQuery = selectedShoesFilter;
+		final int itemMode_forQuery = selectedItemMode;
 		final long myGeneration = ++loadGeneration;
 
 		new Thread(new Runnable() {
@@ -340,6 +370,8 @@ public class NetProfitReportActivity extends Activity {
 						db.getNetProfitSummary(range[0], range[1]);
 
 					final ArrayList<HashMap<String, Object>> byItem =
+						itemMode_forQuery == ITEM_MODE_STANDING_MARGIN ?
+						db.getStandingMarginByItem(ascending_forQuery, shoesFilter_forQuery) :
 						db.getNetProfitByItem(
 							range[0], range[1], ascending_forQuery, shoesFilter_forQuery
 						);
@@ -368,6 +400,11 @@ public class NetProfitReportActivity extends Activity {
 		itemProfitAdapter.notifyDataSetChanged();
 
 		if (itemProfitList.isEmpty()) {
+
+			tv_item_profit_empty.setText(
+				selectedItemMode == ITEM_MODE_STANDING_MARGIN ?
+				"No active items." : "No item sales in this period."
+			);
 
 			tv_item_profit_empty.setVisibility(View.VISIBLE);
 			lv_item_profit.setVisibility(View.GONE);

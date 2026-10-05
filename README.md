@@ -189,9 +189,14 @@ re-blend it.
 ## Reports
 
 Total Sales · Sales by Party · Item Ranking · Party Ranking · Net Profit
-(with a per-item profit/loss breakdown, sortable high-to-low or
-low-to-high, and an All/Shoes Only/Non-Shoes Only filter, for every
-item with a sale in the period) · Stock Worth ·
+(a merged Item Profitability report - the per-item breakdown has a
+This Period/Standing Margin mode toggle: This Period is actual
+profit/loss for every item with a sale in the period; Standing Margin
+is every active item's own current margin per unit and margin %
+straight from its purchase/sale price, period-independent and
+including items that have never sold. Either mode is sortable
+high-to-low or low-to-high with an All/Shoes Only/Non-Shoes Only
+filter) · Stock Worth ·
 Party Balances (zero/non-zero balance filter, same 6-way sort as the
 Parties screen - Recent/Oldest Activity, Balance High-Low/Low-High,
 Name A-Z/Z-A) · Credit Due (every unpaid/partially-paid Sale whose

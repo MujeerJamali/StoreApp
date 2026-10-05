@@ -4858,6 +4858,67 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// STANDING MARGIN BY ITEM - the other half of the merged Item
+	// Profitability report alongside getNetProfitByItem()'s "This
+	// Period" actuals: every active item's own current margin per unit
+	// (sale_price - purchase_price - extra_cost_per_unit) and margin %,
+	// straight from the item master - period-independent, and includes
+	// an item with zero sales ever (unlike getNetProfitByItem(), which
+	// only lists items that actually sold in the period).
+	// =====================
+	public ArrayList<HashMap<String, Object>> getStandingMarginByItem(
+		boolean ascending, int shoesFilter) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		ArrayList<String> conditions = new ArrayList<>();
+		conditions.add("active = 1");
+
+		if (shoesFilter == SHOES_FILTER_SHOES_ONLY) {
+			conditions.add("name LIKE 'Shoe%'");
+		} else if (shoesFilter == SHOES_FILTER_NON_SHOES_ONLY) {
+			conditions.add("name NOT LIKE 'Shoe%'");
+		}
+
+		StringBuilder whereClause = new StringBuilder("WHERE ");
+
+		for (int i = 0; i < conditions.size(); i++) {
+			whereClause.append(i == 0 ? "" : " AND ").append(conditions.get(i));
+		}
+
+		String sql =
+			"SELECT id, code, name, sale_price, " +
+			"(sale_price - purchase_price - extra_cost_per_unit) AS margin, " +
+			"CASE WHEN sale_price > 0 " +
+			"THEN (sale_price - purchase_price - extra_cost_per_unit) / sale_price * 100 " +
+			"ELSE 0 END AS margin_percent " +
+			"FROM " + TABLE_ITEMS + " " + whereClause + " " +
+			"ORDER BY margin " + (ascending ? "ASC" : "DESC");
+
+		Cursor cursor = db.rawQuery(sql, null);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<>();
+
+			row.put("item_id", cursor.getInt(0));
+			row.put("item_code", cursor.getString(1));
+			row.put("item_name", cursor.getString(2));
+			row.put("sale_price", cursor.getDouble(3));
+			row.put("margin", cursor.getDouble(4));
+			row.put("margin_percent", cursor.getDouble(5));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// =====================
 	// REPORT: SHOES VS NON-SHOES - sales and profit for a period, split
 	// by the same "item name starts with 'Shoe'" rule as everywhere else
 	// (Item Ranking's shoes filter, Stock Worth). Both metrics are
