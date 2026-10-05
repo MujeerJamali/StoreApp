@@ -509,7 +509,7 @@ public class Expenseeditactivity extends Activity {
 	// =====================
 	private void loadTopExpenseChips() {
 
-		ArrayList<HashMap<String, Object>> topItems = db.getTopExpenseItems(6);
+		ArrayList<HashMap<String, Object>> topItems = db.getTopExpenseItems(8);
 
 		if (topItems.isEmpty()) {
 			return;
