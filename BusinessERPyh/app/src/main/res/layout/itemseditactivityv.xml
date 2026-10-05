@@ -52,6 +52,14 @@
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
+            <TextView style="@style/FieldLabel" android:text="Reorder Threshold" />
+            <EditText
+                android:id="@+id/et_reorder_threshold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="0 = no Low Stock alert"
+                android:inputType="numberDecimal" />
+
             <CheckBox
                 android:id="@+id/cb_active"
                 android:layout_width="match_parent"

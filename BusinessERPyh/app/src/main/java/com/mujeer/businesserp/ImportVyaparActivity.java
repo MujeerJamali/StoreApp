@@ -301,6 +301,8 @@ public class ImportVyaparActivity extends Activity {
             // exported before each one existed.
             boolean itemsHaveExtraCost = columnExists(vyaparDb, "kb_items", "item_extra_cost_per_unit");
             boolean itemsHaveActive = columnExists(vyaparDb, "kb_items", "item_active");
+            boolean itemsHaveReorderThreshold =
+                columnExists(vyaparDb, "kb_items", "item_reorder_threshold");
             boolean salesHaveDueDate = columnExists(vyaparDb, "kb_transactions", "txn_due_date");
             boolean hasCostItemsTable = tableExists(vyaparDb, "businesserp_cost_items");
             boolean hasPurchaseExpenseLinksTable = tableExists(vyaparDb, "businesserp_purchase_expense_links");
@@ -335,7 +337,9 @@ public class ImportVyaparActivity extends Activity {
             importParties(vyaparDb, helper, db, partyIdMap, skipped, counts);
 
             setStatus("Importing items...");
-            importItems(vyaparDb, helper, db, itemIdMap, itemsHaveExtraCost, itemsHaveActive, skipped, counts);
+            importItems(
+                vyaparDb, helper, db, itemIdMap, itemsHaveExtraCost, itemsHaveActive,
+                itemsHaveReorderThreshold, skipped, counts);
 
             if (hasVarietyTables) {
 
@@ -794,19 +798,22 @@ public class ImportVyaparActivity extends Activity {
         HashMap<Long, Integer> itemIdMap,
         boolean itemsHaveExtraCost,
         boolean itemsHaveActive,
+        boolean itemsHaveReorderThreshold,
         ArrayList<SkippedRow> skipped,
         Counts counts) {
 
-        // item_extra_cost_per_unit/item_active are this app's own
-        // extensions (see itemsHaveExtraCost/itemsHaveActive in
-        // runImport()) - only selected when the backup's kb_items
-        // actually has that column, since a real Vyapar backup or an
-        // export made before either existed won't; item_active defaults
-        // to active (see below) rather than failing in that case.
+        // item_extra_cost_per_unit/item_active/item_reorder_threshold are
+        // this app's own extensions (see itemsHaveExtraCost/itemsHaveActive/
+        // itemsHaveReorderThreshold in runImport()) - only selected when
+        // the backup's kb_items actually has that column, since a real
+        // Vyapar backup or an export made before any of them existed
+        // won't; item_active defaults to active and item_reorder_threshold
+        // to 0 (no alert) rather than failing in that case.
         Cursor c = vyaparDb.rawQuery(
             "SELECT item_id, item_code, item_name, item_purchase_unit_price, item_sale_unit_price" +
             (itemsHaveExtraCost ? ", item_extra_cost_per_unit" : "") +
-            (itemsHaveActive ? ", item_active" : "") + " " +
+            (itemsHaveActive ? ", item_active" : "") +
+            (itemsHaveReorderThreshold ? ", item_reorder_threshold" : "") + " " +
             "FROM kb_items " +
             "WHERE item_type != 2 " +
             "   OR item_id IN (" +
@@ -818,6 +825,7 @@ public class ImportVyaparActivity extends Activity {
 
         int extraCostColumn = 5;
         int activeColumn = itemsHaveExtraCost ? 6 : 5;
+        int reorderThresholdColumn = activeColumn + (itemsHaveActive ? 1 : 0);
 
         while (c.moveToNext()) {
 
@@ -832,6 +840,10 @@ public class ImportVyaparActivity extends Activity {
 
             boolean active = (!itemsHaveActive || c.isNull(activeColumn)) ?
                 true : c.getInt(activeColumn) != 0;
+
+            double reorderThreshold =
+                (itemsHaveReorderThreshold && !c.isNull(reorderThresholdColumn)) ?
+                c.getDouble(reorderThresholdColumn) : 0.0;
 
             String importKey = "vyb_item_" + itemId;
 
@@ -848,7 +860,7 @@ public class ImportVyaparActivity extends Activity {
             }
 
             long localId = helper.insertItemBulk(
-                db, code, name, purchasePrice, salePrice, extraCostPerUnit, active);
+                db, code, name, purchasePrice, salePrice, extraCostPerUnit, active, reorderThreshold);
 
             helper.markImportKeyUsedBulk(db, importKey);
             helper.saveVybLocalId(db, "item", itemId, localId);

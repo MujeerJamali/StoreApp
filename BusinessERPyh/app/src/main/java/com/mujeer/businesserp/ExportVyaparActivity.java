@@ -378,7 +378,13 @@ public class ExportVyaparActivity extends Activity {
 			// existed, which ImportVyaparActivity's itemsHaveActive
 			// detects up front so it defaults to active (1) instead of
 			// failing.
-			"item_active INTEGER" +
+			"item_active INTEGER, " +
+			// Another of this app's own extensions (Low Stock alert
+			// threshold) - absent from a real Vyapar backup or one
+			// exported before it existed, which ImportVyaparActivity's
+			// itemsHaveReorderThreshold detects up front so it defaults
+			// to 0 (no alert) instead of failing.
+			"item_reorder_threshold REAL" +
 			")"
 		);
 
@@ -620,7 +626,8 @@ public class ExportVyaparActivity extends Activity {
 	private void exportItems(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
-			"SELECT id, code, name, purchase_price, sale_price, extra_cost_per_unit, active FROM items", null);
+			"SELECT id, code, name, purchase_price, sale_price, extra_cost_per_unit, active, " +
+			"reorder_threshold FROM items", null);
 
 		while (c.moveToNext()) {
 
@@ -633,6 +640,7 @@ public class ExportVyaparActivity extends Activity {
 			values.put("item_type", 1);
 			values.put("item_active", c.getInt(6));
 			values.put("item_extra_cost_per_unit", c.getDouble(5));
+			values.put("item_reorder_threshold", c.getDouble(7));
 
 			vyb.insert("kb_items", null, values);
 		}

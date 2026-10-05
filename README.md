@@ -32,7 +32,9 @@ BusinessERPyh/                  Gradle project root
   filter on the Items list; an inactive item is hidden from every
   item picker used to add a new Sale/Purchase line or Wanted Item, but
   stays fully visible/editable on the Items list itself and in past
-  transactions.
+  transactions. Each item also has a **Reorder Threshold** (Edit Item
+  screen, 0 = no alert) - its total stock at or below that number is
+  what the Low Stock report/notification flags.
 - **Purchases / Sales** — line-item transactions, size dropdowns on sale
   items only show sizes with stock, bulk Excel import for purchases. The
   Add/Edit Item dialog's Quantity, Price and Total fields are linked live:

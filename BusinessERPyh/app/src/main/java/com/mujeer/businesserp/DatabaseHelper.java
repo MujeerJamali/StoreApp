@@ -66,7 +66,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // default as a credit Sale. Not yet exercised in practice (every
     // Purchase is currently paid in full), but wired the same way so it
     // works the moment it is.
-    public static final int DATABASE_VERSION = 22;
+    // Bumped 22 -> 23 to add items.reorder_threshold (0 = no alert) -
+    // backs the Low Stock report/notification.
+    public static final int DATABASE_VERSION = 23;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -220,7 +222,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"sale_price REAL NOT NULL DEFAULT 0, " +
 			"balance REAL NOT NULL DEFAULT 0, " +
 			"extra_cost_per_unit REAL NOT NULL DEFAULT 0, " +
-			"active INTEGER NOT NULL DEFAULT 1" +
+			"active INTEGER NOT NULL DEFAULT 1, " +
+			"reorder_threshold REAL NOT NULL DEFAULT 0" +
 			");"
 		);
 
@@ -516,6 +519,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		// Same, mirrored onto Purchases - see DATABASE_VERSION's comment.
 		addColumnIfMissing(db, TABLE_PURCHASES, "due_date", "TEXT");
+
+		// Per-item reorder threshold (0 = no alert) - backs the Low Stock
+		// report/notification.
+		addColumnIfMissing(db, TABLE_ITEMS, "reorder_threshold", "REAL NOT NULL DEFAULT 0");
 
 		// cost_items (created above by onCreate(db)) is brand new as of
 		// this version - every expense/recurring-expense rule recorded
@@ -1235,7 +1242,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		SQLiteDatabase db = this.getReadableDatabase();
 
 		Cursor cursor = db.rawQuery(
-			"SELECT code, name, purchase_price, sale_price, balance, extra_cost_per_unit, active FROM " +
+			"SELECT code, name, purchase_price, sale_price, balance, extra_cost_per_unit, active, " +
+			"reorder_threshold FROM " +
 			TABLE_ITEMS +
 			" WHERE id=?",
 			new String[]{String.valueOf(id)}
@@ -1250,6 +1258,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("balance", cursor.getDouble(4));
 			map.put("extra_cost_per_unit", cursor.getDouble(5));
 			map.put("active", cursor.getInt(6) != 0);
+			map.put("reorder_threshold", cursor.getDouble(7));
 		}
 
 		cursor.close();
@@ -1348,6 +1357,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 							  double salePrice,
 							  Double balance) {
 
+		return updateItem(id, name, purchasePrice, salePrice, balance, null);
+	}
+
+	// reorderThreshold == null leaves it untouched, same convention as
+	// balance above - used by Itemseditactivity, which always passes its
+	// own (possibly-0, never-null) field value explicitly.
+	public boolean updateItem(int id,
+							  String name,
+							  double purchasePrice,
+							  double salePrice,
+							  Double balance,
+							  Double reorderThreshold) {
+
 		SQLiteDatabase db = this.getWritableDatabase();
 
 		ContentValues values = new ContentValues();
@@ -1358,6 +1380,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		if (balance != null) {
 			values.put("balance", balance);
+		}
+
+		if (reorderThreshold != null) {
+			values.put("reorder_threshold", reorderThreshold);
 		}
 
 		int rows = db.update(
@@ -7403,6 +7429,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		double extraCostPerUnit,
 		boolean active) {
 
+		return insertItemBulk(
+			db, preferredCode, name, purchasePrice, salePrice, extraCostPerUnit, active, 0
+		);
+	}
+
+	public long insertItemBulk(
+		SQLiteDatabase db,
+		String preferredCode,
+		String name,
+		double purchasePrice,
+		double salePrice,
+		double extraCostPerUnit,
+		boolean active,
+		double reorderThreshold) {
+
 		preferredCode = preferredCode == null ? "" : preferredCode.trim();
 		name = name == null || name.trim().length() == 0 ? "Imported Item" : name.trim();
 
@@ -7418,6 +7459,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("balance", 0.0);
 		values.put("extra_cost_per_unit", extraCostPerUnit);
 		values.put("active", active ? 1 : 0);
+		values.put("reorder_threshold", reorderThreshold);
 
 		return db.insert(TABLE_ITEMS, null, values);
 	}

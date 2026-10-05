@@ -22,6 +22,7 @@ public class Itemseditactivity extends Activity {
     EditText et_purchase_price;
     EditText et_sale_price;
     TextView tv_item_stock;
+    EditText et_reorder_threshold;
     CheckBox cb_active;
 
     LinearLayout cardVarieties;
@@ -43,6 +44,7 @@ public class Itemseditactivity extends Activity {
         et_purchase_price = findViewById(R.id.et_purchase_price);
         et_sale_price = findViewById(R.id.et_sale_price);
         tv_item_stock = findViewById(R.id.tv_item_stock);
+        et_reorder_threshold = findViewById(R.id.et_reorder_threshold);
         cb_active = findViewById(R.id.cb_active);
 
         btn_update_item = findViewById(R.id.btn_update_item);
@@ -76,6 +78,14 @@ public class Itemseditactivity extends Activity {
             } else {
                 tv_item_stock.setTextColor(getResources().getColor(R.color.mod_items));
             }
+
+            double reorderThreshold = 0;
+
+            if (item.get("reorder_threshold") != null) {
+                reorderThreshold = (Double) item.get("reorder_threshold");
+            }
+
+            et_reorder_threshold.setText(AmountFormat.formatPlain(reorderThreshold));
 
             cb_active.setChecked(!Boolean.FALSE.equals(item.get("active")));
 
@@ -114,11 +124,24 @@ public class Itemseditactivity extends Activity {
 					double purchasePrice = Double.parseDouble(purchase);
 					double salePrice = Double.parseDouble(sale);
 
+					double reorderThreshold = 0;
+
+					try {
+
+						reorderThreshold = Double.parseDouble(
+							et_reorder_threshold.getText().toString().trim()
+						);
+
+					} catch (Exception e) {
+					}
+
 					if (db.updateItem(
 							itemId,
 							name,
 							purchasePrice,
-							salePrice
+							salePrice,
+							null,
+							reorderThreshold
 						)) {
 
 						db.setItemActive(itemId, cb_active.isChecked());
