@@ -292,6 +292,10 @@ public class ExportVyaparActivity extends Activity {
 			in.close();
 			out.close();
 
+			// Resets BackupReminderNotifier's countdown - a backup just
+			// actually succeeded, so there's nothing overdue right now.
+			BackupReminderNotifier.recordBackupNow(getApplicationContext());
+
 			setStatus(
 				"Backup saved.\n\nRestore it later - on this device after a reinstall, or on " +
 				"another device with this app - using \"Restore Vyapar Backup\". Restoring it " +

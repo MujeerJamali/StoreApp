@@ -16,5 +16,6 @@ public class BusinessERPApplication extends Application {
 		// MainActivity's Dashboard - see AndroidManifest.xml.
 		CreditDueNotifier.checkAndNotifyIfNeeded(getApplicationContext());
 		LowStockNotifier.checkAndNotifyIfNeeded(getApplicationContext());
+		BackupReminderNotifier.checkAndNotifyIfNeeded(getApplicationContext());
 	}
 }

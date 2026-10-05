@@ -137,7 +137,13 @@ BusinessERPyh/                  Gradle project root
   Overdue range if anything is overdue, Today otherwise; and
   `LowStockNotifier` for any active item at or below its
   own Reorder Threshold (name + current stock per line, opens that item
-  directly or the Low Stock report).
+  directly or the Low Stock report). A third, `BackupReminderNotifier`,
+  is allowed to repeat daily rather than check once and stop: once 7
+  days pass with no successful Vyapar backup export, it nags every day
+  (opening straight to Export Vyapar Backup) until one actually
+  happens, which resets its countdown. A brand-new install gets the
+  same 7-day grace period an overdue backup would, rather than nagging
+  on day one.
 - **Data tools** — bulk Excel import for purchases and items; full backup
   export/import in Vyapar's `.vyb` format. Alongside standard Vyapar data
   (parties, items, purchases, sales, payments, expenses, party transfers),
