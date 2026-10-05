@@ -3,6 +3,7 @@ package com.mujeer.businesserp;
 import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -122,16 +123,59 @@ public class ExportVyaparActivity extends Activity {
 	}
 
 	// =====================
-	// Builds the .vyb (zipped SQLite db) into cache storage, then hands
-	// off to the system file picker to choose where it's actually saved -
-	// the app has no storage permission and doesn't need one this way.
+	// Builds the .vyb (zipped SQLite db) into cache storage via
+	// buildBackupZipFile() below, then hands off to the system file
+	// picker to choose where it's actually saved - the app has no
+	// storage permission and doesn't need one this way.
 	// =====================
 	private void buildBackupFile() {
 
 		setStatus("Reading your data...");
 
-		File dbFile = new File(getCacheDir(), "vyb_export_raw.tmp");
-		File zipFile = new File(getCacheDir(), "vyb_export.tmp");
+		try {
+
+			pendingZipFile = buildBackupZipFile(this, getCacheDir());
+
+			runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						openSavePicker();
+					}
+				});
+
+		} catch (final Exception e) {
+
+			setStatus("Export failed: " + e.toString());
+
+			runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						btn_export_vyb.setEnabled(true);
+					}
+				});
+		}
+	}
+
+	// =====================
+	// The actual export work, needing nothing but a plain Context - no
+	// Activity dependency. Split out from buildBackupFile() above so
+	// AutoBackupReceiver can call this exact same logic directly from
+	// its own background thread (see that class) instead of starting
+	// this Activity, which Android blocks when triggered unattended
+	// from the background (e.g. an AlarmManager alarm) on API 29+ (this
+	// app's targetSdkVersion) unless the app already has a visible
+	// window or an active foreground service - neither applies to a
+	// routine background backup. Every exportXxx()/createVyaparShapedTables()/
+	// zipDatabaseFile() method this calls is static for the same reason:
+	// none of them ever touched instance/UI state anyway, only the
+	// SQLiteDatabase/File arguments already passed in. Returns the
+	// finished zip file; the caller decides what to do with it and is
+	// responsible for deleting it once done.
+	// =====================
+	static File buildBackupZipFile(Context context, File cacheDir) throws Exception {
+
+		File dbFile = new File(cacheDir, "vyb_export_raw.tmp");
+		File zipFile = new File(cacheDir, "vyb_export.tmp");
 
 		if (dbFile.exists()) {
 			dbFile.delete();
@@ -145,7 +189,7 @@ public class ExportVyaparActivity extends Activity {
 
 			createVyaparShapedTables(vyb);
 
-			DatabaseHelper helper = new DatabaseHelper(this);
+			DatabaseHelper helper = new DatabaseHelper(context);
 			SQLiteDatabase local = helper.getReadableDatabase();
 
 			HashMap<String, Long> expenseCategoryNameId = new HashMap<String, Long>();
@@ -181,29 +225,9 @@ public class ExportVyaparActivity extends Activity {
 			vyb.close();
 			vyb = null;
 
-			setStatus("Compressing backup...");
-
 			zipDatabaseFile(dbFile, zipFile);
 
-			pendingZipFile = zipFile;
-
-			runOnUiThread(new Runnable() {
-					@Override
-					public void run() {
-						openSavePicker();
-					}
-				});
-
-		} catch (final Exception e) {
-
-			setStatus("Export failed: " + e.toString());
-
-			runOnUiThread(new Runnable() {
-					@Override
-					public void run() {
-						btn_export_vyb.setEnabled(true);
-					}
-				});
+			return zipFile;
 
 		} finally {
 
@@ -327,7 +351,7 @@ public class ExportVyaparActivity extends Activity {
 	// whose first non-directory entry is the database) - the entry name
 	// itself isn't read by the importer, so any name works.
 	// =====================
-	private void zipDatabaseFile(File dbFile, File zipFile) throws Exception {
+	private static void zipDatabaseFile(File dbFile, File zipFile) throws Exception {
 
 		OutputStream fos = new FileOutputStream(zipFile);
 		ZipOutputStream zos = new ZipOutputStream(fos);
@@ -353,7 +377,7 @@ public class ExportVyaparActivity extends Activity {
 	// importSales/importSaleLineItems/importPayments/importPartyTransfers/
 	// importExpenses methods for exactly which ones and why.
 	// =====================
-	private void createVyaparShapedTables(SQLiteDatabase vyb) {
+	private static void createVyaparShapedTables(SQLiteDatabase vyb) {
 
 		vyb.execSQL(
 			"CREATE TABLE kb_names (" +
@@ -606,7 +630,7 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	// PARTIES -> kb_names (name_type=1)
 	// =====================
-	private void exportParties(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportParties(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery("SELECT id, name FROM parties", null);
 
@@ -627,7 +651,7 @@ public class ExportVyaparActivity extends Activity {
 	// ITEMS -> kb_items (item_type=1, i.e. a real item, never the
 	// importer's item_type=2 "expense line item" convention)
 	// =====================
-	private void exportItems(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportItems(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, code, name, purchase_price, sale_price, extra_cost_per_unit, active, " +
@@ -655,7 +679,7 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	// VARIETY GROUPS -> businesserp_variety_groups (1:1 copy)
 	// =====================
-	private void exportVarietyGroups(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportVarietyGroups(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, item_id, name, sort_order FROM variety_groups", null);
@@ -677,7 +701,7 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	// VARIETY VALUES -> businesserp_variety_values (1:1 copy)
 	// =====================
-	private void exportVarietyValues(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportVarietyValues(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, group_id, label, sort_order, is_default FROM variety_values", null);
@@ -704,7 +728,7 @@ public class ExportVyaparActivity extends Activity {
 	// items rather than trusting a point-in-time snapshot number, so
 	// there's nothing here for it to read.
 	// =====================
-	private void exportVarietyCombos(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportVarietyCombos(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, item_id FROM variety_combos", null);
@@ -724,7 +748,7 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	// VARIETY COMBO VALUES -> businesserp_variety_combo_values (1:1 copy)
 	// =====================
-	private void exportVarietyComboValues(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportVarietyComboValues(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT combo_id, group_id, value_id FROM variety_combo_values", null);
@@ -745,7 +769,7 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	// CASH ADJUSTMENTS -> businesserp_cash_adjustments (1:1 copy)
 	// =====================
-	private void exportCashAdjustments(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportCashAdjustments(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, date, time, amount, notes, source FROM cash_adjustments", null);
@@ -773,7 +797,7 @@ public class ExportVyaparActivity extends Activity {
 	// app has no separate category concept of its own to preserve
 	// instead, so the description doubles as both.
 	// =====================
-	private void exportExpenseCategories(
+	private static void exportExpenseCategories(
 		SQLiteDatabase local, SQLiteDatabase vyb, HashMap<String, Long> categoryNameId) {
 
 		Cursor c = local.rawQuery("SELECT DISTINCT item FROM expenses", null);
@@ -806,7 +830,7 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	// PURCHASES -> kb_transactions (txn_type=2)
 	// =====================
-	private void exportPurchases(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportPurchases(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, party_id, date, time, invoice_number, grand_total, amount_paid, notes, due_date " +
@@ -848,7 +872,7 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	// PURCHASE ITEMS -> kb_lineitems
 	// =====================
-	private void exportPurchaseItems(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportPurchaseItems(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, purchase_id, item_id, quantity, purchase_price, total, combo_id " +
@@ -882,7 +906,7 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	// SALES -> kb_transactions (txn_type=1)
 	// =====================
-	private void exportSales(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportSales(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, party_id, date, time, invoice_no, discount, other_charges, " +
@@ -934,7 +958,7 @@ public class ExportVyaparActivity extends Activity {
 	// SALE ITEMS -> kb_lineitems (offset so lineitem_id never collides
 	// with a purchase line item's, since they share one id space)
 	// =====================
-	private void exportSaleItems(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportSaleItems(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, sale_id, item_id, qty, rate, amount, combo_id FROM sale_items", null);
@@ -967,7 +991,7 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	// PAYMENTS (both directions) -> kb_transactions (txn_type 3/4)
 	// =====================
-	private void exportPayments(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportPayments(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, type, party_id, date, time, amount, notes FROM payments", null);
@@ -1014,7 +1038,7 @@ public class ExportVyaparActivity extends Activity {
 	// grand_total, instead of every imported expense coming back fully
 	// paid regardless of its original paid/credit split.
 	// =====================
-	private void exportExpenses(
+	private static void exportExpenses(
 		SQLiteDatabase local, SQLiteDatabase vyb, HashMap<String, Long> categoryNameId) {
 
 		Cursor c = local.rawQuery(
@@ -1065,7 +1089,7 @@ public class ExportVyaparActivity extends Activity {
 	// carried across purely for readability, not because anything resolves
 	// through it on the way back in.
 	// =====================
-	private void exportCostItems(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportCostItems(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery("SELECT id, name FROM cost_items", null);
 
@@ -1088,7 +1112,7 @@ public class ExportVyaparActivity extends Activity {
 	// ImportVyaparActivity.importPurchaseExpenseLinks() can resolve them
 	// through the exact same maps those two steps already build.
 	// =====================
-	private void exportPurchaseExpenseLinks(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportPurchaseExpenseLinks(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, expense_id, purchase_id, share_percent, allocated_amount " +
@@ -1116,7 +1140,7 @@ public class ExportVyaparActivity extends Activity {
 	// ImportVyaparActivity.importRecurringExpenses() resolves it through
 	// the same partyIdMap purchases/sales/expenses already use.
 	// =====================
-	private void exportRecurringExpenses(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportRecurringExpenses(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, item, amount, notes, party_id, frequency, day_of_week, day_of_month, " +
@@ -1161,7 +1185,7 @@ public class ExportVyaparActivity extends Activity {
 	// ImportVyaparActivity.importDrafts() - since export doesn't yet know
 	// what ids this backup will be restored into).
 	// =====================
-	private void exportDrafts(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportDrafts(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery("SELECT id, type, label, data, date, time FROM drafts", null);
 
@@ -1184,7 +1208,7 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	// WANTED ITEMS -> businesserp_wanted_items (1:1 copy)
 	// =====================
-	private void exportWantedItems(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportWantedItems(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, item_id, item_name, date, time, party_id, notes, fulfilled " +
@@ -1219,7 +1243,7 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	// DISPLAY SHOES -> businesserp_display_shoes (1:1 copy)
 	// =====================
-	private void exportDisplayShoes(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportDisplayShoes(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, item_id, combo_id, row_pos, col_pos FROM display_shoes", null);
@@ -1242,7 +1266,7 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	// SAMPLE SHOES -> businesserp_sample_shoes (1:1 copy)
 	// =====================
-	private void exportSampleShoes(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportSampleShoes(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, item_id, combo_id FROM sample_shoes", null);
@@ -1267,7 +1291,7 @@ public class ExportVyaparActivity extends Activity {
 	// the paying/receiving party and time the same way it would for a
 	// real Vyapar backup - see its importPartyTransfers() comment.
 	// =====================
-	private void exportPartyTransfers(SQLiteDatabase local, SQLiteDatabase vyb) {
+	private static void exportPartyTransfers(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, from_party_id, to_party_id, date, time, amount, notes FROM party_transfers", null);
@@ -1319,14 +1343,14 @@ public class ExportVyaparActivity extends Activity {
 
 	// Reverses ImportVyaparActivity.formatDate(): the app's "yyyy-MM-dd"
 	// back into Vyapar's "yyyy-MM-dd 00:00:00".
-	private String toVyaparDate(String localDate) {
+	private static String toVyaparDate(String localDate) {
 		return (localDate == null ? "" : localDate) + " 00:00:00";
 	}
 
 	// Reverses ImportVyaparActivity.formatTime(): the app's "HH:mm" back
 	// into seconds-since-midnight. Loses no precision - the app never
 	// stored more than minute granularity in the first place.
-	private int toVyaparTime(String localTime) {
+	private static int toVyaparTime(String localTime) {
 
 		if (localTime == null || !localTime.contains(":")) {
 			return 0;

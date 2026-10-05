@@ -143,7 +143,19 @@ BusinessERPyh/                  Gradle project root
   (opening straight to Export Vyapar Backup) until one actually
   happens, which resets its countdown. A brand-new install gets the
   same 7-day grace period an overdue backup would, rather than nagging
-  on day one.
+  on day one. Alongside the reminder, `AutoBackupScheduler` also
+  actually runs a backup automatically every 7 days (a plain
+  AlarmManager repeating alarm, re-registered - harmlessly, not
+  duplicated - on every app open) via `AutoBackupReceiver`, which does
+  the whole export itself in the background rather than opening Export
+  Vyapar Backup (Android blocks a background trigger like this from
+  starting an Activity on API 29+ unless the app is already visible).
+  It writes one rolling file, overwritten each run, to this app's own
+  external-files folder - a safety net against data loss, not an
+  archive; the manual export is still what moving a backup to another
+  device is for. A successful automatic backup resets the reminder's
+  countdown too, so in normal use the reminder should rarely ever
+  actually need to nag.
 - **Data tools** — bulk Excel import for purchases and items; full backup
   export/import in Vyapar's `.vyb` format. Alongside standard Vyapar data
   (parties, items, purchases, sales, payments, expenses, party transfers),

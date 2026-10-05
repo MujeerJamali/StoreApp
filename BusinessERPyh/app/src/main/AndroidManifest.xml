@@ -279,6 +279,12 @@
             android:label="@string/app_name"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
+        <!-- Fired by AutoBackupScheduler's repeating alarm - see
+             AutoBackupReceiver/ExportVyaparActivity's "auto_backup" mode. -->
+        <receiver
+            android:name=".AutoBackupReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>
