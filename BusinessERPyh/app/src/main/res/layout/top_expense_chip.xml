@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One quick-add chip on the Add Expense screen - see
+     Expenseeditactivity#loadTopExpenseChips(). Tapping it prefills
+     Item/Amount/Paid rather than saving directly, since we're already
+     on the editor - the user can still review or change it before
+     Save. Inflated into row_top_expense_chips, as many as fit on one
+     horizontally-scrollable line (compact by design: this replaced
+     two rows of full-size cards on the Expenses list screen, which
+     took too much space for a shortcut). -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tv_top_expense_chip"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginEnd="8dp"
+    android:background="@drawable/bg_chip"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="7dp"
+    android:paddingBottom="7dp"
+    android:singleLine="true"
+    android:text="Item - 0"
+    android:textColor="@color/text_primary"
+    android:textSize="12sp"
+    android:textStyle="bold" />

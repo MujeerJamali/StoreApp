@@ -122,7 +122,15 @@ BusinessERPyh/                  Gradle project root
   party's balance exactly like a Sale/Purchase (paid in full is a
   no-op; an unpaid portion makes the shop owe the party, same
   direction as an unpaid Purchase), and a party-linked Expense shows
-  up alongside their Sales/Purchases on that party's own screen.
+  up alongside their Sales/Purchases on that party's own screen. Adding
+  a new Expense also shows a compact row of **quick-add chips** for
+  the most frequently logged expense items in the last 7 days (moved
+  here from the Expenses list screen, where two rows of full-size
+  cards took too much space above the list for what's meant to be a
+  quick shortcut) - tapping one prefills Item/Amount exactly like
+  picking the item from the Item autocomplete already does; the user
+  still reviews and hits Save themselves, there's no direct insert
+  from the chip.
 - **Cash** — a single ledger of all cash movement (sales, purchases,
   payments, expenses, manual adjustments); tapping a row opens its real
   source transaction. **A transaction is rejected if it would take the

@@ -3,6 +3,7 @@ package com.mujeer.businesserp;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
@@ -10,6 +11,7 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -44,6 +46,11 @@ public class Expenseeditactivity extends Activity {
 
 	private TextView tv_cash_before;
 	private TextView tv_cash_after;
+
+	// Quick-add chips for frequently logged expense items - new Expense
+	// only (see onCreate()'s expenseId == 0 branch / loadTopExpenseChips()).
+	private View scroll_top_expense_chips;
+	private LinearLayout row_top_expense_chips;
 
 	private Button btn_save;
 	private Button btn_save_draft;
@@ -107,6 +114,9 @@ public class Expenseeditactivity extends Activity {
 		et_amount = findViewById(R.id.et_amount);
 		et_amount_paid = findViewById(R.id.et_amount_paid);
 		cb_full_paid = findViewById(R.id.cb_full_paid);
+
+		scroll_top_expense_chips = findViewById(R.id.scroll_top_expense_chips);
+		row_top_expense_chips = findViewById(R.id.row_top_expense_chips);
 		et_notes = findViewById(R.id.et_notes);
 		tv_cash_before = findViewById(R.id.tv_cash_before);
 		tv_cash_after = findViewById(R.id.tv_cash_after);
@@ -266,6 +276,7 @@ public class Expenseeditactivity extends Activity {
 			}
 
 			loadCashBaseline(0);
+			loadTopExpenseChips();
 
 		} else {
 
@@ -481,6 +492,56 @@ public class Expenseeditactivity extends Activity {
 		);
 
 		updatingAmountPaidProgrammatically = false;
+	}
+
+	// =====================
+	// Quick-add chips for the most frequently logged expense items in
+	// the last 7 days (see DatabaseHelper.getTopExpenseItems()) - new
+	// Expense only. Tapping one prefills Item/Amount exactly like
+	// picking the item from the autocomplete dropdown already does
+	// (see et_item's own OnItemClickListener above, which does the
+	// same lastAmount lookup) - there's no direct insert from here,
+	// the user still reviews and hits Save themselves. Moved here from
+	// a row of 6 full-size cards on the Expenses list screen, which
+	// took too much space above the list for what's meant to be a
+	// quick shortcut; a single compact, horizontally-scrollable line
+	// fits the same shortcut without that cost.
+	// =====================
+	private void loadTopExpenseChips() {
+
+		ArrayList<HashMap<String, Object>> topItems = db.getTopExpenseItems(6);
+
+		if (topItems.isEmpty()) {
+			return;
+		}
+
+		row_top_expense_chips.removeAllViews();
+
+		LayoutInflater inflater = LayoutInflater.from(this);
+
+		for (HashMap<String, Object> entry : topItems) {
+
+			final String item = String.valueOf(entry.get("item"));
+			final double amount = (Double) entry.get("amount");
+
+			View chip = inflater.inflate(R.layout.top_expense_chip, row_top_expense_chips, false);
+
+			TextView label = chip.findViewById(R.id.tv_top_expense_chip);
+			label.setText(item + " - " + AmountFormat.format(amount));
+
+			chip.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+
+						et_item.setText(item, false);
+						et_amount.setText(AmountFormat.formatPlain(amount));
+					}
+				});
+
+			row_top_expense_chips.addView(chip);
+		}
+
+		scroll_top_expense_chips.setVisibility(View.VISIBLE);
 	}
 
 	// =====================

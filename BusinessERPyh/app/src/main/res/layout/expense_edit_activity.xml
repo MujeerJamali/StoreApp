@@ -22,6 +22,28 @@
             android:textSize="18sp"
             android:textStyle="bold" />
 
+        <!-- Quick-add shortcuts for the most frequently logged expense
+             items (new Expense only - see Expenseeditactivity#
+             loadTopExpenseChips()). One compact, horizontally-
+             scrollable line; tapping a chip prefills the fields below
+             rather than saving directly, since the editor's own Save
+             button is right there. -->
+        <HorizontalScrollView
+            android:id="@+id/scroll_top_expense_chips"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/row_top_expense_chips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+
+        </HorizontalScrollView>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
