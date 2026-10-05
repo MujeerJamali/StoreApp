@@ -223,12 +223,16 @@ and Net Cash Movement opens the Cash ledger) · Cash Flow Forecast
 (today's real cash balance projected forward day by day using only
 Sales/Purchases already due on a future date - never a prediction from
 history, so a day with nothing due just carries the balance forward
-unchanged; a Next 7/14/30/60 Days horizon spinner, default 30 Days)
+unchanged; a Next 7/14/30/60 Days horizon spinner, default 30 Days) ·
+Slow-Moving Stock (every active item still carrying stock that hasn't
+sold within a 30/60/90/180 Days window, oldest/never-sold first - a
+never-sold item always qualifies regardless of how young it is; tapping
+a row opens that item)
 
 Every report list row that represents an item or a party is tappable
 and opens that item's or party's own screen (Net Profit, Item Ranking,
 Party Ranking, Sales by Party, Item Monthly Rank, Party Balances,
-Combo/Variety Stock, Low Stock).
+Combo/Variety Stock, Low Stock, Slow-Moving Stock).
 
 The Parties list itself also sorts (Recent/Oldest Activity, Balance
 High-Low/Low-High, Name A-Z/Z-A) using the same underlying query as

@@ -4965,6 +4965,57 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// SLOW-MOVING STOCK - every active item still carrying stock whose
+	// most recent Sale (if it has ever had one) falls before the cutoff
+	// date, oldest/never-sold first. An item with stock that's never
+	// sold at all (last_sale_date IS NULL) always qualifies regardless
+	// of how young the item is - there's no "too new to judge" grace
+	// period, since a never-sold item sitting on stock is exactly what
+	// this report exists to surface.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getSlowMovingStock(int days) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Calendar cutoff = Calendar.getInstance();
+		cutoff.add(Calendar.DAY_OF_MONTH, -days);
+
+		String cutoffDate =
+			new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cutoff.getTime());
+
+		Cursor cursor = db.rawQuery(
+			"SELECT i.id, i.code, i.name, i.balance, MAX(s.date) AS last_sale_date " +
+			"FROM " + TABLE_ITEMS + " i " +
+			"LEFT JOIN sale_items si ON si.item_id = i.id " +
+			"LEFT JOIN sales s ON s.id = si.sale_id " +
+			"WHERE i.active = 1 AND i.balance > 0 " +
+			"GROUP BY i.id " +
+			"HAVING last_sale_date IS NULL OR last_sale_date < ? " +
+			"ORDER BY last_sale_date ASC, i.name ASC",
+			new String[]{cutoffDate}
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+
+			row.put("item_id", cursor.getInt(0));
+			row.put("code", cursor.getString(1));
+			row.put("name", cursor.getString(2));
+			row.put("balance", cursor.getDouble(3));
+			row.put("last_sale_date", cursor.isNull(4) ? null : cursor.getString(4));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// =====================
 	// REPORT: STOCK WORTH - current stock quantity times purchase_price,
 	// split into shoes/non-shoes by the same name-prefix rule as
 	// everywhere else. This is always a snapshot of right now: the app
