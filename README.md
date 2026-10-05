@@ -55,6 +55,19 @@ BusinessERPyh/                  Gradle project root
   (defaults to the transaction date + 3 days the moment it becomes a
   credit transaction, editable from there) - see the Credit Due report
   below (Sales only - Purchases don't have an equivalent report yet).
+  The Purchases/Sales list also supports **bulk select**: long-pressing
+  any row enters selection mode (every row gets a checkbox, replacing
+  that row's own single-delete confirmation) and a bar appears with a
+  live "N selected" count plus Delete/Cancel; Delete confirms once,
+  then loops the exact same per-row delete calls (`deletePurchase()`,
+  or `deleteSaleItems()` + `deleteSale()`) the old single long-press
+  used to make, one call per selected row, so every balance-reversal
+  side effect that already happens for a single delete still happens
+  for each one in the batch. This is the first screen to get it, not
+  the last - every other delete-capable list (Payments, Expenses,
+  Wanted Items, Drafts, ...) is a candidate to pick up the same pattern
+  later, the same way charts and info bubbles are being rolled out
+  incrementally rather than everywhere at once.
 - **Cost Items / Linking Expenses to Purchases** — Expenses double as the
   source of a purchase's landed costs (petrol, shipping, packaging, ...);
   there's no separate "Purchase Cost" record to create. Cost Items is

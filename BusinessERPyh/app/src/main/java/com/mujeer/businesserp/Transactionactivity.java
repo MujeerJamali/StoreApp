@@ -25,6 +25,18 @@ public class Transactionactivity extends Activity {
 
 	private int transactionType = TYPE_PURCHASE;
 
+	// Bulk select - entered by long-pressing any row (instead of that
+	// row's own single-delete confirmation, which this replaces);
+	// loops the same per-row delete calls the old single long-press
+	// used, one call per selected id.
+	private boolean selectionMode = false;
+	private final java.util.HashSet<Integer> selectedIds = new java.util.HashSet<Integer>();
+
+	private View bar_bulk_select;
+	private TextView tv_bulk_select_count;
+	private Button btn_bulk_delete;
+	private Button btn_bulk_cancel;
+
 	// Set only when launched from DayCloseReportActivity's Sales/
 	// Purchases cards - when present, every load (onCreate's and every
 	// onResume's) stays pinned to this one day instead of the normal
@@ -67,6 +79,11 @@ public class Transactionactivity extends Activity {
 
 		btn_add = findViewById(R.id.btn_add);
 		btn_filter = findViewById(R.id.btn_filter);
+
+		bar_bulk_select = findViewById(R.id.bar_bulk_select);
+		tv_bulk_select_count = findViewById(R.id.tv_bulk_select_count);
+		btn_bulk_delete = findViewById(R.id.btn_bulk_delete);
+		btn_bulk_cancel = findViewById(R.id.btn_bulk_cancel);
 
 		lv_transactions = findViewById(R.id.lv_transactions);
 
@@ -140,6 +157,27 @@ public class Transactionactivity extends Activity {
 					HashMap<String, Object> transaction =
 						(HashMap<String, Object>) adapter.getItem(position);
 
+					final int transactionId =
+						Integer.parseInt(transaction.get("id").toString());
+
+					if (selectionMode) {
+
+						if (selectedIds.contains(transactionId)) {
+							selectedIds.remove(transactionId);
+						} else {
+							selectedIds.add(transactionId);
+						}
+
+						if (selectedIds.isEmpty()) {
+							exitSelectionMode();
+						} else {
+							updateBulkSelectBar();
+							adapter.notifyDataSetChanged();
+						}
+
+						return;
+					}
+
 					Intent intent = new Intent(
 						Transactionactivity.this,
 						Transactionviewactivity.class
@@ -152,9 +190,7 @@ public class Transactionactivity extends Activity {
 
 					intent.putExtra(
 						"transaction_id",
-						Integer.parseInt(
-							transaction.get("id").toString()
-						)
+						transactionId
 					);
 
 					startActivity(intent);
@@ -172,54 +208,81 @@ public class Transactionactivity extends Activity {
 					int position,
 					long id) {
 
-					final HashMap<String, Object> transaction =
+					HashMap<String, Object> transaction =
 						(HashMap<String, Object>) adapter.getItem(position);
 
-					final int transactionId =
+					int transactionId =
 						Integer.parseInt(transaction.get("id").toString());
 
-					if (transactionType == TYPE_PURCHASE) {
-
-						new AlertDialog.Builder(Transactionactivity.this)
-							.setTitle("Delete Purchase")
-							.setMessage("Are you sure you want to delete this purchase?")
-							.setPositiveButton("Delete", new DialogInterface.OnClickListener() {
-									@Override
-									public void onClick(DialogInterface dialog, int which) {
-
-										if (db.deletePurchase(transactionId)) {
-											loadTransactions();
-										}
-									}
-								})
-							.setNegativeButton("Cancel", null)
-							.show();
-
-					} else {
-
-						new AlertDialog.Builder(Transactionactivity.this)
-							.setTitle("Delete Sale")
-							.setMessage("Are you sure you want to delete this sale?")
-							.setPositiveButton("Delete", new DialogInterface.OnClickListener() {
-									@Override
-									public void onClick(DialogInterface dialog, int which) {
-
-										String saleId = String.valueOf(transactionId);
-
-										db.deleteSaleItems(saleId);
-										db.deleteSale(saleId);
-
-										loadTransactions();
-									}
-								})
-							.setNegativeButton("Cancel", null)
-							.show();
+					if (!selectionMode) {
+						selectionMode = true;
+						adapter.setSelectionMode(true, selectedIds);
 					}
+
+					selectedIds.add(transactionId);
+
+					updateBulkSelectBar();
+					adapter.notifyDataSetChanged();
 
 					return true;
 				}
 			}
 		);
+
+		btn_bulk_cancel.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					exitSelectionMode();
+				}
+			});
+
+		btn_bulk_delete.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					if (selectedIds.isEmpty()) {
+						return;
+					}
+
+					final int count = selectedIds.size();
+					final String noun = transactionType == TYPE_PURCHASE ?
+						(count == 1 ? "purchase" : "purchases") :
+						(count == 1 ? "sale" : "sales");
+
+					new AlertDialog.Builder(Transactionactivity.this)
+						.setTitle("Delete " + count + " " + noun + "?")
+						.setMessage("This cannot be undone.")
+						.setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+								@Override
+								public void onClick(DialogInterface dialog, int which) {
+
+									// A plain copy, not a live view - deleting a
+									// purchase/sale below has no reason to touch
+									// selectedIds itself, but iterating a set while
+									// something else might mutate it is a trap
+									// worth avoiding on principle.
+									for (int transactionId : new java.util.ArrayList<Integer>(selectedIds)) {
+
+										if (transactionType == TYPE_PURCHASE) {
+
+											db.deletePurchase(transactionId);
+
+										} else {
+
+											String saleId = String.valueOf(transactionId);
+											db.deleteSaleItems(saleId);
+											db.deleteSale(saleId);
+										}
+									}
+
+									exitSelectionMode();
+									loadTransactions();
+								}
+							})
+						.setNegativeButton("Cancel", null)
+						.show();
+				}
+			});
 
 		et_search.addTextChangedListener(
 			new TextWatcher() {
@@ -259,6 +322,36 @@ public class Transactionactivity extends Activity {
 		loadTransactions();
 	}
 
+	@Override
+	public void onBackPressed() {
+
+		if (selectionMode) {
+			exitSelectionMode();
+			return;
+		}
+
+		super.onBackPressed();
+	}
+
+	private void updateBulkSelectBar() {
+
+		bar_bulk_select.setVisibility(selectionMode ? View.VISIBLE : View.GONE);
+
+		tv_bulk_select_count.setText(selectedIds.size() + " selected");
+	}
+
+	private void exitSelectionMode() {
+
+		selectionMode = false;
+		selectedIds.clear();
+
+		adapter.setSelectionMode(false, selectedIds);
+
+		bar_bulk_select.setVisibility(View.GONE);
+
+		adapter.notifyDataSetChanged();
+	}
+
 	private void loadTransactions() {
 
 		if (filterFromDate != null && filterToDate != null) {
@@ -285,6 +378,8 @@ public class Transactionactivity extends Activity {
 			this,
 			transactionList
 		);
+
+		adapter.setSelectionMode(selectionMode, selectedIds);
 
 		lv_transactions.setAdapter(adapter);
 		lv_transactions.setEmptyView(tv_empty);
@@ -614,6 +709,8 @@ public class Transactionactivity extends Activity {
 			this,
 			transactionList
 		);
+
+		adapter.setSelectionMode(selectionMode, selectedIds);
 
 		lv_transactions.setAdapter(adapter);
 		lv_transactions.setEmptyView(tv_empty);

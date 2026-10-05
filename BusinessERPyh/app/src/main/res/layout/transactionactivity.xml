@@ -40,6 +40,45 @@
             android:layout_marginTop="10dp"
             android:text="Filter" />
 
+        <!-- Bulk select bar - long-press a row to enter selection mode
+             (every row gets a checkbox), hidden otherwise. See
+             Transactionactivity's selectionMode handling. -->
+        <LinearLayout
+            android:id="@+id/bar_bulk_select"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tv_bulk_select_count"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="0 selected"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btn_bulk_delete"
+                style="@style/AppButton.Danger.Small"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="Delete" />
+
+            <Button
+                android:id="@+id/btn_bulk_cancel"
+                style="@style/AppButton.Outline.Small"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Cancel" />
+
+        </LinearLayout>
+
         <TextView
             android:id="@+id/tv_empty"
             android:layout_width="match_parent"

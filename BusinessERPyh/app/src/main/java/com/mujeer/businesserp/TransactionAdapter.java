@@ -5,10 +5,12 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
+import android.widget.CheckBox;
 import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Set;
 
 public class TransactionAdapter extends BaseAdapter {
 
@@ -16,6 +18,13 @@ public class TransactionAdapter extends BaseAdapter {
 
 	private ArrayList<HashMap<String, Object>> originalList;
 	private ArrayList<HashMap<String, Object>> filteredList;
+
+	// Only used by Transactionactivity's bulk-select mode - stays false/
+	// empty for every other screen that reuses this same adapter
+	// (Partyviewactivity, Itemviewactivity), which never shows the
+	// checkbox column at all.
+	private boolean selectionMode = false;
+	private Set<Integer> selectedIds = null;
 
 	private TextView tv_type;
 	private TextView tv_code;
@@ -31,6 +40,13 @@ public class TransactionAdapter extends BaseAdapter {
 
 		this.originalList = list;
 		this.filteredList = new ArrayList<HashMap<String, Object>>(list);
+	}
+
+	// selectedIds is read live (not copied) - the caller mutates the
+	// same Set it passed in and calls notifyDataSetChanged() itself.
+	public void setSelectionMode(boolean selectionMode, Set<Integer> selectedIds) {
+		this.selectionMode = selectionMode;
+		this.selectedIds = selectedIds;
 	}
 
 	@Override
@@ -69,8 +85,22 @@ public class TransactionAdapter extends BaseAdapter {
 		tv_date = convertView.findViewById(R.id.tv_date);
 		tv_total = convertView.findViewById(R.id.tv_total);
 
+		CheckBox cb_select = convertView.findViewById(R.id.cb_select);
+
 		HashMap<String, Object> transaction =
 			filteredList.get(position);
+
+		if (selectionMode) {
+
+			cb_select.setVisibility(View.VISIBLE);
+			cb_select.setChecked(
+				selectedIds != null && selectedIds.contains((Integer) transaction.get("id"))
+			);
+
+		} else {
+
+			cb_select.setVisibility(View.GONE);
+		}
 
 		if (tv_type != null) {
 
