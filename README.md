@@ -329,6 +329,19 @@ already uses; invoice numbers get their own query
 Purchases are two separate tables with no existing combined list to
 filter.
 
+**Info Bubbles**: a reusable minimalist "i" badge (`InfoBubbleView` -
+a small circle, text "i", not an image icon, since this app removed
+decorative icons everywhere else; this is a functional tap
+affordance, exempt the same way a Spinner's dropdown arrow would be)
+that shows an explanation dialog on tap. One call wires it:
+`infoBubble.setInfo(title, description)`. First-pass coverage: every
+report under Reports (all 18, plus the Reports list itself) now has
+one next to its title, and the Dashboard has three (Cash in Hand,
+Sales Trend, Favorites). This is a first pass, not a finished one -
+every other screen in the app is a candidate to pick up the same
+badge later, the same way charts and bulk select were rolled out
+incrementally rather than everywhere at once.
+
 ## Building
 
 Open `BusinessERPyh/` in Android Studio (compileSdk 29, minSdk 21) and run the

@@ -56,6 +56,11 @@ public class MonthOverMonthReportActivity extends Activity {
 
 		setTitle("Month-over-Month");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Month-over-Month", "This Month (1st through today) vs the full previous calendar month, for Sales/Net Profit/Expenses - Expenses is the one metric where a decrease is the improvement, the other two are the opposite."
+		);
+
 		tv_month_labels = findViewById(R.id.tv_month_labels);
 
 		tv_sales_this = findViewById(R.id.tv_sales_this);

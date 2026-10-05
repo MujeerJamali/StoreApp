@@ -64,6 +64,11 @@ public class Salesreportactivity extends Activity {
 
 		setTitle("Total Sales");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Total Sales", "Total sales amount for the selected period, with a day-by-day breakdown. Change the period or pick a custom date range above."
+		);
+
 		spinner_range = findViewById(R.id.spinner_range);
 
 		container_custom_range = findViewById(R.id.container_custom_range);

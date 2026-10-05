@@ -53,6 +53,11 @@ public class CashFlowForecastReportActivity extends Activity {
 
 		setTitle("Cash Flow Forecast");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Cash Flow Forecast", "Today's real cash balance projected forward using only Sales and Purchases already due on a future date - never a prediction, so a day with nothing due just carries the balance forward unchanged."
+		);
+
 		spinner_horizon = findViewById(R.id.spinner_horizon);
 		lv_cash_flow_forecast = findViewById(R.id.lv_cash_flow_forecast);
 

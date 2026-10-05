@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The minimalist "i" badge's own background - a plain filled circle,
+     no border, matching the app's existing flat/minimalist shapes
+     (see bg_chip.xml). Used only by InfoBubbleView. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/primary_light"/>
+</shape>

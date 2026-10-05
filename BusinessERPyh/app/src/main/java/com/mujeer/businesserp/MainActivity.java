@@ -69,7 +69,7 @@ public class MainActivity extends Activity {
 
 	EditText et_dashboard_search;
 
-	TextView tv_favorites_label;
+	View row_favorites_label;
 	LinearLayout card_favorites;
 
 	// Every long-press-pinnable Tool Row on this screen (both the
@@ -130,13 +130,31 @@ public class MainActivity extends Activity {
 		tv_expense_week = findViewById(R.id.tv_expense_week);
 		tv_expense_month = findViewById(R.id.tv_expense_month);
 
+		InfoBubbleView info_bubble_cash = findViewById(R.id.info_bubble_cash);
+		info_bubble_cash.setInfo(
+			"Cash in Hand",
+			"Running cash balance: every Sale's paid amount and Payment In, minus every Purchase's paid amount, Payment Out, and Expense's paid amount, plus manual Cash Adjustments. Today's/This Week's/This Month's Expense figures below are a separate, simpler total - just paid-or-not expenses in that window, excluding one already counted as a Purchase's landed cost."
+		);
+
 		spinner_sales_trend_horizon = findViewById(R.id.spinner_sales_trend_horizon);
 		chart_sales_trend = findViewById(R.id.chart_sales_trend);
 
+		InfoBubbleView info_bubble_sales_trend = findViewById(R.id.info_bubble_sales_trend);
+		info_bubble_sales_trend.setInfo(
+			"Sales Trend",
+			"Daily sales total for the last 7/30 days, including a day with zero sales - a quick \"is the shop busy lately\" glance, not a profit report."
+		);
+
 		et_dashboard_search = findViewById(R.id.et_dashboard_search);
 
-		tv_favorites_label = findViewById(R.id.tv_favorites_label);
+		row_favorites_label = findViewById(R.id.row_favorites_label);
 		card_favorites = findViewById(R.id.card_favorites);
+
+		InfoBubbleView info_bubble_favorites = findViewById(R.id.info_bubble_favorites);
+		info_bubble_favorites.setInfo(
+			"Favorites",
+			"Long-press any row in the Modules or Tools card below to pin it here for quick access - long-press a pinned row here to unpin it. Pin order is remembered across app opens."
+		);
 
 		db = new DatabaseHelper(this);
 
@@ -529,13 +547,13 @@ public class MainActivity extends Activity {
 
 		if (favorites.isEmpty()) {
 
-			tv_favorites_label.setVisibility(View.GONE);
+			row_favorites_label.setVisibility(View.GONE);
 			card_favorites.setVisibility(View.GONE);
 
 			return;
 		}
 
-		tv_favorites_label.setVisibility(View.VISIBLE);
+		row_favorites_label.setVisibility(View.VISIBLE);
 		card_favorites.setVisibility(View.VISIBLE);
 
 		LayoutInflater inflater = LayoutInflater.from(this);

@@ -85,6 +85,11 @@ public class Partysalesreportactivity extends Activity {
 
 		setTitle("Sales by Party");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Sales by Party", "Every party's sales for the selected period. The Profit sort doubles as a Top Customers view - ranked by what each party actually contributed to profit, not just how much they spent."
+		);
+
 		spinner_range = findViewById(R.id.spinner_range);
 
 		container_custom_range = findViewById(R.id.container_custom_range);

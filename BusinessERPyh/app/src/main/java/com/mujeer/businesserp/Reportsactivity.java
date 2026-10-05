@@ -34,6 +34,11 @@ public class Reportsactivity extends Activity {
 
 		setTitle("Reports");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Reports", "Every report in the app. Most carry their own (i) explaining exactly what they measure - tap it before reading too much into a number you're not sure about."
+		);
+
 		btn_report_sales = findViewById(R.id.btn_report_sales);
 		btn_report_party_sales = findViewById(R.id.btn_report_party_sales);
 		btn_report_item_ranking = findViewById(R.id.btn_report_item_ranking);

@@ -87,6 +87,11 @@ public class CreditDueReportActivity extends Activity {
 
 		setTitle("Credit Due");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Credit Due", "Unpaid or partially-paid Sales whose Due Date falls in the selected period - forward-looking, unlike every other report's period selector, since a due date is something still coming, not something that already happened."
+		);
+
 		spinner_range = findViewById(R.id.spinner_range);
 
 		container_custom_range = findViewById(R.id.container_custom_range);

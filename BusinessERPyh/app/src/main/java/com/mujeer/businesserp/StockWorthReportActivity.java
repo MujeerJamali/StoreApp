@@ -36,6 +36,11 @@ public class StockWorthReportActivity extends Activity {
 
 		setTitle("Stock Worth");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Stock Worth", "Current stock quantity times purchase price, as of right now. There's no historical stock-level record to look back further."
+		);
+
 		tv_total_worth = findViewById(R.id.tv_total_worth);
 		tv_shoes_worth = findViewById(R.id.tv_shoes_worth);
 		tv_shoes_count = findViewById(R.id.tv_shoes_count);

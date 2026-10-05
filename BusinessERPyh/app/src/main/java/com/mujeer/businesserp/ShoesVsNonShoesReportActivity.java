@@ -81,6 +81,11 @@ public class ShoesVsNonShoesReportActivity extends Activity {
 
 		setTitle("Shoes vs Non-Shoes");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Shoes vs Non-Shoes", "What share of sales/profit came from shoe items versus everything else, for a selectable period."
+		);
+
 		spinner_metric = findViewById(R.id.spinner_metric);
 		spinner_range = findViewById(R.id.spinner_range);
 

@@ -52,16 +52,31 @@
                  pinned row here unpins it too. Hidden entirely when
                  nothing is pinned (see
                  MainActivity#refreshFavoritesCard()). -->
-            <TextView
-                android:id="@+id/tv_favorites_label"
+            <LinearLayout
+                android:id="@+id/row_favorites_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="10dp"
-                android:text="Favorites"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tv_favorites_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:text="Favorites"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <com.mujeer.businesserp.InfoBubbleView
+                    android:id="@+id/info_bubble_favorites"
+                    android:layout_width="@dimen/info_bubble_size"
+                    android:layout_height="@dimen/info_bubble_size" />
+
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/card_favorites"
@@ -86,12 +101,26 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <TextView
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Cash in Hand"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="Cash in Hand"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+
+                    <com.mujeer.businesserp.InfoBubbleView
+                        android:id="@+id/info_bubble_cash"
+                        android:layout_width="@dimen/info_bubble_size"
+                        android:layout_height="@dimen/info_bubble_size" />
+
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/tv_cash_balance"
@@ -212,6 +241,12 @@
                         android:text="Sales Trend"
                         android:textColor="@color/text_secondary"
                         android:textSize="13sp" />
+
+                    <com.mujeer.businesserp.InfoBubbleView
+                        android:id="@+id/info_bubble_sales_trend"
+                        android:layout_width="@dimen/info_bubble_size"
+                        android:layout_height="@dimen/info_bubble_size"
+                        android:layout_marginEnd="8dp" />
 
                     <Spinner
                         android:id="@+id/spinner_sales_trend_horizon"

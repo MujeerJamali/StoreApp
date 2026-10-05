@@ -64,6 +64,11 @@ public class Partyrankingreportactivity extends Activity {
 
 		setTitle("Party Ranking");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Party Ranking", "Each party's Today + Week + Month + Quarter + Year + All Time sales are added together into one combined score, and parties are ranked by that score."
+		);
+
 		spinner_party_ranking_sort = findViewById(R.id.spinner_party_ranking_sort);
 
 		tv_empty = findViewById(R.id.tv_empty);

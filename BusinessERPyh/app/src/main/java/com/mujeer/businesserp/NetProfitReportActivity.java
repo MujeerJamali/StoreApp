@@ -100,6 +100,11 @@ public class NetProfitReportActivity extends Activity {
 
 		setTitle("Net Profit");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Net Profit", "Net Profit = Sales Total - Item Cost - Expenses. The per-item breakdown below can switch between This Period's actual profit and each item's own Standing Margin, period-independent."
+		);
+
 		spinner_range = findViewById(R.id.spinner_range);
 
 		container_custom_range = findViewById(R.id.container_custom_range);

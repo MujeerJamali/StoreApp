@@ -81,6 +81,11 @@ public class PartyBalanceReportActivity extends Activity {
 
 		setTitle("Party Balances");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Party Balances", "Every party's balance and how long since their last Sale/Purchase/Payment/Expense/Transfer - sort by that to see which balances have been sitting the longest."
+		);
+
 		spinner_balance_filter = findViewById(R.id.spinner_balance_filter);
 		spinner_party_sort = findViewById(R.id.spinner_party_sort);
 

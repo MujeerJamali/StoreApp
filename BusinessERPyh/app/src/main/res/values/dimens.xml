@@ -21,6 +21,10 @@
     <dimen name="calendar_cell_size">40dp</dimen>
     <dimen name="calendar_badge_size">16dp</dimen>
 
+    <!-- InfoBubbleView - the minimalist "i" tap-for-explanation badge
+         next to a screen's title (see InfoBubbleView.java). -->
+    <dimen name="info_bubble_size">18dp</dimen>
+
     <dimen name="text_headline">22sp</dimen>
     <dimen name="text_title">17sp</dimen>
     <dimen name="text_body">15sp</dimen>

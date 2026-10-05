@@ -63,6 +63,11 @@ public class AverageCartReportActivity extends Activity {
 
 		setTitle("Average Cart");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Average Cart", "Average number of distinct items and average amount per sale for the selected period, plus how many sales that's based on."
+		);
+
 		spinner_range = findViewById(R.id.spinner_range);
 
 		container_custom_range = findViewById(R.id.container_custom_range);

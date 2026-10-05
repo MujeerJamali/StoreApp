@@ -6,7 +6,26 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <TextView style="@style/PageTitle" android:text="Average Cart" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            style="@style/PageTitle"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginBottom="0dp"
+            android:text="Average Cart" />
+
+        <com.mujeer.businesserp.InfoBubbleView
+            android:id="@+id/info_bubble"
+            android:layout_width="@dimen/info_bubble_size"
+            android:layout_height="@dimen/info_bubble_size" />
+
+    </LinearLayout>
 
     <Spinner
         android:id="@+id/spinner_range"

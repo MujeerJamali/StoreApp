@@ -40,6 +40,11 @@ public class LowStockReportActivity extends Activity {
 
 		setTitle("Low Stock");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Low Stock", "Every active item at or below its own Reorder Threshold (set on the Edit Item screen), lowest stock first - always a snapshot of right now, no period selector."
+		);
+
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_low_stock = findViewById(R.id.lv_low_stock);
 

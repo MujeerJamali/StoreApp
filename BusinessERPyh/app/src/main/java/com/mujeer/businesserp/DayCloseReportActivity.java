@@ -54,6 +54,11 @@ public class DayCloseReportActivity extends Activity {
 
 		setTitle("Day Close");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Day Close", "One day's Sales, Purchases, Expenses and Payments at a glance, plus how much that day actually moved the cash balance. Tap any row to see what's behind it."
+		);
+
 		et_date = findViewById(R.id.et_date);
 
 		tv_sales_total = findViewById(R.id.tv_sales_total);

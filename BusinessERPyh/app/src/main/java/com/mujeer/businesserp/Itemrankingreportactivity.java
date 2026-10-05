@@ -76,6 +76,11 @@ public class Itemrankingreportactivity extends Activity {
 
 		setTitle("Item Ranking");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Item Ranking", "Each item's Today + Week + Month + Quarter + Year + All Time sales are added together into one combined score, and items are ranked by that score."
+		);
+
 		spinner_item_sort = findViewById(R.id.spinner_item_sort);
 		spinner_shoes_filter = findViewById(R.id.spinner_shoes_filter);
 

@@ -85,6 +85,11 @@ public class ItemMonthlyRankReportActivity extends Activity {
 
 		setTitle("Item Monthly Rank");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Item Monthly Rank", "Each item is ranked against the others within every month it sold in (1 = best), and those per-month ranks are summed - a lower sum means it ranked well more consistently."
+		);
+
 		spinner_metric = findViewById(R.id.spinner_metric);
 		spinner_range = findViewById(R.id.spinner_range);
 		spinner_shoes_filter = findViewById(R.id.spinner_shoes_filter);

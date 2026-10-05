@@ -76,6 +76,11 @@ public class ComboStockReportActivity extends Activity {
 
 		setTitle("Combo/Variety Stock");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Combo/Variety Stock", "Every shoe item with its available sizes and stock. Filter by Gender + Size to see only items carrying that size; it's shown first and bold on each row."
+		);
+
 		spinner_combo_filter = findViewById(R.id.spinner_combo_filter);
 		tv_total_stock = findViewById(R.id.tv_total_stock);
 		tv_empty = findViewById(R.id.tv_empty);

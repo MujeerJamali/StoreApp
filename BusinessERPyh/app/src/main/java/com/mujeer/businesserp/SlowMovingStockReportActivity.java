@@ -52,6 +52,11 @@ public class SlowMovingStockReportActivity extends Activity {
 
 		setTitle("Slow-Moving Stock");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Slow-Moving Stock", "Every active item still carrying stock that hasn't sold within the selected window, oldest/never-sold first - a never-sold item always qualifies regardless of how young it is."
+		);
+
 		spinner_window = findViewById(R.id.spinner_window);
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_slow_moving_stock = findViewById(R.id.lv_slow_moving_stock);

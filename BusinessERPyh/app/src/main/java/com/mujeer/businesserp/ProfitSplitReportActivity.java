@@ -68,6 +68,11 @@ public class ProfitSplitReportActivity extends Activity {
 
 		setTitle("Profit: Cash Sale vs Party");
 
+		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
+		info_bubble.setInfo(
+			"Profit: Cash Sale vs Party", "What share of profit came from unnamed Cash Sales versus real, named parties."
+		);
+
 		spinner_range = findViewById(R.id.spinner_range);
 
 		container_custom_range = findViewById(R.id.container_custom_range);
