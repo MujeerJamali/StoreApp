@@ -61,7 +61,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // this got missed when the column was first added, so onUpgrade()
     // never ran on any install already at 20 and every getSaleById()/
     // getCreditDueSales()/export call hit "no such column: due_date".
-    public static final int DATABASE_VERSION = 21;
+    // Bumped 21 -> 22 to add purchases.due_date, mirroring sales.due_date -
+    // a credit Purchase (not fully paid) now gets the same Due Date field/
+    // default as a credit Sale. Not yet exercised in practice (every
+    // Purchase is currently paid in full), but wired the same way so it
+    // works the moment it is.
+    public static final int DATABASE_VERSION = 22;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -231,7 +236,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"notes TEXT, " +
 			"source TEXT, " +
 			"other_charges REAL NOT NULL DEFAULT 0, " +
-			"other_charges_to_party INTEGER NOT NULL DEFAULT 1" +
+			"other_charges_to_party INTEGER NOT NULL DEFAULT 1, " +
+			"due_date TEXT" +
 			");"
 		);
 
@@ -507,6 +513,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		// unpaid/partial sale from before this column was added simply
 		// has no due date rather than one getting invented for it.
 		addColumnIfMissing(db, "sales", "due_date", "TEXT");
+
+		// Same, mirrored onto Purchases - see DATABASE_VERSION's comment.
+		addColumnIfMissing(db, TABLE_PURCHASES, "due_date", "TEXT");
 
 		// cost_items (created above by onCreate(db)) is brand new as of
 		// this version - every expense/recurring-expense rule recorded
@@ -2639,7 +2648,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	) {
 
 		return insertPurchase(
-			partyId, date, time, invoiceNumber, grandTotal, amountPaid, notes, 0, true
+			partyId, date, time, invoiceNumber, grandTotal, amountPaid, notes, null
+		);
+	}
+
+	public long insertPurchase(
+        int partyId,
+        String date,
+        String time,
+        String invoiceNumber,
+        double grandTotal,
+        double amountPaid,
+        String notes,
+        String dueDate
+	) {
+
+		return insertPurchase(
+			partyId, date, time, invoiceNumber, grandTotal, amountPaid, notes, 0, true, dueDate
 		);
 	}
 
@@ -2653,6 +2678,25 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         String notes,
         double otherCharges,
         boolean otherChargesToParty
+	) {
+
+		return insertPurchase(
+			partyId, date, time, invoiceNumber, grandTotal, amountPaid, notes,
+			otherCharges, otherChargesToParty, null
+		);
+	}
+
+	public long insertPurchase(
+        int partyId,
+        String date,
+        String time,
+        String invoiceNumber,
+        double grandTotal,
+        double amountPaid,
+        String notes,
+        double otherCharges,
+        boolean otherChargesToParty,
+        String dueDate
 	) {
 
 		SQLiteDatabase db = this.getWritableDatabase();
@@ -2673,6 +2717,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("source", "Manual");
 		values.put("other_charges", otherCharges);
 		values.put("other_charges_to_party", otherChargesToParty ? 1 : 0);
+		values.put("due_date", dueDate);
 
 		long id = db.insert(
             TABLE_PURCHASES,
@@ -2921,7 +2966,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 			"SELECT p.party_id, pa.name, p.date, p.time, " +
 			"p.invoice_number, p.grand_total, " +
-			"p.amount_paid, p.notes, p.other_charges, p.other_charges_to_party " +
+			"p.amount_paid, p.notes, p.other_charges, p.other_charges_to_party, " +
+			"p.due_date " +
 			"FROM " + TABLE_PURCHASES + " p " +
 			"INNER JOIN " + TABLE_PARTIES + " pa " +
 			"ON p.party_id = pa.id " +
@@ -2944,6 +2990,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("notes", cursor.getString(7));
 			map.put("other_charges", cursor.getDouble(8));
 			map.put("other_charges_to_party", cursor.getInt(9) != 0);
+			map.put("due_date", cursor.getString(10));
 		}
 
 		cursor.close();
@@ -3738,7 +3785,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		return updatePurchase(
 			purchaseId, partyId, date, time, invoiceNumber, grandTotal,
-			amountPaid, notes, 0, true
+			amountPaid, notes, 0, true, null
 		);
 	}
 
@@ -3753,6 +3800,25 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         String notes,
         double otherCharges,
         boolean otherChargesToParty) {
+
+		return updatePurchase(
+			purchaseId, partyId, date, time, invoiceNumber, grandTotal,
+			amountPaid, notes, otherCharges, otherChargesToParty, null
+		);
+	}
+
+	public boolean updatePurchase(
+        int purchaseId,
+        int partyId,
+        String date,
+        String time,
+        String invoiceNumber,
+        double grandTotal,
+        double amountPaid,
+        String notes,
+        double otherCharges,
+        boolean otherChargesToParty,
+        String dueDate) {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
@@ -3788,6 +3854,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("source", "Manual");
 		values.put("other_charges", otherCharges);
 		values.put("other_charges_to_party", otherChargesToParty ? 1 : 0);
+		values.put("due_date", dueDate);
 
 		int rows = db.update(
             TABLE_PURCHASES,
@@ -7164,6 +7231,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		String notes,
 		String source) {
 
+		return insertPurchaseBulk(
+			db, partyId, date, time, invoiceNumber, grandTotal, amountPaid, notes, source, null
+		);
+	}
+
+	public long insertPurchaseBulk(
+		SQLiteDatabase db,
+		int partyId,
+		String date,
+		String time,
+		String invoiceNumber,
+		double grandTotal,
+		double amountPaid,
+		String notes,
+		String source,
+		String dueDate) {
+
 		// Same fallback as insertPurchase(): a purchase must always carry
 		// an invoice number. Imports preserve whatever the source file
 		// already has, but when the source row has none (e.g. a Cash
@@ -7184,6 +7268,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("amount_paid", amountPaid);
 		values.put("notes", notes);
 		values.put("source", source);
+		values.put("due_date", dueDate);
 
 		long id = db.insert(TABLE_PURCHASES, null, values);
 

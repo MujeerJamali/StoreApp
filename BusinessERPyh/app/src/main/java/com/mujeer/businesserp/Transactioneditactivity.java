@@ -1646,10 +1646,10 @@ public class Transactioneditactivity extends Activity {
 			et_amount_paid.setText((String) data.get("amount_paid"));
 		}
 
-		// Sale only - see saveDraft()/updateDueDateVisibility(). Read
-		// back before updateGrandTotal() runs below (triggered once the
-		// items list is restored a few lines down) so the default-due-
-		// date logic sees it already filled in.
+		// Sale or Purchase - see saveDraft()/updateDueDateVisibility().
+		// Read back before updateGrandTotal() runs below (triggered once
+		// the items list is restored a few lines down) so the default-
+		// due-date logic sees it already filled in.
 		if (data.get("due_date") != null) {
 			et_due_date.setText((String) data.get("due_date"));
 		}
@@ -1707,7 +1707,8 @@ public class Transactioneditactivity extends Activity {
 		data.put("items", new ArrayList<HashMap<String, Object>>(transactionItemList));
 
 		if (
-			transactionType == TYPE_SALE && container_due_date != null &&
+			(transactionType == TYPE_SALE || transactionType == TYPE_PURCHASE) &&
+			container_due_date != null &&
 			container_due_date.getVisibility() == View.VISIBLE
 		) {
 			data.put("due_date", et_due_date.getText().toString());
@@ -2796,17 +2797,19 @@ public class Transactioneditactivity extends Activity {
 	}
 
 	// =====================
-	// Sale only - a credit sale (anything not fully paid) gets a Due
-	// Date field; a fully-paid one has nothing to be due, so the field
-	// is hidden (not cleared - switching back to partial/unpaid later
-	// brings back whatever was there). The field defaults to the sale
-	// date + 3 days only the moment it first becomes relevant and is
-	// still empty - editing an existing credit sale's already-saved due
-	// date, or one the user already picked, is never overwritten.
+	// A credit transaction (anything not fully paid, Sale or Purchase)
+	// gets a Due Date field; a fully-paid one has nothing to be due, so
+	// the field is hidden (not cleared - switching back to partial/
+	// unpaid later brings back whatever was there). The field defaults
+	// to the transaction date + 3 days only the moment it first becomes
+	// relevant and is still empty - editing an existing credit Sale/
+	// Purchase's already-saved due date, or one the user already
+	// picked, is never overwritten.
 	// =====================
 	private void updateDueDateVisibility(double grandTotal) {
 
-		if (transactionType != TYPE_SALE || container_due_date == null) {
+		if ((transactionType != TYPE_SALE && transactionType != TYPE_PURCHASE)
+			|| container_due_date == null) {
 			return;
 		}
 
@@ -3158,6 +3161,11 @@ public class Transactioneditactivity extends Activity {
 
 		int purchaseId;
 
+		// Same "only a credit transaction gets a due date" rule as Sale -
+		// see updateDueDateVisibility().
+		String dueDate =
+			amountPaid < grandTotal - 0.01 ? et_due_date.getText().toString().trim() : null;
+
 			if (isEditMode) {
 
 				purchaseId = transactionId;
@@ -3172,7 +3180,8 @@ public class Transactioneditactivity extends Activity {
 			amountPaid,
 				et_notes.getText().toString(),
 				legacyOtherCharges,
-				legacyOtherChargesToParty
+				legacyOtherChargesToParty,
+				dueDate
 				);
 
 					if (!success) {
@@ -3197,7 +3206,8 @@ public class Transactioneditactivity extends Activity {
 			et_invoice_number.getText().toString(),
 		grandTotal,
 			amountPaid,
-			et_notes.getText().toString()
+			et_notes.getText().toString(),
+			dueDate
 				);
 
 				if (newPurchaseId <= 0) {
@@ -3464,7 +3474,7 @@ public class Transactioneditactivity extends Activity {
 	}
 
 	// Same tappable-date-picker pattern as showDatePicker() above, for
-	// a credit Sale's due date (see updateDueDateVisibility()).
+	// a credit Sale or Purchase's due date (see updateDueDateVisibility()).
 	private void showDueDatePicker() {
 
 		java.util.Calendar calendar = java.util.Calendar.getInstance();
@@ -3751,6 +3761,14 @@ public class Transactioneditactivity extends Activity {
 			(Double) purchase.get("amount_paid"),
 			(Double) purchase.get("grand_total")
 		);
+
+		// Read back before updateGrandTotal() runs below, so
+		// updateDueDateVisibility() sees it already filled in and
+		// doesn't overwrite it with a freshly-computed default - same
+		// as loadSale() does.
+		if (purchase.get("due_date") != null) {
+			et_due_date.setText(purchase.get("due_date").toString());
+		}
 
 		et_notes.setText(
 			purchase.get("notes").toString()

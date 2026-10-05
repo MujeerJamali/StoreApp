@@ -1085,8 +1085,13 @@ public class GenerateEntriesActivity extends Activity {
 
 				if (entryType == TYPE_PURCHASE) {
 
+					// Always a 100% credit purchase (amountPaid is always 0
+					// above) - same "date + 3 days" default due date the
+					// Sale branch below gets, mirroring Purchase's own Due
+					// Date field in Transactioneditactivity.
 					long purchaseId = db.insertPurchaseBulk(
-						conn, partyId, date, time, "", grandTotal, 0, notes, "Generate Entries");
+						conn, partyId, date, time, "", grandTotal, 0, notes, "Generate Entries",
+						addDaysToDateString(date, 3));
 
 					for (Object[] pair : entries) {
 

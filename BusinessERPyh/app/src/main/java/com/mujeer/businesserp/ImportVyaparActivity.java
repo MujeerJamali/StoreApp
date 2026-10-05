@@ -60,7 +60,9 @@ import java.util.zip.ZipInputStream;
 // salesHaveDueDate/hasCostItemsTable/hasPurchaseExpenseLinksTable/
 // hasRecurringExpensesTable/hasDraftsTable below detect up front so that
 // whole step is just skipped (or, for the extra columns, defaults to
-// 0/null) rather than failing the import.
+// 0/null) rather than failing the import. salesHaveDueDate, despite the
+// name, gates both kb_transactions.txn_due_date columns - Sale's and
+// Purchase's - since it's one shared column on one shared table.
 // =====================
 public class ImportVyaparActivity extends Activity {
 
@@ -354,7 +356,8 @@ public class ImportVyaparActivity extends Activity {
             }
 
             setStatus("Importing purchases...");
-            importPurchases(vyaparDb, helper, db, partyIdMap, purchaseIdMap, skipped, counts);
+            importPurchases(
+                vyaparDb, helper, db, partyIdMap, purchaseIdMap, salesHaveDueDate, skipped, counts);
 
             setStatus("Importing purchase line items...");
             importPurchaseLineItems(
@@ -1225,6 +1228,7 @@ public class ImportVyaparActivity extends Activity {
         SQLiteDatabase db,
         HashMap<Long, Integer> partyIdMap,
         HashMap<Long, Long> purchaseIdMap,
+        boolean purchasesHaveDueDate,
         ArrayList<SkippedRow> skipped,
         Counts counts) {
 
@@ -1236,7 +1240,8 @@ public class ImportVyaparActivity extends Activity {
         // showing up as "party not found" when this was misread as Purchase.
         Cursor c = vyaparDb.rawQuery(
             "SELECT txn_id, txn_name_id, txn_date, txn_time, txn_cash_amount, txn_balance_amount, " +
-            "txn_invoice_prefix, txn_ref_number_char, txn_description " +
+            "txn_invoice_prefix, txn_ref_number_char, txn_description" +
+            (purchasesHaveDueDate ? ", txn_due_date" : "") + " " +
             "FROM kb_transactions WHERE txn_type=2", null);
 
         while (c.moveToNext()) {
@@ -1250,6 +1255,8 @@ public class ImportVyaparActivity extends Activity {
             String prefix = c.getString(6);
             String ref = c.getString(7);
             String description = c.getString(8);
+
+            String dueDate = (purchasesHaveDueDate && !c.isNull(9)) ? c.getString(9) : null;
 
             String importKey = "vyb_purchase_" + txnId;
 
@@ -1291,7 +1298,8 @@ public class ImportVyaparActivity extends Activity {
                 grandTotal,
                 cash,
                 description == null ? "" : description,
-                "Vyapar Import"
+                "Vyapar Import",
+                dueDate
             );
 
             helper.markImportKeyUsedBulk(db, importKey);

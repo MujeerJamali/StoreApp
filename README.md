@@ -49,9 +49,10 @@ BusinessERPyh/                  Gradle project root
   Purchase shows in the Linked Expenses list right away, tagged
   "(pending - applies on Update)", exactly like a new Purchase's picks
   do, rather than committing to the database the moment it's picked.
-  A Sale that isn't fully paid gets a **Due Date** field (defaults to
-  the sale date + 3 days the moment it becomes a credit sale, editable
-  from there) - see the Credit Due report below.
+  A Sale or Purchase that isn't fully paid gets a **Due Date** field
+  (defaults to the transaction date + 3 days the moment it becomes a
+  credit transaction, editable from there) - see the Credit Due report
+  below (Sales only - Purchases don't have an equivalent report yet).
 - **Cost Items / Linking Expenses to Purchases** — Expenses double as the
   source of a purchase's landed costs (petrol, shipping, packaging, ...);
   there's no separate "Purchase Cost" record to create. Cost Items is
@@ -104,10 +105,10 @@ BusinessERPyh/                  Gradle project root
   entry; tapping one reopens the right editor prefilled from it, and
   the draft is deleted once it's actually saved for real.
 - **Generate Entries** — bulk-create sale/purchase/payment/expense entries
-  across a date range via a calendar tap UI. A generated Sale is always
-  a 100% credit sale (no paid-amount concept in this bulk tool), so it
-  gets the same "sale date + 3 days" default Due Date a manually-entered
-  credit sale does.
+  across a date range via a calendar tap UI. A generated Sale or Purchase
+  is always a 100% credit transaction (no paid-amount concept in this
+  bulk tool), so each gets the same "transaction date + 3 days" default
+  Due Date a manually-entered credit Sale/Purchase does.
 - **Wanted Items** — log something a customer asked for that's out of
   stock or not in the catalog; not tied to a transaction. Tapping a row
   reopens the same Add dialog prefilled for editing, with a Delete
@@ -137,7 +138,7 @@ BusinessERPyh/                  Gradle project root
   (parties, items, purchases, sales, payments, expenses, party transfers),
   it round-trips every one of this app's own extensions: item variety/
   combo tracking, cash adjustments, each item's Extra Cost/Unit, each
-  expense's paid/credit split, each credit sale's Due Date, Cost Items,
+  expense's paid/credit split, each credit Sale/Purchase's Due Date, Cost Items,
   Expense-to-Purchase landed-cost links, recurring expense rules, Drafts (a Purchase/Sale draft's
   party/item/size/linked-expense selections are re-mapped to the restored
   device's new ids; a Payment/Expense draft has none to remap), Wanted

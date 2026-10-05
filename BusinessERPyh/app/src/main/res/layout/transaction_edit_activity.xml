@@ -306,11 +306,11 @@
 
             </LinearLayout>
 
-            <!-- Sale mode only, and only while the sale is not fully paid
-                 (see Transactioneditactivity#updateDueDateVisibility()) -
-                 defaults to the sale date + 3 days the moment it becomes
-                 relevant, but stays a normal tappable date field after
-                 that. -->
+            <!-- Sale or Purchase mode, and only while not fully paid (see
+                 Transactioneditactivity#updateDueDateVisibility()) -
+                 defaults to the transaction date + 3 days the moment it
+                 becomes relevant, but stays a normal tappable date field
+                 after that. -->
             <LinearLayout
                 android:id="@+id/container_due_date"
                 android:layout_width="match_parent"

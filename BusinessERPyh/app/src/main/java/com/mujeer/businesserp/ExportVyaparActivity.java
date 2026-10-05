@@ -797,7 +797,7 @@ public class ExportVyaparActivity extends Activity {
 	private void exportPurchases(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
-			"SELECT id, party_id, date, time, invoice_number, grand_total, amount_paid, notes " +
+			"SELECT id, party_id, date, time, invoice_number, grand_total, amount_paid, notes, due_date " +
 			"FROM purchases", null);
 
 		while (c.moveToNext()) {
@@ -810,6 +810,7 @@ public class ExportVyaparActivity extends Activity {
 			double grandTotal = c.getDouble(5);
 			double amountPaid = c.getDouble(6);
 			String notes = c.getString(7);
+			String dueDate = c.getString(8);
 
 			ContentValues values = new ContentValues();
 			values.put("txn_id", OFFSET_PURCHASE_TXN + id);
@@ -824,6 +825,7 @@ public class ExportVyaparActivity extends Activity {
 			values.put("txn_description", notes == null ? "" : notes);
 			values.put("txn_discount_amount", 0.0);
 			values.put("txn_tax_amount", 0.0);
+			values.put("txn_due_date", dueDate);
 
 			vyb.insert("kb_transactions", null, values);
 		}
