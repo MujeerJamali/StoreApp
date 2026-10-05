@@ -19,16 +19,19 @@ import java.util.Locale;
 // Checks once per calendar day - not on every single app open, tracked
 // in its own SharedPreferences rather than the business database, since
 // this is local notification state and not something a Vyapar backup
-// needs to carry - whether any credit Sale's Due Date is today, and if
-// so posts one system notification listing each one (party + amount).
-// See BusinessERPApplication.onCreate() for the one call site: it fires
+// needs to carry - whether any credit Sale's Due Date is today or
+// already past (overdue), and if so posts one system notification
+// listing each one (party + amount), overdue ones first. See
+// BusinessERPApplication.onCreate() for the one call site: it fires
 // once per process start regardless of which screen the app actually
 // opens to (normally Transactioneditactivity, the launcher - see
 // AndroidManifest.xml - not necessarily MainActivity's Dashboard).
 //
-// A single due-today Sale's notification opens straight to that Sale;
-// more than one opens the Credit Due report, which already defaults to
-// today (see CreditDueReportActivity.RANGE_TODAY).
+// A single due Sale's notification opens straight to that Sale; more
+// than one opens the Credit Due report, on its Overdue range if
+// anything is actually overdue (the more urgent view), or Today
+// otherwise (see CreditDueReportActivity.RANGE_OVERDUE/RANGE_TODAY and
+// the "initial_range" intent extra it reads).
 // =====================
 class CreditDueNotifier {
 
@@ -57,6 +60,15 @@ class CreditDueNotifier {
 
 					DatabaseHelper db = new DatabaseHelper(appContext);
 
+					java.util.Calendar yesterdayCal = java.util.Calendar.getInstance();
+					yesterdayCal.add(java.util.Calendar.DAY_OF_YEAR, -1);
+
+					String yesterday = new SimpleDateFormat("yyyy-MM-dd", Locale.US)
+						.format(yesterdayCal.getTime());
+
+					ArrayList<HashMap<String, Object>> overdue =
+						db.getCreditDueSales("0000-01-01", yesterday);
+
 					ArrayList<HashMap<String, Object>> dueToday =
 						db.getCreditDueSales(today, today);
 
@@ -65,8 +77,8 @@ class CreditDueNotifier {
 					// on every later app open the same day.
 					prefs.edit().putString(KEY_LAST_CHECKED_DATE, today).apply();
 
-					if (!dueToday.isEmpty()) {
-						showNotification(appContext, dueToday);
+					if (!overdue.isEmpty() || !dueToday.isEmpty()) {
+						showNotification(appContext, overdue, dueToday);
 					}
 				}
 			}
@@ -74,7 +86,9 @@ class CreditDueNotifier {
 	}
 
 	private static void showNotification(
-		Context context, ArrayList<HashMap<String, Object>> dueToday) {
+		Context context,
+		ArrayList<HashMap<String, Object>> overdue,
+		ArrayList<HashMap<String, Object>> dueToday) {
 
 		NotificationManager notificationManager =
 			(NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -91,24 +105,33 @@ class CreditDueNotifier {
 				NotificationManager.IMPORTANCE_DEFAULT
 			);
 
-			channel.setDescription("A daily reminder for credit Sales due today.");
+			channel.setDescription("A daily reminder for credit Sales due today or overdue.");
 
 			notificationManager.createNotificationChannel(channel);
 		}
 
+		int totalCount = overdue.size() + dueToday.size();
+
 		Intent intent;
 
-		if (dueToday.size() == 1) {
+		if (totalCount == 1) {
+
+			HashMap<String, Object> onlyRow =
+				overdue.isEmpty() ? dueToday.get(0) : overdue.get(0);
 
 			intent = new Intent(context, Transactionviewactivity.class);
 			intent.putExtra("transaction_type", DatabaseHelper.TRANSACTION_TYPE_SALE);
-			intent.putExtra(
-				"transaction_id", (Integer) dueToday.get(0).get("sale_id")
-			);
+			intent.putExtra("transaction_id", (Integer) onlyRow.get("sale_id"));
 
 		} else {
 
 			intent = new Intent(context, CreditDueReportActivity.class);
+
+			intent.putExtra(
+				"initial_range",
+				overdue.isEmpty() ? CreditDueReportActivity.RANGE_TODAY
+					: CreditDueReportActivity.RANGE_OVERDUE
+			);
 		}
 
 		intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -127,6 +150,21 @@ class CreditDueNotifier {
 
 		double total = 0;
 
+		// Overdue first - the more urgent ones lead the list.
+		for (HashMap<String, Object> row : overdue) {
+
+			Object partyNameObj = row.get("party_name");
+
+			String partyName =
+				partyNameObj == null ? "Unknown Party" : partyNameObj.toString();
+
+			double balance = (Double) row.get("balance");
+
+			total += balance;
+
+			inboxStyle.addLine("Overdue: " + partyName + " - " + AmountFormat.format(balance));
+		}
+
 		for (HashMap<String, Object> row : dueToday) {
 
 			Object partyNameObj = row.get("party_name");
@@ -141,10 +179,20 @@ class CreditDueNotifier {
 			inboxStyle.addLine(partyName + " - " + AmountFormat.format(balance));
 		}
 
-		String title =
-			dueToday.size() == 1
-			? "1 payment due today"
-			: dueToday.size() + " payments due today";
+		String title;
+
+		if (!overdue.isEmpty() && !dueToday.isEmpty()) {
+
+			title = dueToday.size() + " due today, " + overdue.size() + " overdue";
+
+		} else if (!overdue.isEmpty()) {
+
+			title = overdue.size() == 1 ? "1 payment overdue" : overdue.size() + " payments overdue";
+
+		} else {
+
+			title = dueToday.size() == 1 ? "1 payment due today" : dueToday.size() + " payments due today";
+		}
 
 		inboxStyle.setBigContentTitle(title);
 		inboxStyle.setSummaryText("Total " + AmountFormat.format(total));

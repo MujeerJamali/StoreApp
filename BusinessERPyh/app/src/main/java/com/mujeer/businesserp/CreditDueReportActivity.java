@@ -37,14 +37,16 @@ public class CreditDueReportActivity extends Activity {
 	// today or earlier, never anything due tomorrow onward. These
 	// options are its own, purpose-built set instead; the Spinner
 	// WIDGET convention is unchanged, only its option semantics are.
-	private static final int RANGE_OVERDUE = 0;
-	private static final int RANGE_TODAY = 1;
-	private static final int RANGE_TOMORROW = 2;
-	private static final int RANGE_NEXT_3_DAYS = 3;
-	private static final int RANGE_NEXT_7_DAYS = 4;
-	private static final int RANGE_THIS_MONTH = 5;
-	private static final int RANGE_ALL = 6;
-	private static final int RANGE_CUSTOM = 7;
+	// Package-visible (not private) so CreditDueNotifier can request a
+	// specific starting range via the "initial_range" intent extra below.
+	static final int RANGE_OVERDUE = 0;
+	static final int RANGE_TODAY = 1;
+	static final int RANGE_TOMORROW = 2;
+	static final int RANGE_NEXT_3_DAYS = 3;
+	static final int RANGE_NEXT_7_DAYS = 4;
+	static final int RANGE_THIS_MONTH = 5;
+	static final int RANGE_ALL = 6;
+	static final int RANGE_CUSTOM = 7;
 
 	private Spinner spinner_range;
 
@@ -151,6 +153,15 @@ public class CreditDueReportActivity extends Activity {
 				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
+
+		// CreditDueNotifier opens straight to Overdue instead of the
+		// plain Today default when that's what its notification was
+		// actually about - everything else (a normal tap from Reports)
+		// has no such extra and keeps defaulting to Today.
+		int initialRange = getIntent().getIntExtra("initial_range", RANGE_TODAY);
+
+		selectedRange = initialRange;
+		spinner_range.setSelection(initialRange);
 
 		loadReport();
 	}

@@ -132,8 +132,10 @@ BusinessERPyh/                  Gradle project root
   business database - see `BusinessERPApplication`), two independent
   checks each post their own notification when there's something to
   flag: `CreditDueNotifier` for any credit Sale whose Due Date is today
-  (party + balance per line, opens that Sale directly or the Credit Due
-  report), and `LowStockNotifier` for any active item at or below its
+  or already past (overdue ones listed first, party + balance per
+  line), opening that Sale directly, or the Credit Due report on its
+  Overdue range if anything is overdue, Today otherwise; and
+  `LowStockNotifier` for any active item at or below its
   own Reorder Threshold (name + current stock per line, opens that item
   directly or the Low Stock report).
 - **Data tools** — bulk Excel import for purchases and items; full backup
