@@ -34,6 +34,32 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
 
+            <!-- Favorites: long-press any Tool Row below (Modules or
+                 Tools card) to pin/unpin it here - long-pressing a
+                 pinned row here unpins it too. Hidden entirely when
+                 nothing is pinned (see
+                 MainActivity#refreshFavoritesCard()). -->
+            <TextView
+                android:id="@+id/tv_favorites_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:text="Favorites"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/card_favorites"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/bg_card"
+                android:elevation="@dimen/elevation_card"
+                android:orientation="vertical"
+                android:visibility="gone" />
+
             <!-- Cash summary: current cash-in-hand plus today/week/month
                  expense totals, computed live each time this screen is
                  shown (see MainActivity#loadCashSummary()). -->

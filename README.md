@@ -270,6 +270,15 @@ rendering (no per-bar value text, only every few bars labeled) so a
 30-point chart doesn't turn into overlapping text - every other chart
 above has far fewer entries and renders exactly as before.
 
+**Dashboard Favorites**: long-press any Tool Row on the Dashboard
+(either the Modules card - Parties/Items/Purchases/Sales/Payments/
+Expenses/Reports - or the Tools card below it) to pin it into a new
+Favorites card at the very top of the Dashboard, above the cash
+summary; long-pressing a pinned row there unpins it the same way. Pin
+order is preserved across app opens (`DashboardFavorites`,
+`SharedPreferences`); the Favorites card and its label are hidden
+entirely when nothing is pinned.
+
 ## Building
 
 Open `BusinessERPyh/` in Android Studio (compileSdk 29, minSdk 21) and run the

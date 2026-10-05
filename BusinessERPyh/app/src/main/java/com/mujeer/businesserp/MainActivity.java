@@ -3,14 +3,17 @@ package com.mujeer.businesserp;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.MenuItem;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -62,6 +65,29 @@ public class MainActivity extends Activity {
 	// recent request by the time it comes back.
 	private long trendLoadGeneration = 0;
 
+	TextView tv_favorites_label;
+	LinearLayout card_favorites;
+
+	// Every long-press-pinnable Tool Row on this screen (both the
+	// Modules and Tools cards), keyed by its own button id's resource
+	// name - the same key DashboardFavorites stores and
+	// openShortcut(key) switches on.
+	private static final String[] SHORTCUT_KEYS = {
+		"btn_parties", "btn_items", "btn_transactions_purchase", "btn_transactions_sale",
+		"btn_payments", "btn_expenses", "btn_reports",
+		"btn_import", "btn_generate_entries", "btn_cash", "btn_wanted_items",
+		"btn_recurring_expenses", "btn_drafts", "btn_cost_items",
+		"btn_display_shoes", "btn_sample_shoes"
+	};
+
+	private static final String[] SHORTCUT_LABELS = {
+		"Parties", "Items", "Purchases", "Sales",
+		"Payments", "Expenses", "Reports",
+		"Import", "Generate Entries", "Cash", "Wanted Items",
+		"Recurring Expenses", "Drafts", "Cost Items",
+		"Display Shoes", "Sample Shoes"
+	};
+
 	DatabaseHelper db;
 
 	@Override
@@ -102,7 +128,27 @@ public class MainActivity extends Activity {
 		spinner_sales_trend_horizon = findViewById(R.id.spinner_sales_trend_horizon);
 		chart_sales_trend = findViewById(R.id.chart_sales_trend);
 
+		tv_favorites_label = findViewById(R.id.tv_favorites_label);
+		card_favorites = findViewById(R.id.card_favorites);
+
 		db = new DatabaseHelper(this);
+
+		attachFavoriteLongPress(btn_parties, "btn_parties");
+		attachFavoriteLongPress(btn_items, "btn_items");
+		attachFavoriteLongPress(btn_transactions_purchase, "btn_transactions_purchase");
+		attachFavoriteLongPress(btn_transactions_sale, "btn_transactions_sale");
+		attachFavoriteLongPress(btn_payments, "btn_payments");
+		attachFavoriteLongPress(btn_expenses, "btn_expenses");
+		attachFavoriteLongPress(btn_reports, "btn_reports");
+		attachFavoriteLongPress(btn_import, "btn_import");
+		attachFavoriteLongPress(btn_generate_entries, "btn_generate_entries");
+		attachFavoriteLongPress(btn_cash, "btn_cash");
+		attachFavoriteLongPress(btn_wanted_items, "btn_wanted_items");
+		attachFavoriteLongPress(btn_recurring_expenses, "btn_recurring_expenses");
+		attachFavoriteLongPress(btn_drafts, "btn_drafts");
+		attachFavoriteLongPress(btn_cost_items, "btn_cost_items");
+		attachFavoriteLongPress(btn_display_shoes, "btn_display_shoes");
+		attachFavoriteLongPress(btn_sample_shoes, "btn_sample_shoes");
 
 		ArrayAdapter<String> trendHorizonAdapter = new ArrayAdapter<String>(
 			this, android.R.layout.simple_spinner_item, TREND_HORIZON_LABELS
@@ -406,6 +452,195 @@ public class MainActivity extends Activity {
 		super.onResume();
 		loadCashSummary();
 		loadSalesTrend();
+		refreshFavoritesCard();
+	}
+
+	// Every Tool Row (Modules/Tools card buttons) gets the same
+	// long-press behavior: toggle its pin and refresh the Favorites
+	// card immediately, with a Toast so a long-press that didn't look
+	// like it did anything still confirms it worked.
+	private void attachFavoriteLongPress(Button button, final String key) {
+
+		button.setOnLongClickListener(new View.OnLongClickListener() {
+				@Override
+				public boolean onLongClick(View v) {
+
+					boolean nowFavorite = DashboardFavorites.toggleFavorite(MainActivity.this, key);
+
+					Toast.makeText(
+						MainActivity.this,
+						nowFavorite ? "Added to Favorites" : "Removed from Favorites",
+						Toast.LENGTH_SHORT
+					).show();
+
+					refreshFavoritesCard();
+
+					return true;
+				}
+			});
+	}
+
+	private String labelForKey(String key) {
+
+		for (int i = 0; i < SHORTCUT_KEYS.length; i++) {
+
+			if (SHORTCUT_KEYS[i].equals(key)) {
+				return SHORTCUT_LABELS[i];
+			}
+		}
+
+		return key;
+	}
+
+	private void refreshFavoritesCard() {
+
+		java.util.ArrayList<String> favorites = DashboardFavorites.getFavorites(this);
+
+		card_favorites.removeAllViews();
+
+		if (favorites.isEmpty()) {
+
+			tv_favorites_label.setVisibility(View.GONE);
+			card_favorites.setVisibility(View.GONE);
+
+			return;
+		}
+
+		tv_favorites_label.setVisibility(View.VISIBLE);
+		card_favorites.setVisibility(View.VISIBLE);
+
+		LayoutInflater inflater = LayoutInflater.from(this);
+
+		for (int i = 0; i < favorites.size(); i++) {
+
+			final String key = favorites.get(i);
+
+			View row = inflater.inflate(R.layout.dashboard_favorite_row, card_favorites, false);
+
+			Button btn = row.findViewById(R.id.btn_favorite_shortcut);
+			btn.setText(labelForKey(key));
+
+			btn.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						openShortcut(key);
+					}
+				});
+
+			btn.setOnLongClickListener(new View.OnLongClickListener() {
+					@Override
+					public boolean onLongClick(View v) {
+
+						DashboardFavorites.toggleFavorite(MainActivity.this, key);
+
+						Toast.makeText(
+							MainActivity.this, "Removed from Favorites", Toast.LENGTH_SHORT
+						).show();
+
+						refreshFavoritesCard();
+
+						return true;
+					}
+				});
+
+			card_favorites.addView(row);
+
+			if (i < favorites.size() - 1) {
+
+				View divider = new View(this);
+
+				divider.setLayoutParams(new LinearLayout.LayoutParams(
+					LinearLayout.LayoutParams.MATCH_PARENT, (int) (1 * getResources().getDisplayMetrics().density)
+				));
+
+				divider.setBackgroundColor(getResources().getColor(R.color.stroke));
+
+				card_favorites.addView(divider);
+			}
+		}
+	}
+
+	// Reopens whatever Activity/extras the matching Tool Row's own
+	// onClick above launches - kept as one switch here instead of
+	// threading a Runnable/Intent through DashboardFavorites, since
+	// only this Activity knows every button's target.
+	private void openShortcut(String key) {
+
+		Intent intent;
+
+		switch (key) {
+
+			case "btn_parties":
+				intent = new Intent(this, Partiesactivity.class);
+				break;
+
+			case "btn_items":
+				intent = new Intent(this, Itemsactivity.class);
+				break;
+
+			case "btn_transactions_purchase":
+				intent = new Intent(this, Transactionactivity.class);
+				intent.putExtra("transaction_type", 0);
+				break;
+
+			case "btn_transactions_sale":
+				intent = new Intent(this, Transactionactivity.class);
+				intent.putExtra("transaction_type", 1);
+				break;
+
+			case "btn_payments":
+				intent = new Intent(this, Paymentactivity.class);
+				break;
+
+			case "btn_expenses":
+				intent = new Intent(this, Expensesactivity.class);
+				break;
+
+			case "btn_reports":
+				intent = new Intent(this, Reportsactivity.class);
+				break;
+
+			case "btn_import":
+				intent = new Intent(this, Importexcelactivity.class);
+				break;
+
+			case "btn_generate_entries":
+				intent = new Intent(this, GenerateEntriesActivity.class);
+				break;
+
+			case "btn_cash":
+				intent = new Intent(this, CashActivity.class);
+				break;
+
+			case "btn_wanted_items":
+				intent = new Intent(this, WantedItemsActivity.class);
+				break;
+
+			case "btn_recurring_expenses":
+				intent = new Intent(this, RecurringExpensesActivity.class);
+				break;
+
+			case "btn_drafts":
+				intent = new Intent(this, DraftsActivity.class);
+				break;
+
+			case "btn_cost_items":
+				intent = new Intent(this, CostItemsActivity.class);
+				break;
+
+			case "btn_display_shoes":
+				intent = new Intent(this, DisplayShoesActivity.class);
+				break;
+
+			case "btn_sample_shoes":
+				intent = new Intent(this, SampleShoesActivity.class);
+				break;
+
+			default:
+				return;
+		}
+
+		startActivity(intent);
 	}
 
 	// Computed off the main thread - a handful of SUM queries, but still
