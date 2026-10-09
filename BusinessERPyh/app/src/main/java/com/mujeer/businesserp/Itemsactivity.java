@@ -135,6 +135,57 @@ public class Itemsactivity extends Activity {
 					startActivity(intent);
 				}
 			});
+
+        lv_items.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+				@Override
+				public boolean onItemLongClick(
+					AdapterView<?> parent, View view, int position, long id) {
+
+					showRowActions((HashMap<String, Object>) adapter.getItem(position));
+					return true;
+				}
+			});
+    }
+
+    // Long-press menu: quickly duplicate an item to set up a similar one,
+    // or toggle active/inactive without opening the Edit Item screen.
+    private void showRowActions(final HashMap<String, Object> item) {
+
+        final int itemId = (Integer) item.get("id");
+        final boolean active = !Boolean.FALSE.equals(item.get("active"));
+
+        android.widget.PopupMenu popup = new android.widget.PopupMenu(this, lv_items);
+        popup.getMenu().add(0, 1, 0, "Copy Item");
+        popup.getMenu().add(0, 2, 1, active ? "Mark Inactive" : "Mark Active");
+
+        popup.setOnMenuItemClickListener(new android.widget.PopupMenu.OnMenuItemClickListener() {
+				@Override
+				public boolean onMenuItemClick(android.view.MenuItem menuItem) {
+
+					if (menuItem.getItemId() == 1) {
+
+						long newId = db.copyItem(itemId);
+
+						Toast.makeText(
+							Itemsactivity.this, "Item copied - edit it to finish setting it up",
+							Toast.LENGTH_LONG
+						).show();
+
+						Intent intent = new Intent(Itemsactivity.this, Itemseditactivity.class);
+						intent.putExtra("item_id", (int) newId);
+						startActivity(intent);
+
+					} else if (menuItem.getItemId() == 2) {
+
+						db.setItemActive(itemId, !active);
+						loadItems();
+					}
+
+					return true;
+				}
+			});
+
+        popup.show();
     }
 
     @Override

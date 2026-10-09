@@ -45,6 +45,12 @@ BusinessERPyh/                  Gradle project root
   instead of the user typing the whole formatted string by hand.
   Editing an existing item that already matches the convention
   auto-checks the box and pre-fills the 7 fields from its current name.
+  Long-pressing a row on the Items list opens **Copy Item** (duplicates
+  name/prices/Reorder Threshold with a fresh code and zero stock, then
+  opens the new item's Edit screen to finish setting it up - variety
+  groups are deliberately not copied, since those are specific to
+  whatever the new item turns out to be) and a quick **Mark Active/
+  Inactive** toggle, without opening the Edit Item screen for either.
 - **Swipe navigation** — on the plain Add Sale / Add Purchase / Add
   Expense screens (never while editing an existing one, so a swipe
   can't be mistaken for navigating away from in-progress edits), a

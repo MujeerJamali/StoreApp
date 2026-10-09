@@ -1065,6 +1065,38 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return generateNextItemCode();
 	}
 
+	// Quick duplicate for creating a similar item (see Itemsactivity's
+	// long-press menu) - copies name (with " (Copy)" appended), purchase
+	// price, sale price and Reorder Threshold with a fresh auto-generated
+	// code and zero stock. Deliberately does NOT copy variety groups/
+	// combos - those are specific stock-keeping structure the new item
+	// should set up fresh for whatever it actually turns out to be, not
+	// an exact clone of the original's. Returns the new item's id.
+	public long copyItem(int itemId) {
+
+		HashMap<String, Object> original = getItemById(itemId);
+
+		String originalName = (String) original.get("name");
+		double purchasePrice = (Double) original.get("purchase_price");
+		double salePrice = (Double) original.get("sale_price");
+		double reorderThreshold =
+			original.get("reorder_threshold") == null ? 0 : (Double) original.get("reorder_threshold");
+
+		long newId = insertItem(originalName + " (Copy)", purchasePrice, salePrice, 0);
+
+		if (newId != -1 && reorderThreshold > 0) {
+
+			SQLiteDatabase db = this.getWritableDatabase();
+
+			ContentValues values = new ContentValues();
+			values.put("reorder_threshold", reorderThreshold);
+
+			db.update(TABLE_ITEMS, values, "id=?", new String[]{String.valueOf(newId)});
+		}
+
+		return newId;
+	}
+
 	public boolean isItemCodeTaken(String code) {
 
 		if (code == null || code.trim().length() == 0) {
