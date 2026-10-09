@@ -126,6 +126,7 @@ public class ImportVyaparActivity extends Activity {
         int displayShoesImported, displayShoesDuplicate;
         int sampleShoesImported, sampleShoesDuplicate;
         int itemClearanceImported, itemClearanceDuplicate;
+        int loyaltyPointsImported, loyaltyPointsDuplicate;
     }
 
     @Override
@@ -313,6 +314,7 @@ public class ImportVyaparActivity extends Activity {
             boolean hasSampleShoesTable = tableExists(vyaparDb, "businesserp_sample_shoes");
             boolean hasDraftsTable = tableExists(vyaparDb, "businesserp_drafts");
             boolean hasItemClearanceTable = tableExists(vyaparDb, "businesserp_item_clearance");
+            boolean hasLoyaltyPointsTable = tableExists(vyaparDb, "businesserp_loyalty_points");
 
             helper = new DatabaseHelper(this);
             helper.beginTransaction();
@@ -447,6 +449,12 @@ public class ImportVyaparActivity extends Activity {
                 importItemClearance(vyaparDb, helper, db, itemIdMap, skipped, counts);
             }
 
+            if (hasLoyaltyPointsTable) {
+
+                setStatus("Importing loyalty points...");
+                importLoyaltyPoints(vyaparDb, helper, db, partyIdMap, skipped, counts);
+            }
+
             setStatus("Logging unsupported transaction types...");
             logUnsupportedTypes(vyaparDb, skipped);
 
@@ -564,6 +572,10 @@ public class ImportVyaparActivity extends Activity {
                     if (finalCounts.itemClearanceImported > 0 || finalCounts.itemClearanceDuplicate > 0) {
                         summary.append("Item clearance: " + finalCounts.itemClearanceImported
 									   + " imported, " + finalCounts.itemClearanceDuplicate + " already imported\n");
+                    }
+                    if (finalCounts.loyaltyPointsImported > 0 || finalCounts.loyaltyPointsDuplicate > 0) {
+                        summary.append("Loyalty points: " + finalCounts.loyaltyPointsImported
+									   + " imported, " + finalCounts.loyaltyPointsDuplicate + " already imported\n");
                     }
 
                     summary.append("\nRows not imported: " + finalSkippedCount);
@@ -2407,6 +2419,64 @@ public class ImportVyaparActivity extends Activity {
 
             helper.markImportKeyUsedBulk(db, importKey);
             counts.itemClearanceImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // LOYALTY POINTS (businesserp_loyalty_points) - only present when
+    // hasLoyaltyPointsTable was true. party_id is NOT NULL (every
+    // ledger entry belongs to a real party) - a row whose party no
+    // longer exists in this backup is dropped rather than left
+    // dangling.
+    // =====================
+    private void importLoyaltyPoints(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> partyIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT id, party_id, points, date, time, reason FROM businesserp_loyalty_points", null);
+
+        while (c.moveToNext()) {
+
+            long id = c.getLong(0);
+            long vybPartyId = c.getLong(1);
+            int points = c.getInt(2);
+            String date = c.getString(3);
+            String time = c.getString(4);
+            String reason = c.getString(5);
+
+            String importKey = "vyb_loyalty_points_" + id;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.loyaltyPointsDuplicate++;
+                continue;
+            }
+
+            Integer partyId = resolveParty(helper, db, partyIdMap, vybPartyId);
+
+            if (partyId == null) {
+
+                addSkipped(
+                    skipped, "loyalty_points", vybPartyId,
+                    "Its party no longer exists in this backup"
+                );
+
+                continue;
+            }
+
+            helper.insertLoyaltyPointsBulk(
+                db, partyId, points, date == null ? "" : date, time == null ? "" : time,
+                reason == null ? "" : reason
+            );
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.loyaltyPointsImported++;
         }
 
         c.close();

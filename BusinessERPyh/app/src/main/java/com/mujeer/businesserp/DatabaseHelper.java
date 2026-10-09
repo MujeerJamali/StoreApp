@@ -85,7 +85,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // endClearance()/getActiveClearances()). Unlike reorder_suggestion_
     // log above, this IS real standing user data (an active clearance
     // decision), so it's included in the Vyapar round-trip.
-    public static final int DATABASE_VERSION = 26;
+    // Bumped 26 -> 27 to add loyalty_points_ledger - backs the Loyalty
+    // Points feature (see earnLoyaltyPointsForSale()/
+    // getLoyaltyPointsBalance()/adjustLoyaltyPoints()). Real standing
+    // user data (a customer's earned rewards), so it's included in the
+    // Vyapar round-trip, same reasoning as item_clearance above.
+    public static final int DATABASE_VERSION = 27;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -177,6 +182,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// level when clearance began, so progress can be shown as how much
 	// of that has sold since.
 	public static final String TABLE_ITEM_CLEARANCE = "item_clearance";
+
+	// One row per loyalty-points event (earn from a Sale, or a manual
+	// adjustment) for one party - an append-only ledger, not a running
+	// total; a party's current balance is SUM(points) over their rows
+	// (see getLoyaltyPointsBalance()). AUTOINCREMENT since a party can
+	// have many entries over time.
+	public static final String TABLE_LOYALTY_POINTS = "loyalty_points_ledger";
 
 	public static final String DRAFT_TYPE_SALE = "sale";
 	public static final String DRAFT_TYPE_PURCHASE = "purchase";
@@ -542,6 +554,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"started_date TEXT NOT NULL, " +
 			"discount_percent REAL NOT NULL, " +
 			"starting_balance REAL NOT NULL" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_LOYALTY_POINTS + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"party_id INTEGER NOT NULL, " +
+			"points INTEGER NOT NULL, " +
+			"date TEXT NOT NULL, " +
+			"time TEXT NOT NULL, " +
+			"reason TEXT NOT NULL" +
 			")"
 		);
 
@@ -2437,6 +2460,19 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return db.insertWithOnConflict(
 			TABLE_ITEM_CLEARANCE, null, values, SQLiteDatabase.CONFLICT_REPLACE
 		);
+	}
+
+	public long insertLoyaltyPointsBulk(
+		SQLiteDatabase db, int partyId, int points, String date, String time, String reason) {
+
+		ContentValues values = new ContentValues();
+		values.put("party_id", partyId);
+		values.put("points", points);
+		values.put("date", date);
+		values.put("time", time);
+		values.put("reason", reason);
+
+		return db.insert(TABLE_LOYALTY_POINTS, null, values);
 	}
 
 	public void removeSampleShoeById(int id) {
@@ -6440,6 +6476,176 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 				"percent_cleared",
 				startingBalance > 0 ? Math.max(0, Math.min(100, sold / startingBalance * 100)) : 0
 			);
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// =====================
+	// LOYALTY POINTS - 1 point per LOYALTY_POINTS_PER_RUPEES spent on a
+	// Sale (floored), skipped for the "Cash Sale" placeholder party
+	// since it isn't a trackable customer. Deliberately an append-only
+	// ledger (one row per earn/adjustment), not a running total column
+	// on parties - a party's current balance is always SUM(points)
+	// over their own rows (getLoyaltyPointsBalance()). Points earned
+	// are NOT clawed back if the originating Sale is later deleted or
+	// edited - once earned, a reward stays earned, same as most real
+	// loyalty programs; a genuine correction goes through
+	// adjustLoyaltyPoints() instead. The rate and milestone thresholds
+	// aren't yet exposed as settings - reasonable defaults for now,
+	// same as DailyDigestScheduler's fixed 9 PM.
+	// =====================
+	public static final int LOYALTY_POINTS_PER_RUPEES = 100;
+
+	private static final int[] LOYALTY_MILESTONES = {100, 250, 500, 1000, 2500, 5000, 10000};
+
+	// Called right after a new Sale is saved (Transactioneditactivity) -
+	// NOT from insertSale() itself, so an edit/undo/restore never
+	// re-triggers it. Returns the milestone just crossed (e.g. 500), or
+	// null if the party didn't cross one (including when no points were
+	// earned at all, or the party is "Cash Sale").
+	public Integer earnLoyaltyPointsForSale(int partyId, double grandTotal, long saleId) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		Cursor nameCursor = db.rawQuery(
+			"SELECT name FROM " + TABLE_PARTIES + " WHERE id=?",
+			new String[]{String.valueOf(partyId)}
+		);
+
+		String partyName = null;
+
+		if (nameCursor.moveToFirst()) {
+			partyName = nameCursor.getString(0);
+		}
+
+		nameCursor.close();
+
+		if ("Cash Sale".equalsIgnoreCase(partyName)) {
+			return null;
+		}
+
+		int points = (int) Math.floor(grandTotal / LOYALTY_POINTS_PER_RUPEES);
+
+		if (points <= 0) {
+			return null;
+		}
+
+		int before = getLoyaltyPointsBalance(partyId);
+
+		String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+		String now = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
+
+		insertLoyaltyLedgerEntry(db, partyId, points, today, now, "Sale #" + saleId);
+
+		int after = before + points;
+
+		for (int i = LOYALTY_MILESTONES.length - 1; i >= 0; i--) {
+
+			int milestone = LOYALTY_MILESTONES[i];
+
+			if (before < milestone && after >= milestone) {
+				return milestone;
+			}
+		}
+
+		return null;
+	}
+
+	// A manual correction (redemption, goodwill credit, fixing an
+	// error) - pointsDelta can be negative. Never rejected for going
+	// negative; a party's balance is just allowed to read negative
+	// until it's earned back, same as a party balance can.
+	public void adjustLoyaltyPoints(int partyId, int pointsDelta, String reason) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+		String now = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
+
+		insertLoyaltyLedgerEntry(db, partyId, pointsDelta, today, now, reason);
+	}
+
+	private void insertLoyaltyLedgerEntry(
+		SQLiteDatabase db, int partyId, int points, String date, String time, String reason) {
+
+		ContentValues values = new ContentValues();
+		values.put("party_id", partyId);
+		values.put("points", points);
+		values.put("date", date);
+		values.put("time", time);
+		values.put("reason", reason);
+
+		db.insert(TABLE_LOYALTY_POINTS, null, values);
+	}
+
+	public int getLoyaltyPointsBalance(int partyId) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		return (int) sumColumn(
+			db,
+			"SELECT SUM(points) FROM " + TABLE_LOYALTY_POINTS + " WHERE party_id=?",
+			new String[]{String.valueOf(partyId)}
+		);
+	}
+
+	public ArrayList<HashMap<String, Object>> getLoyaltyLedgerForParty(int partyId) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT points, date, time, reason FROM " + TABLE_LOYALTY_POINTS +
+			" WHERE party_id=? ORDER BY date DESC, time DESC, id DESC",
+			new String[]{String.valueOf(partyId)}
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+			row.put("points", cursor.getInt(0));
+			row.put("date", cursor.getString(1));
+			row.put("time", cursor.getString(2));
+			row.put("reason", cursor.getString(3));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// Every party with a non-zero points balance, highest first - backs
+	// LoyaltyPointsActivity.
+	public ArrayList<HashMap<String, Object>> getLoyaltyRanking() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT p.id, p.name, SUM(l.points) AS total_points FROM " +
+			TABLE_LOYALTY_POINTS + " l " +
+			"INNER JOIN " + TABLE_PARTIES + " p ON p.id = l.party_id " +
+			"GROUP BY l.party_id " +
+			"HAVING total_points != 0 " +
+			"ORDER BY total_points DESC",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+			row.put("party_id", cursor.getInt(0));
+			row.put("name", cursor.getString(1));
+			row.put("points", cursor.getInt(2));
 
 			list.add(row);
 		}

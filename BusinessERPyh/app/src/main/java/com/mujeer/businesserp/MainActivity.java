@@ -49,6 +49,7 @@ public class MainActivity extends Activity {
 	Button btn_recently_deleted;
 	Button btn_reorder_list;
 	Button btn_bulk_item_update;
+	Button btn_loyalty_points;
 
 	Button btn_quick_add;
 
@@ -84,7 +85,7 @@ public class MainActivity extends Activity {
 		"btn_import", "btn_generate_entries", "btn_cash", "btn_wanted_items",
 		"btn_recurring_expenses", "btn_drafts", "btn_cost_items",
 		"btn_display_shoes", "btn_sample_shoes", "btn_recently_deleted",
-		"btn_reorder_list", "btn_bulk_item_update"
+		"btn_reorder_list", "btn_bulk_item_update", "btn_loyalty_points"
 	};
 
 	private static final String[] SHORTCUT_LABELS = {
@@ -93,7 +94,7 @@ public class MainActivity extends Activity {
 		"Import", "Generate Entries", "Cash", "Wanted Items",
 		"Recurring Expenses", "Drafts", "Cost Items",
 		"Display Shoes", "Sample Shoes", "Recently Deleted",
-		"Reorder List", "Bulk Item Update"
+		"Reorder List", "Bulk Item Update", "Loyalty Points"
 	};
 
 	DatabaseHelper db;
@@ -128,6 +129,7 @@ public class MainActivity extends Activity {
 		btn_recently_deleted = findViewById(R.id.btn_recently_deleted);
 		btn_reorder_list = findViewById(R.id.btn_reorder_list);
 		btn_bulk_item_update = findViewById(R.id.btn_bulk_item_update);
+		btn_loyalty_points = findViewById(R.id.btn_loyalty_points);
 
 		btn_quick_add = findViewById(R.id.btn_quick_add);
 
@@ -191,6 +193,7 @@ public class MainActivity extends Activity {
 		attachFavoriteLongPress(btn_recently_deleted, "btn_recently_deleted");
 		attachFavoriteLongPress(btn_reorder_list, "btn_reorder_list");
 		attachFavoriteLongPress(btn_bulk_item_update, "btn_bulk_item_update");
+		attachFavoriteLongPress(btn_loyalty_points, "btn_loyalty_points");
 
 		ArrayAdapter<String> trendHorizonAdapter = new ArrayAdapter<String>(
 			this, android.R.layout.simple_spinner_item, TREND_HORIZON_LABELS
@@ -435,6 +438,19 @@ public class MainActivity extends Activity {
 					Intent intent = new Intent(
 						MainActivity.this,
 						RecentlyDeletedActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_loyalty_points.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						LoyaltyPointsActivity.class
 					);
 
 					startActivity(intent);
@@ -727,6 +743,10 @@ public class MainActivity extends Activity {
 
 			case "btn_bulk_item_update":
 				intent = new Intent(this, BulkItemUpdateActivity.class);
+				break;
+
+			case "btn_loyalty_points":
+				intent = new Intent(this, LoyaltyPointsActivity.class);
 				break;
 
 			default:

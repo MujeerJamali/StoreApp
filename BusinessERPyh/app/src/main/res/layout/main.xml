@@ -475,6 +475,16 @@
                     style="@style/ToolRow"
                     android:text="Bulk Item Update" />
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <Button
+                    android:id="@+id/btn_loyalty_points"
+                    style="@style/ToolRow"
+                    android:text="Loyalty Points" />
+
             </LinearLayout>
 
         </LinearLayout>

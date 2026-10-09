@@ -191,6 +191,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".LoyaltyPointsActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".CostItemEditActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />

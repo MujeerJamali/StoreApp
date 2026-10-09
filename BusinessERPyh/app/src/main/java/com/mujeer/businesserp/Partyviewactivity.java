@@ -5,9 +5,11 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -19,6 +21,8 @@ public class Partyviewactivity extends Activity {
 
     TextView tv_party_name;
     TextView tv_party_balance;
+    TextView tv_party_loyalty_points;
+    TextView tv_adjust_loyalty_points;
     TextView tv_transactions_empty;
     Button btn_edit_party, btn_delete_party;
 
@@ -39,6 +43,8 @@ public class Partyviewactivity extends Activity {
 
         tv_party_name = findViewById(R.id.tv_party_name);
         tv_party_balance = findViewById(R.id.tv_party_balance);
+        tv_party_loyalty_points = findViewById(R.id.tv_party_loyalty_points);
+        tv_adjust_loyalty_points = findViewById(R.id.tv_adjust_loyalty_points);
         tv_transactions_empty = findViewById(R.id.tv_transactions_empty);
         btn_edit_party = findViewById(R.id.btn_edit_party);
         btn_delete_party = findViewById(R.id.btn_delete_party);
@@ -111,6 +117,13 @@ public class Partyviewactivity extends Activity {
                 }
             }
         );
+
+        tv_adjust_loyalty_points.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					promptAdjustLoyaltyPoints();
+				}
+			});
 
         btn_edit_party.setOnClickListener(new View.OnClickListener() {
 				@Override
@@ -192,11 +205,67 @@ public class Partyviewactivity extends Activity {
         lv_transactions.setEmptyView(tv_transactions_empty);
     }
 
+    private void promptAdjustLoyaltyPoints() {
+
+        final EditText input = new EditText(this);
+        input.setHint("e.g. 50 or -50");
+        input.setInputType(
+            InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED
+        );
+
+        int pad = (int) (16 * getResources().getDisplayMetrics().density);
+        input.setPadding(pad, pad, pad, pad);
+
+        new AlertDialog.Builder(this)
+            .setTitle("Adjust Loyalty Points")
+            .setMessage(
+                "A positive number adds points (e.g. a goodwill credit), " +
+                "a negative number removes them (e.g. a redemption)."
+            )
+            .setView(input)
+            .setPositiveButton("Apply", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+
+                        int delta;
+
+                        try {
+                            delta = Integer.parseInt(input.getText().toString().trim());
+                        } catch (Exception e) {
+                            Toast.makeText(
+                                Partyviewactivity.this,
+                                "Enter a valid whole number",
+                                Toast.LENGTH_SHORT
+                            ).show();
+                            return;
+                        }
+
+                        if (delta == 0) {
+                            return;
+                        }
+
+                        db.adjustLoyaltyPoints(
+                            partyId, delta,
+                            (delta > 0 ? "Manual credit" : "Manual redemption") + " (+/-" +
+                            Math.abs(delta) + ")"
+                        );
+
+                        loadParty();
+                    }
+                })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
     private void loadParty() {
 
         if (partyId != -1) {
 
             tv_party_name.setText(db.getPartyById(partyId));
+
+            tv_party_loyalty_points.setText(
+                String.valueOf(db.getLoyaltyPointsBalance(partyId)) + " points"
+            );
 
             double balance = db.getPartyBalance(partyId);
 

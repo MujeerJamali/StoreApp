@@ -4160,6 +4160,24 @@ public class Transactioneditactivity extends Activity {
 			draftId = -1;
 		}
 
+		// Loyalty points - only for a brand-new Sale (see this method's
+		// own "only ever runs for a brand-new Sale" note below), never
+		// on an edit. A milestone crossing gets a one-time celebratory
+		// toast; most saves cross nothing and this is a no-op.
+		int loyaltyPartyId = (Integer) parties.get(partyPosition).get("id");
+		Integer milestoneCrossed = db.earnLoyaltyPointsForSale(loyaltyPartyId, grandTotal, saleId);
+
+		if (milestoneCrossed != null) {
+
+			String partyName = (String) parties.get(partyPosition).get("name");
+
+			android.widget.Toast.makeText(
+				this,
+				partyName + " just reached " + milestoneCrossed + " loyalty points!",
+				android.widget.Toast.LENGTH_LONG
+			).show();
+		}
+
 		runDisplaySampleHookThenFinish(andNew);
 	}
 

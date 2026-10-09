@@ -219,6 +219,7 @@ public class ExportVyaparActivity extends Activity {
 			exportDisplayShoes(local, vyb);
 			exportSampleShoes(local, vyb);
 			exportItemClearance(local, vyb);
+			exportLoyaltyPoints(local, vyb);
 
 			// Deliberately NOT exported: TABLE_RECENTLY_DELETED. Unlike
 			// every table above, it holds already-deleted data's
@@ -658,6 +659,21 @@ public class ExportVyaparActivity extends Activity {
 			"started_date TEXT, " +
 			"discount_percent REAL, " +
 			"starting_balance REAL" +
+			")"
+		);
+
+		// Loyalty points ledger (see DatabaseHelper.TABLE_LOYALTY_POINTS) -
+		// an append-only history, so (unlike item_clearance) this keeps
+		// its own AUTOINCREMENT-style id rather than using party_id as
+		// the primary key - a party can have many entries.
+		vyb.execSQL(
+			"CREATE TABLE businesserp_loyalty_points (" +
+			"id INTEGER PRIMARY KEY, " +
+			"party_id INTEGER, " +
+			"points INTEGER, " +
+			"date TEXT, " +
+			"time TEXT, " +
+			"reason TEXT" +
 			")"
 		);
 	}
@@ -1338,6 +1354,33 @@ public class ExportVyaparActivity extends Activity {
 			values.put("starting_balance", c.getDouble(3));
 
 			vyb.insert("businesserp_item_clearance", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// LOYALTY POINTS -> businesserp_loyalty_points (1:1 copy, keeps its
+	// own id since nothing else references a ledger row by id)
+	// =====================
+	private static void exportLoyaltyPoints(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery(
+			"SELECT id, party_id, points, date, time, reason FROM loyalty_points_ledger",
+			null
+		);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("id", c.getLong(0));
+			values.put("party_id", c.getLong(1));
+			values.put("points", c.getInt(2));
+			values.put("date", c.getString(3));
+			values.put("time", c.getString(4));
+			values.put("reason", c.getString(5));
+
+			vyb.insert("businesserp_loyalty_points", null, values);
 		}
 
 		c.close();

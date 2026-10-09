@@ -170,6 +170,27 @@ BusinessERPyh/                  Gradle project root
   deliberately **not** part of the Vyapar backup round-trip, same
   reasoning as Recently Deleted above - it's the automation's own
   operational memory, not a business record.
+- **Loyalty Points** (Dashboard Tools card, pinnable as a Favorite) —
+  every named customer earns 1 point per ₹100 spent on a Sale (floored;
+  `DatabaseHelper.LOYALTY_POINTS_PER_RUPEES`), skipped for the "Cash
+  Sale" placeholder party since it isn't a trackable customer.
+  Deliberately an append-only ledger (`loyalty_points_ledger`), not a
+  running total column - a party's current balance is always the sum
+  of their own ledger rows (`getLoyaltyPointsBalance()`), and points
+  earned are **not** clawed back if the originating Sale is later
+  edited or deleted (once earned, a reward stays earned, same as most
+  real loyalty programs); a genuine correction is a manual adjustment
+  instead. Crossing a milestone (100/250/500/1000/2500/5000/10000
+  points) shows a one-time "`<party>` just reached `<N>` loyalty
+  points!" toast right after the Sale that crossed it - the rate and
+  milestones aren't yet exposed as settings, reasonable defaults for
+  now like `DailyDigestScheduler`'s fixed 9 PM. The Loyalty Points
+  screen ranks every party with a non-zero balance, highest first,
+  tapping through to that party's own screen - which also shows the
+  balance directly and an **Adjust** action (a signed whole number +
+  reason, e.g. a goodwill credit or a redemption) for manual
+  corrections. Real standing user data (a customer's earned rewards),
+  so it's included in the Vyapar backup round-trip.
 - **Cost Items / Linking Expenses to Purchases** — Expenses double as the
   source of a purchase's landed costs (petrol, shipping, packaging, ...);
   there's no separate "Purchase Cost" record to create. Cost Items is
