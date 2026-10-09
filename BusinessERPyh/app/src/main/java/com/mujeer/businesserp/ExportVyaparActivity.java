@@ -1,9 +1,11 @@
 package com.mujeer.businesserp;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -59,6 +61,7 @@ import java.util.zip.ZipOutputStream;
 public class ExportVyaparActivity extends Activity {
 
 	private static final int REQUEST_SAVE_VYB = 3001;
+	private static final int REQUEST_CONNECT_DRIVE = 3002;
 
 	// Large fixed offsets keep synthesized ids from different local
 	// tables from colliding once they all share Vyapar's single
@@ -82,6 +85,8 @@ public class ExportVyaparActivity extends Activity {
 
 	private Button btn_export_vyb;
 	private TextView tv_export_result;
+	private Button btn_connect_drive;
+	private TextView tv_drive_status;
 
 	// The zipped .vyb sitting in cache storage, waiting to be copied to
 	// wherever the user picks in writeZipToDestination() - null whenever
@@ -95,6 +100,8 @@ public class ExportVyaparActivity extends Activity {
 
 		btn_export_vyb = (Button) findViewById(R.id.btn_export_vyb);
 		tv_export_result = (TextView) findViewById(R.id.tv_export_result);
+		btn_connect_drive = (Button) findViewById(R.id.btn_connect_drive);
+		tv_drive_status = (TextView) findViewById(R.id.tv_drive_status);
 
 		btn_export_vyb.setOnClickListener(new View.OnClickListener() {
 				@Override
@@ -110,6 +117,87 @@ public class ExportVyaparActivity extends Activity {
 						}).start();
 				}
 			});
+
+		btn_connect_drive.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					if (CloudBackupSettings.isConnected(ExportVyaparActivity.this)) {
+						confirmDisconnectDrive();
+					} else {
+						promptConnectDrive();
+					}
+				}
+			});
+
+		refreshDriveStatus();
+	}
+
+	// =====================
+	// CLOUD BACKUP (GOOGLE DRIVE) - a "connect once" folder picker, not a
+	// Google Sign-In integration: this app has no Drive API/Google
+	// Sign-In Maven dependency (see CloudBackupSettings), so "connect"
+	// means picking a folder through the system's own storage chooser,
+	// which already lets the user navigate into "Drive" and pick a
+	// folder under whichever Google account (mujeerahmed001@gmail.com)
+	// is signed into the Drive app on this device, then persisting
+	// read/write access to exactly that folder.
+	// =====================
+	private void promptConnectDrive() {
+
+		new AlertDialog.Builder(this)
+			.setTitle("Connect Google Drive")
+			.setMessage(
+				"You'll be shown the system's \"Save to\" picker. Choose \"Drive\" from the " +
+				"left-hand list, sign into mujeerahmed001@gmail.com if asked, then pick or " +
+				"create a folder there (e.g. \"BusinessERP Backups\") and tap Select/Use " +
+				"this folder.\n\nOnce connected, every backup - manual and automatic - also " +
+				"saves a timestamped copy into that folder.")
+			.setPositiveButton("Continue", new DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+
+						Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+						startActivityForResult(intent, REQUEST_CONNECT_DRIVE);
+					}
+				})
+			.setNegativeButton("Cancel", null)
+			.show();
+	}
+
+	private void confirmDisconnectDrive() {
+
+		new AlertDialog.Builder(this)
+			.setTitle("Disconnect Google Drive")
+			.setMessage(
+				"Future backups will no longer be copied to this folder. Nothing already " +
+				"saved there is deleted.")
+			.setPositiveButton("Disconnect", new DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						CloudBackupSettings.disconnect(ExportVyaparActivity.this);
+						refreshDriveStatus();
+					}
+				})
+			.setNegativeButton("Cancel", null)
+			.show();
+	}
+
+	private void refreshDriveStatus() {
+
+		if (CloudBackupSettings.isConnected(this)) {
+
+			String folderName = CloudBackupSettings.getFolderDisplayName(this);
+
+			tv_drive_status.setText(
+				"Connected: " + (folderName != null ? folderName : "Drive folder"));
+			btn_connect_drive.setText("Disconnect");
+
+		} else {
+
+			tv_drive_status.setText("Not connected. Backups are not copied to the cloud.");
+			btn_connect_drive.setText("Connect Google Drive");
+		}
 	}
 
 	private void setStatus(final String text) {
@@ -285,6 +373,24 @@ public class ExportVyaparActivity extends Activity {
 	protected void onActivityResult(int requestCode, int resultCode, final Intent data) {
 		super.onActivityResult(requestCode, resultCode, data);
 
+		if (requestCode == REQUEST_CONNECT_DRIVE) {
+
+			if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+
+				Uri treeUri = data.getData();
+
+				getContentResolver().takePersistableUriPermission(
+					treeUri,
+					Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+				);
+
+				CloudBackupSettings.setFolderUri(this, treeUri);
+			}
+
+			refreshDriveStatus();
+			return;
+		}
+
 		if (requestCode != REQUEST_SAVE_VYB) {
 			return;
 		}
@@ -343,8 +449,17 @@ public class ExportVyaparActivity extends Activity {
 			// actually succeeded, so there's nothing overdue right now.
 			BackupReminderNotifier.recordBackupNow(getApplicationContext());
 
+			// If a Google Drive folder is connected (see the Cloud Backup
+			// card below), also drop a timestamped copy there - on top
+			// of, not instead of, the file the user just picked above.
+			boolean alsoWroteToCloud =
+				CloudBackupWriter.writeIfConnected(getApplicationContext(), zipFile);
+
 			setStatus(
-				"Backup saved.\n\nRestore it later - on this device after a reinstall, or on " +
+				"Backup saved." +
+				(alsoWroteToCloud ?
+					"\n\nAlso saved a copy to your connected Google Drive folder." : "") +
+				"\n\nRestore it later - on this device after a reinstall, or on " +
 				"another device with this app - using \"Restore Vyapar Backup\". Restoring it " +
 				"replaces everything currently there, so don't restore it back into this same " +
 				"app unless you want to reset it to this exact snapshot.");

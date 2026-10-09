@@ -85,6 +85,11 @@ public class AutoBackupReceiver extends BroadcastReceiver {
 
 			BackupReminderNotifier.recordBackupNow(context);
 
+			// If the user has connected a Google Drive folder (see
+			// ExportVyaparActivity's Cloud Backup card), every scheduled
+			// backup lands there too, not just the manual ones.
+			CloudBackupWriter.writeIfConnected(context, zipFile);
+
 		} catch (Exception e) {
 
 			// Silent failure - there's no one watching an alarm-triggered

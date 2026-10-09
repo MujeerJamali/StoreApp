@@ -318,7 +318,29 @@ BusinessERPyh/                  Gradle project root
   archive; the manual export is still what moving a backup to another
   device is for. A successful automatic backup resets the reminder's
   countdown too, so in normal use the reminder should rarely ever
-  actually need to nag. A fourth, `ReorderDigestNotifier`, checks weekly
+  actually need to nag.
+- **Cloud Backup (Google Drive)** — a "Cloud Backup" card on the Export
+  Vyapar Backup screen with a single **Connect Google Drive** button.
+  This app has no Google Sign-In/Drive API Maven dependency - AIDE's
+  on-device build can't reliably resolve a new one (same reasoning as
+  `SimpleBarChartView` avoiding a charting library) - so "connect" means
+  picking a folder through the system's own storage chooser
+  (`Intent.ACTION_OPEN_DOCUMENT_TREE`), which already lets the user
+  navigate into "Drive" and pick/create a folder under whichever Google
+  account (`mujeerahmed001@gmail.com`) is signed into the Drive app on
+  the device, then persisting read/write access to exactly that folder
+  (`takePersistableUriPermission`, `CloudBackupSettings`). Once
+  connected, every backup - the manual "Export to .vyb File" button
+  and every `AutoBackupScheduler` run alike - also copies a timestamped
+  `.vyb` into that folder (`CloudBackupWriter`, built on plain framework
+  `DocumentsContract` calls, not a third-party Drive SDK), on top of,
+  never instead of, wherever the user already saves/writes it. A
+  **Disconnect** option (the same button, relabeled once connected)
+  releases the permission and stops future backups from copying there,
+  without deleting anything already uploaded. The connected folder
+  choice itself is this device's own configuration, not business data,
+  so it is deliberately **not** part of the Vyapar backup round-trip -
+  same reasoning as Reorder Settings. A fourth, `ReorderDigestNotifier`, checks weekly
   rather than daily - a fresh Reorder List isn't worth a notification
   every single day - and opens straight to Reorder List when there's
   anything in it. A fifth, `MarginErosionNotifier`, checks daily like
