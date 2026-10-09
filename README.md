@@ -390,7 +390,12 @@ metric where a decrease is the improvement; below that, a Sales by
 Category breakdown of the same two periods - category is the first
 word of each sold item's name, same proxy as Stock Value's - listing
 every category seen in either period sorted by the size of its
-change, not just a top few)
+change, not just a top few) · Cross-Sell Insight (search and pick any
+item, see what it's frequently bought together with - other items
+that showed up in the same Sale, ranked by how often - and, the
+reverse direction, what it's rarely bought together with - every
+other sold item, ranked by that same co-occurrence count ascending, a
+possible missed cross-sell opportunity)
 
 Every report list row that represents an item or a party is tappable
 and opens that item's or party's own screen (Net Profit, Item Ranking,

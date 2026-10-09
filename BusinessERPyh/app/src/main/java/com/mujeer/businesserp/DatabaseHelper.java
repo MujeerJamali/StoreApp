@@ -5038,6 +5038,131 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// CROSS-SELL INSIGHT - for a given item, which other items most often
+	// appear in the same Sale (co-occurrence count, across every sale
+	// that included this item) - "frequently_together", only items that
+	// co-occurred at least once, highest count first; and the reverse
+	// direction, "rarely_together": every other active item that has
+	// sold at all, sorted by that same co-occurrence count ascending (0
+	// first) - a possible missed cross-sell opportunity, since an item
+	// with zero sales ever isn't a meaningful candidate to compare
+	// against. Both lists exclude the item itself.
+	// =====================
+	public HashMap<String, Object> getCrossSellInsight(int itemId) {
+
+		HashMap<String, Object> result = new HashMap<String, Object>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		ArrayList<Integer> saleIds = new ArrayList<Integer>();
+
+		Cursor saleCursor = db.rawQuery(
+			"SELECT DISTINCT sale_id FROM sale_items WHERE item_id=?",
+			new String[]{String.valueOf(itemId)}
+		);
+
+		while (saleCursor.moveToNext()) {
+			saleIds.add(saleCursor.getInt(0));
+		}
+
+		saleCursor.close();
+
+		HashMap<Integer, Integer> coOccurrence = new HashMap<Integer, Integer>();
+
+		if (!saleIds.isEmpty()) {
+
+			StringBuilder idList = new StringBuilder();
+
+			for (int i = 0; i < saleIds.size(); i++) {
+
+				if (i > 0) {
+					idList.append(",");
+				}
+
+				idList.append(saleIds.get(i));
+			}
+
+			Cursor coCursor = db.rawQuery(
+				"SELECT item_id, COUNT(DISTINCT sale_id) FROM sale_items " +
+				"WHERE sale_id IN (" + idList + ") AND item_id != ? " +
+				"GROUP BY item_id",
+				new String[]{String.valueOf(itemId)}
+			);
+
+			while (coCursor.moveToNext()) {
+				coOccurrence.put(coCursor.getInt(0), coCursor.getInt(1));
+			}
+
+			coCursor.close();
+		}
+
+		ArrayList<HashMap<String, Object>> allSoldItems = new ArrayList<HashMap<String, Object>>();
+
+		Cursor allCursor = db.rawQuery(
+			"SELECT DISTINCT i.id, i.code, i.name FROM " + TABLE_ITEMS + " i " +
+			"INNER JOIN sale_items si ON si.item_id = i.id " +
+			"WHERE i.id != ? AND i.active = 1",
+			new String[]{String.valueOf(itemId)}
+		);
+
+		while (allCursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+
+			int otherItemId = allCursor.getInt(0);
+
+			row.put("item_id", otherItemId);
+			row.put("code", allCursor.getString(1));
+			row.put("name", allCursor.getString(2));
+
+			Integer count = coOccurrence.get(otherItemId);
+			row.put("co_occurrence_count", count == null ? 0 : count);
+
+			allSoldItems.add(row);
+		}
+
+		allCursor.close();
+
+		ArrayList<HashMap<String, Object>> frequentlyTogether =
+			new ArrayList<HashMap<String, Object>>();
+
+		for (HashMap<String, Object> row : allSoldItems) {
+
+			if ((Integer) row.get("co_occurrence_count") > 0) {
+				frequentlyTogether.add(row);
+			}
+		}
+
+		Collections.sort(
+			frequentlyTogether,
+			new Comparator<HashMap<String, Object>>() {
+				@Override
+				public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+					return (Integer) b.get("co_occurrence_count") - (Integer) a.get("co_occurrence_count");
+				}
+			}
+		);
+
+		ArrayList<HashMap<String, Object>> rarelyTogether =
+			new ArrayList<HashMap<String, Object>>(allSoldItems);
+
+		Collections.sort(
+			rarelyTogether,
+			new Comparator<HashMap<String, Object>>() {
+				@Override
+				public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+					return (Integer) a.get("co_occurrence_count") - (Integer) b.get("co_occurrence_count");
+				}
+			}
+		);
+
+		result.put("frequently_together", frequentlyTogether);
+		result.put("rarely_together", rarelyTogether);
+
+		return result;
+	}
+
+	// =====================
 	// REPORT: NET PROFIT BY ITEM - the same Net Profit period, broken
 	// down per item (only items with at least one sale in the period -
 	// the INNER JOINs below drop everything else on their own). Same
