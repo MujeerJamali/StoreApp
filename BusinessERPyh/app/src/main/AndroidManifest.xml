@@ -365,6 +365,12 @@
             android:name=".AutoBackupReceiver"
             android:exported="false" />
 
+        <!-- Fired by DailyDigestScheduler's repeating alarm - see
+             DailyDigestReceiver/DailyDigestNotifier. -->
+        <receiver
+            android:name=".DailyDigestReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>

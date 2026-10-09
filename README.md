@@ -273,7 +273,17 @@ BusinessERPyh/                  Gradle project root
   anything in it. A fifth, `MarginErosionNotifier`, checks daily like
   the first two, for any item whose margin % has dropped 5+ points
   this month vs last (name + point drop per line, opens that item
-  directly or the Margin & Profit Alerts report).
+  directly or the Margin & Profit Alerts report). A sixth,
+  `DailyDigestNotifier`, is fixed-time rather than once-per-app-open:
+  `DailyDigestScheduler` fires it via a plain AlarmManager alarm at a
+  fixed 9 PM local time every day (re-registered - harmlessly, not
+  duplicated - on every app open), posting today's Sales/Purchases/
+  Expenses/Net Cash Movement (the same figures Day Close shows) as one
+  notification that opens straight to today's Day Close. It always
+  posts, even on a zero-activity day - confirming "nothing happened
+  today" is still useful, not something to silently skip the way the
+  alert-style notifiers above do when there's nothing to flag - but
+  still guards against posting twice for the same date.
 - **Trending flags** (Items screen) — each item row shows a small ▲/▼
   next to its stock when `DatabaseHelper.getItemTrends()` finds its last
   7 days of sales meaningfully faster (▲, an early stock-out warning,

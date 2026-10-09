@@ -23,6 +23,7 @@ public class BusinessERPApplication extends Application {
 		// Idempotent - re-registering the same alarm on every app open
 		// just replaces its schedule, never stacks duplicates.
 		AutoBackupScheduler.ensureScheduled(getApplicationContext());
+		DailyDigestScheduler.ensureScheduled(getApplicationContext());
 
 		// A single cheap DELETE WHERE - safe to run unconditionally on
 		// every app open rather than gating it to once a day like the
