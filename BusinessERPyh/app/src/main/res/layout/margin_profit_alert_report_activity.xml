@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/PageTitle"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_marginBottom="0dp"
+                android:text="Margin &amp; Profit Alerts" />
+
+            <com.mujeer.businesserp.InfoBubbleView
+                android:id="@+id/info_bubble"
+                android:layout_width="@dimen/info_bubble_size"
+                android:layout_height="@dimen/info_bubble_size" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_month_labels"
+            style="@style/FieldLabel"
+            android:layout_marginTop="0dp"
+            android:layout_marginBottom="10dp"
+            android:text="This Month vs Last Month" />
+
+        <Spinner
+            android:id="@+id/spinner_shoes_filter"
+            style="@style/FilterSpinner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Average Margin %" />
+
+            <TextView
+                android:id="@+id/tv_margin_avg_this"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="This Month: 0%"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_margin_avg_last"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Last Month: 0%"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tv_margin_avg_delta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="No change"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+        <com.mujeer.businesserp.SimpleBarChartView
+            android:id="@+id/chart_margin_profit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Margin Erosion"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            style="@style/FieldLabel"
+            android:text="Items that sold in both months whose margin % dropped by 5 points or more, biggest drop first." />
+
+        <TextView
+            android:id="@+id/tv_margin_erosion_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="No item's margin has eroded by 5+ points this month."
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/container_margin_erosion"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="vertical" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Biggest Profit Swings"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            style="@style/FieldLabel"
+            android:text="Top 10 items by the size of their profit change vs last month, up or down." />
+
+        <TextView
+            android:id="@+id/tv_profit_swing_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Nothing sold in either month yet."
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/container_profit_swing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="vertical" />
+
+    </LinearLayout>
+
+</ScrollView>

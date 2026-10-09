@@ -268,7 +268,10 @@ BusinessERPyh/                  Gradle project root
   actually need to nag. A fourth, `ReorderDigestNotifier`, checks weekly
   rather than daily - a fresh Reorder List isn't worth a notification
   every single day - and opens straight to Reorder List when there's
-  anything in it.
+  anything in it. A fifth, `MarginErosionNotifier`, checks daily like
+  the first two, for any item whose margin % has dropped 5+ points
+  this month vs last (name + point drop per line, opens that item
+  directly or the Margin & Profit Alerts report).
 - **Trending flags** (Items screen) — each item row shows a small ▲/▼
   next to its stock when `DatabaseHelper.getItemTrends()` finds its last
   7 days of sales meaningfully faster (▲, an early stock-out warning,
@@ -401,7 +404,13 @@ than Slow-Moving Stock's 30-day default - bucketed into 60-89/90-119/
 120+ days or Never Sold; tap Start Clearance on any row to mark it down
 at a chosen discount %, which moves it into an Active Clearances
 section tracking how much of the stock on hand when clearance began
-has sold since, until End Clearance or it's all gone)
+has sold since, until End Clearance or it's all gone) · Margin &
+Profit Alerts (This Month vs Last Month at the item level, with a
+shoes/non-shoes filter: Margin Erosion lists every item that sold in
+both months whose margin % dropped 5+ points, biggest drop first;
+Biggest Profit Swings lists the top 10 items by the size of their
+profit change vs last month, up or down; see Notifications below for
+the daily alert this same check also feeds)
 
 Every report list row that represents an item or a party is tappable
 and opens that item's or party's own screen (Net Profit, Item Ranking,

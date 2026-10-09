@@ -176,6 +176,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".MarginProfitAlertReportActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".CostItemEditActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />

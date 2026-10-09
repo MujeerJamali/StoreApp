@@ -5344,6 +5344,161 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// MARGIN EROSION - items that sold in both This Month (1st-today)
+	// and the full previous month, whose margin % dropped by at least
+	// MARGIN_EROSION_THRESHOLD_POINTS percentage points between the
+	// two. Reuses getNetProfitByItem() for both periods and merges by
+	// item_id, same pattern Month-over-Month's category comparison
+	// uses at item granularity instead. Powers both the Margin &
+	// Profit Alerts report and MarginErosionNotifier's daily check.
+	// =====================
+	public static final double MARGIN_EROSION_THRESHOLD_POINTS = 5.0;
+
+	public ArrayList<HashMap<String, Object>> getMarginErosionAlerts(
+		String thisFrom, String thisTo, String lastFrom, String lastTo, int shoesFilter) {
+
+		ArrayList<HashMap<String, Object>> merged =
+			getMergedItemProfit(thisFrom, thisTo, lastFrom, lastTo, shoesFilter);
+
+		ArrayList<HashMap<String, Object>> result = new ArrayList<HashMap<String, Object>>();
+
+		for (HashMap<String, Object> row : merged) {
+
+			double salesThis = (Double) row.get("sales_this");
+			double salesLast = (Double) row.get("sales_last");
+
+			// Both periods need an actual sale to compare margins
+			// meaningfully - a brand-new or stopped-selling item would
+			// otherwise show a misleading 100% "erosion".
+			if (salesThis < 0.01 || salesLast < 0.01) {
+				continue;
+			}
+
+			double profitThis = (Double) row.get("profit_this");
+			double profitLast = (Double) row.get("profit_last");
+
+			double marginThis = profitThis / salesThis * 100;
+			double marginLast = profitLast / salesLast * 100;
+			double erosion = marginLast - marginThis;
+
+			if (erosion < MARGIN_EROSION_THRESHOLD_POINTS) {
+				continue;
+			}
+
+			row.put("margin_this", marginThis);
+			row.put("margin_last", marginLast);
+			row.put("erosion_points", erosion);
+
+			result.add(row);
+		}
+
+		Collections.sort(result, new Comparator<HashMap<String, Object>>() {
+				@Override
+				public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+					return Double.compare(
+						(Double) b.get("erosion_points"), (Double) a.get("erosion_points")
+					);
+				}
+			}
+		);
+
+		return result;
+	}
+
+	// Every item that sold in either period, ranked by the size of its
+	// profit change (up or down) - a big increase is just as worth
+	// surfacing as a big drop. Not filtered by a threshold like margin
+	// erosion is, since "biggest" is inherently relative; capped to
+	// maxResults so a shop with many items doesn't get an unbounded
+	// list for what's meant to be an at-a-glance alert.
+	public ArrayList<HashMap<String, Object>> getBiggestProfitSwings(
+		String thisFrom, String thisTo, String lastFrom, String lastTo,
+		int shoesFilter, int maxResults) {
+
+		ArrayList<HashMap<String, Object>> merged =
+			getMergedItemProfit(thisFrom, thisTo, lastFrom, lastTo, shoesFilter);
+
+		for (HashMap<String, Object> row : merged) {
+
+			double profitThis = (Double) row.get("profit_this");
+			double profitLast = (Double) row.get("profit_last");
+
+			row.put("profit_swing", profitThis - profitLast);
+		}
+
+		Collections.sort(merged, new Comparator<HashMap<String, Object>>() {
+				@Override
+				public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+					return Double.compare(
+						Math.abs((Double) b.get("profit_swing")),
+						Math.abs((Double) a.get("profit_swing"))
+					);
+				}
+			}
+		);
+
+		if (merged.size() > maxResults) {
+			merged = new ArrayList<HashMap<String, Object>>(merged.subList(0, maxResults));
+		}
+
+		return merged;
+	}
+
+	// Shared merge step for the two methods above: every item that
+	// sold in either period, by item_id, with this/last sales_amount
+	// and profit defaulted to 0 for whichever period it's absent from.
+	private ArrayList<HashMap<String, Object>> getMergedItemProfit(
+		String thisFrom, String thisTo, String lastFrom, String lastTo, int shoesFilter) {
+
+		ArrayList<HashMap<String, Object>> thisList =
+			getNetProfitByItem(thisFrom, thisTo, false, shoesFilter);
+
+		ArrayList<HashMap<String, Object>> lastList =
+			getNetProfitByItem(lastFrom, lastTo, false, shoesFilter);
+
+		LinkedHashMap<Integer, HashMap<String, Object>> merged =
+			new LinkedHashMap<Integer, HashMap<String, Object>>();
+
+		for (HashMap<String, Object> row : thisList) {
+
+			int itemId = (Integer) row.get("item_id");
+
+			HashMap<String, Object> mergedRow = new HashMap<String, Object>();
+			mergedRow.put("item_id", itemId);
+			mergedRow.put("item_name", row.get("item_name"));
+			mergedRow.put("sales_this", (Double) row.get("sales_amount"));
+			mergedRow.put("profit_this", (Double) row.get("profit"));
+			mergedRow.put("sales_last", 0.0);
+			mergedRow.put("profit_last", 0.0);
+
+			merged.put(itemId, mergedRow);
+		}
+
+		for (HashMap<String, Object> row : lastList) {
+
+			int itemId = (Integer) row.get("item_id");
+
+			HashMap<String, Object> mergedRow = merged.get(itemId);
+
+			if (mergedRow == null) {
+
+				mergedRow = new HashMap<String, Object>();
+				mergedRow.put("item_id", itemId);
+				mergedRow.put("item_name", row.get("item_name"));
+				mergedRow.put("sales_this", 0.0);
+				mergedRow.put("profit_this", 0.0);
+
+				merged.put(itemId, mergedRow);
+			}
+
+			mergedRow.put("sales_last", (Double) row.get("sales_amount"));
+			mergedRow.put("profit_last", (Double) row.get("profit"));
+		}
+
+		return new ArrayList<HashMap<String, Object>>(merged.values());
+	}
+
+	// =====================
 	// REPORT: SHOES VS NON-SHOES - sales and profit for a period, split
 	// by the same "item name starts with 'Shoe'" rule as everywhere else
 	// (Item Ranking's shoes filter, Stock Worth). Both metrics are

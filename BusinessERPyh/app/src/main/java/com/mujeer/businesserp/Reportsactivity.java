@@ -25,6 +25,7 @@ public class Reportsactivity extends Activity {
 	Button btn_report_cash_projection;
 	Button btn_report_cross_sell;
 	Button btn_report_dead_stock_aging;
+	Button btn_report_margin_profit_alerts;
 	Button btn_report_month_over_month;
 	Button btn_report_item_monthly_rank;
 	Button btn_report_average_cart;
@@ -61,6 +62,7 @@ public class Reportsactivity extends Activity {
 		btn_report_cash_projection = findViewById(R.id.btn_report_cash_projection);
 		btn_report_cross_sell = findViewById(R.id.btn_report_cross_sell);
 		btn_report_dead_stock_aging = findViewById(R.id.btn_report_dead_stock_aging);
+		btn_report_margin_profit_alerts = findViewById(R.id.btn_report_margin_profit_alerts);
 		btn_report_month_over_month = findViewById(R.id.btn_report_month_over_month);
 		btn_report_item_monthly_rank = findViewById(R.id.btn_report_item_monthly_rank);
 		btn_report_average_cart = findViewById(R.id.btn_report_average_cart);
@@ -283,6 +285,19 @@ public class Reportsactivity extends Activity {
 					Intent intent = new Intent(
 						Reportsactivity.this,
 						DeadStockAgingReportActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_report_margin_profit_alerts.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						Reportsactivity.this,
+						MarginProfitAlertReportActivity.class
 					);
 
 					startActivity(intent);

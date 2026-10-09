@@ -218,6 +218,16 @@
             android:background="@color/stroke" />
 
         <Button
+            android:id="@+id/btn_report_margin_profit_alerts"
+            style="@style/ToolRow"
+            android:text="Margin &amp; Profit Alerts" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
             android:id="@+id/btn_report_month_over_month"
             style="@style/ToolRow"
             android:text="Month-over-Month" />
