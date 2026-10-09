@@ -55,6 +55,16 @@ BusinessERPyh/                  Gradle project root
   always opens a fresh screen rather than finishing the current one,
   so nothing typed is ever lost to a swipe - the previous screen just
   sits in the back stack, reachable with a normal Back press.
+- **Bulk Item Update** (Dashboard Tools card, pinnable as a Favorite) —
+  applies a price change or a new Reorder Threshold across every
+  active item whose name or code contains a typed filter. There's no
+  separate category field on items, so this substring match is the
+  closest thing to one (typing "Shoes Men" matches every men's shoe,
+  since that's how this shop's naming convention already groups
+  them). The match count updates live as the filter is typed, and
+  both actions - a ± percent price change (Purchase Price and/or Sale
+  Price, floored at 0) and setting a new Reorder Threshold - confirm
+  with that exact count before touching anything.
 - **Purchases / Sales** — line-item transactions, size dropdowns on sale
   items only show sizes with stock, bulk Excel import for purchases. The
   Add/Edit Item dialog's Quantity, Price and Total fields are linked live:

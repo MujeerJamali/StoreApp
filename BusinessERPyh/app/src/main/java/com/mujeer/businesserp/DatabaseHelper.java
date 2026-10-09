@@ -1453,6 +1453,109 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 // =====================
+// BULK ITEM UPDATES - operates on every active item whose name or code
+// contains the given filter text (case-insensitive substring match) -
+// there's no formal "category" field on items, so this substring match
+// is the closest thing to one. Used by BulkItemUpdateActivity's
+// Preview/Apply flow so the user always sees the affected count before
+// committing to either change.
+// =====================
+
+	public ArrayList<java.util.HashMap<String, Object>> getItemsMatchingFilter(String filterText) {
+
+		ArrayList<java.util.HashMap<String, Object>> list = new ArrayList<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		String like = "%" + filterText.trim() + "%";
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, code, name, purchase_price, sale_price, reorder_threshold FROM " +
+			TABLE_ITEMS +
+			" WHERE active = 1 AND (name LIKE ? COLLATE NOCASE OR code LIKE ? COLLATE NOCASE) " +
+			"ORDER BY code",
+			new String[]{like, like}
+		);
+
+		while (cursor.moveToNext()) {
+
+			java.util.HashMap<String, Object> row = new java.util.HashMap<>();
+
+			row.put("id", cursor.getInt(0));
+			row.put("code", cursor.getString(1));
+			row.put("name", cursor.getString(2));
+			row.put("purchase_price", cursor.getDouble(3));
+			row.put("sale_price", cursor.getDouble(4));
+			row.put("reorder_threshold", cursor.getDouble(5));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// Applies a percentage change (10 = +10%, -10 = -10%) to purchase
+	// and/or sale price across every item matching the filter, floored
+	// at 0 so a large negative percentage can't push a price negative.
+	// Returns how many items were affected.
+	public int bulkAdjustPrice(
+		String filterText, boolean applyToPurchase, boolean applyToSale, double percentChange) {
+
+		ArrayList<java.util.HashMap<String, Object>> items = getItemsMatchingFilter(filterText);
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		double multiplier = 1 + (percentChange / 100.0);
+
+		for (java.util.HashMap<String, Object> item : items) {
+
+			ContentValues values = new ContentValues();
+
+			if (applyToPurchase) {
+
+				double newPurchase = (Double) item.get("purchase_price") * multiplier;
+				values.put("purchase_price", Math.max(0, newPurchase));
+			}
+
+			if (applyToSale) {
+
+				double newSale = (Double) item.get("sale_price") * multiplier;
+				values.put("sale_price", Math.max(0, newSale));
+			}
+
+			if (values.size() > 0) {
+
+				db.update(
+					TABLE_ITEMS, values, "id=?", new String[]{String.valueOf(item.get("id"))}
+				);
+			}
+		}
+
+		return items.size();
+	}
+
+	// Sets every matching item's reorder_threshold to the same value.
+	// Returns how many items were affected.
+	public int bulkSetReorderThreshold(String filterText, double threshold) {
+
+		ArrayList<java.util.HashMap<String, Object>> items = getItemsMatchingFilter(filterText);
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		ContentValues values = new ContentValues();
+		values.put("reorder_threshold", threshold);
+
+		for (java.util.HashMap<String, Object> item : items) {
+
+			db.update(TABLE_ITEMS, values, "id=?", new String[]{String.valueOf(item.get("id"))});
+		}
+
+		return items.size();
+	}
+
+// =====================
 // DELETE ITEM
 // =====================
 

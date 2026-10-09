@@ -146,6 +146,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".BulkItemUpdateActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".CostItemEditActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />

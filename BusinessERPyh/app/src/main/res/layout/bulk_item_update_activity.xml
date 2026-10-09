@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/PageTitle"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_marginBottom="0dp"
+                android:text="Bulk Item Update" />
+
+            <com.mujeer.businesserp.InfoBubbleView
+                android:id="@+id/info_bubble"
+                android:layout_width="@dimen/info_bubble_size"
+                android:layout_height="@dimen/info_bubble_size" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Items whose name or code contains" />
+            <EditText
+                android:id="@+id/et_filter_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. Shoes Men, or a category word"
+                android:inputType="text|textNoSuggestions" />
+
+            <TextView
+                android:id="@+id/tv_match_count"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Type above to see how many items match."
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Change Price"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <CheckBox
+                android:id="@+id/cb_apply_purchase_price"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:checked="true"
+                android:text="Purchase Price" />
+
+            <CheckBox
+                android:id="@+id/cb_apply_sale_price"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="Sale Price" />
+
+            <TextView style="@style/FieldLabel" android:text="Percent change (e.g. 10 for +10%, -10 for -10%)" />
+            <EditText
+                android:id="@+id/et_percent_change"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. 10"
+                android:inputType="numberDecimal|numberSigned" />
+
+            <Button
+                android:id="@+id/btn_apply_price_change"
+                style="@style/AppButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="Apply Price Change" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Change Reorder Threshold"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView style="@style/FieldLabel" android:text="New threshold (0 = no Low Stock alert)" />
+            <EditText
+                android:id="@+id/et_new_threshold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. 5"
+                android:inputType="numberDecimal" />
+
+            <Button
+                android:id="@+id/btn_apply_threshold"
+                style="@style/AppButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="Apply Threshold Change" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

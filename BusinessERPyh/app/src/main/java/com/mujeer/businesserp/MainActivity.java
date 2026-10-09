@@ -48,6 +48,7 @@ public class MainActivity extends Activity {
 	Button btn_sample_shoes;
 	Button btn_recently_deleted;
 	Button btn_reorder_list;
+	Button btn_bulk_item_update;
 
 	Button btn_quick_add;
 
@@ -83,7 +84,7 @@ public class MainActivity extends Activity {
 		"btn_import", "btn_generate_entries", "btn_cash", "btn_wanted_items",
 		"btn_recurring_expenses", "btn_drafts", "btn_cost_items",
 		"btn_display_shoes", "btn_sample_shoes", "btn_recently_deleted",
-		"btn_reorder_list"
+		"btn_reorder_list", "btn_bulk_item_update"
 	};
 
 	private static final String[] SHORTCUT_LABELS = {
@@ -92,7 +93,7 @@ public class MainActivity extends Activity {
 		"Import", "Generate Entries", "Cash", "Wanted Items",
 		"Recurring Expenses", "Drafts", "Cost Items",
 		"Display Shoes", "Sample Shoes", "Recently Deleted",
-		"Reorder List"
+		"Reorder List", "Bulk Item Update"
 	};
 
 	DatabaseHelper db;
@@ -126,6 +127,7 @@ public class MainActivity extends Activity {
 		btn_sample_shoes = findViewById(R.id.btn_sample_shoes);
 		btn_recently_deleted = findViewById(R.id.btn_recently_deleted);
 		btn_reorder_list = findViewById(R.id.btn_reorder_list);
+		btn_bulk_item_update = findViewById(R.id.btn_bulk_item_update);
 
 		btn_quick_add = findViewById(R.id.btn_quick_add);
 
@@ -188,6 +190,7 @@ public class MainActivity extends Activity {
 		attachFavoriteLongPress(btn_sample_shoes, "btn_sample_shoes");
 		attachFavoriteLongPress(btn_recently_deleted, "btn_recently_deleted");
 		attachFavoriteLongPress(btn_reorder_list, "btn_reorder_list");
+		attachFavoriteLongPress(btn_bulk_item_update, "btn_bulk_item_update");
 
 		ArrayAdapter<String> trendHorizonAdapter = new ArrayAdapter<String>(
 			this, android.R.layout.simple_spinner_item, TREND_HORIZON_LABELS
@@ -451,6 +454,19 @@ public class MainActivity extends Activity {
 				}
 			});
 
+		btn_bulk_item_update.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						BulkItemUpdateActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
 		btn_quick_add.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
@@ -707,6 +723,10 @@ public class MainActivity extends Activity {
 
 			case "btn_reorder_list":
 				intent = new Intent(this, ReorderListActivity.class);
+				break;
+
+			case "btn_bulk_item_update":
+				intent = new Intent(this, BulkItemUpdateActivity.class);
 				break;
 
 			default:

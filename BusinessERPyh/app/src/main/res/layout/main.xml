@@ -465,6 +465,16 @@
                     style="@style/ToolRow"
                     android:text="Reorder List" />
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <Button
+                    android:id="@+id/btn_bulk_item_update"
+                    style="@style/ToolRow"
+                    android:text="Bulk Item Update" />
+
             </LinearLayout>
 
         </LinearLayout>
