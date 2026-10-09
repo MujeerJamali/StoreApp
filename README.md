@@ -34,7 +34,17 @@ BusinessERPyh/                  Gradle project root
   stays fully visible/editable on the Items list itself and in past
   transactions. Each item also has a **Reorder Threshold** (Edit Item
   screen, 0 = no alert) - its total stock at or below that number is
-  what the Low Stock report/notification flags.
+  what the Low Stock report/notification flags. Add/Edit Item has a
+  **"This is a shoe"** checkbox that swaps the plain Name field for 7
+  structured fields - Gender, Type, Sole, Upper, Design, Color, Size -
+  matching this shop's `"Shoes {Gender} {Type} {Sole} {Upper} {Design}
+  {Color} {Size} - {Code}"` naming convention (see `ShoeIdentity`,
+  which every shoes-only report already parses that name back apart
+  with). Each field must be a single word (no spaces), since the name
+  is rebuilt by joining them - the screen builds and validates it
+  instead of the user typing the whole formatted string by hand.
+  Editing an existing item that already matches the convention
+  auto-checks the box and pre-fills the 7 fields from its current name.
 - **Purchases / Sales** — line-item transactions, size dropdowns on sale
   items only show sizes with stock, bulk Excel import for purchases. The
   Add/Edit Item dialog's Quantity, Price and Total fields are linked live:

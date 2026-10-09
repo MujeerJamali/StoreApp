@@ -25,6 +25,18 @@ public class Itemseditactivity extends Activity {
     EditText et_reorder_threshold;
     CheckBox cb_active;
 
+    CheckBox cb_is_shoe;
+    TextView tv_item_name_label;
+    LinearLayout container_shoe_fields;
+
+    EditText et_shoe_gender;
+    EditText et_shoe_type;
+    EditText et_shoe_sole;
+    EditText et_shoe_upper;
+    EditText et_shoe_design;
+    EditText et_shoe_color;
+    EditText et_shoe_size;
+
     LinearLayout cardVarieties;
     LinearLayout containerVarieties;
     Button btnAddVarietyGroup;
@@ -34,6 +46,7 @@ public class Itemseditactivity extends Activity {
     DatabaseHelper db;
 
     int itemId = -1;
+    String itemCode = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,6 +59,28 @@ public class Itemseditactivity extends Activity {
         tv_item_stock = findViewById(R.id.tv_item_stock);
         et_reorder_threshold = findViewById(R.id.et_reorder_threshold);
         cb_active = findViewById(R.id.cb_active);
+
+        cb_is_shoe = findViewById(R.id.cb_is_shoe);
+        tv_item_name_label = findViewById(R.id.tv_item_name_label);
+        container_shoe_fields = findViewById(R.id.container_shoe_fields);
+
+        et_shoe_gender = findViewById(R.id.et_shoe_gender);
+        et_shoe_type = findViewById(R.id.et_shoe_type);
+        et_shoe_sole = findViewById(R.id.et_shoe_sole);
+        et_shoe_upper = findViewById(R.id.et_shoe_upper);
+        et_shoe_design = findViewById(R.id.et_shoe_design);
+        et_shoe_color = findViewById(R.id.et_shoe_color);
+        et_shoe_size = findViewById(R.id.et_shoe_size);
+
+        cb_is_shoe.setOnCheckedChangeListener(
+            new android.widget.CompoundButton.OnCheckedChangeListener() {
+                @Override
+                public void onCheckedChanged(
+                    android.widget.CompoundButton buttonView, boolean isChecked) {
+                    applyShoeMode(isChecked);
+                }
+            }
+        );
 
         btn_update_item = findViewById(R.id.btn_update_item);
 
@@ -61,7 +96,28 @@ public class Itemseditactivity extends Activity {
 
             HashMap<String, Object> item = db.getItemById(itemId);
 
-            et_item_name.setText((String) item.get("name"));
+            itemCode = (String) item.get("code");
+
+            String existingName = (String) item.get("name");
+
+            et_item_name.setText(existingName);
+
+            ShoeIdentity existingShoe = ShoeIdentity.parse(existingName);
+
+            if (existingShoe != null) {
+
+                cb_is_shoe.setChecked(true);
+                applyShoeMode(true);
+
+                et_shoe_gender.setText(existingShoe.gender);
+                et_shoe_type.setText(existingShoe.type);
+                et_shoe_sole.setText(existingShoe.sole);
+                et_shoe_upper.setText(existingShoe.upper);
+                et_shoe_design.setText(existingShoe.design);
+                et_shoe_color.setText(existingShoe.color);
+                et_shoe_size.setText(existingShoe.size);
+            }
+
             et_purchase_price.setText(AmountFormat.formatPlain((Double) item.get("purchase_price")));
             et_sale_price.setText(AmountFormat.formatPlain((Double) item.get("sale_price")));
 
@@ -106,7 +162,21 @@ public class Itemseditactivity extends Activity {
 				@Override
 				public void onClick(View v) {
 
-					String name = et_item_name.getText().toString().trim();
+					String name;
+
+					if (cb_is_shoe.isChecked()) {
+
+						name = buildShoeName();
+
+						if (name == null) {
+							return;
+						}
+
+					} else {
+
+						name = et_item_name.getText().toString().trim();
+					}
+
 					String purchase = et_purchase_price.getText().toString().trim();
 					String sale = et_sale_price.getText().toString().trim();
 
@@ -164,6 +234,56 @@ public class Itemseditactivity extends Activity {
 					}
 				}
 			});
+    }
+
+    // Toggling "This is a shoe" swaps the plain free-text Name field for
+    // the 7 structured fields (Gender/Type/Sole/Upper/Design/Color/Size)
+    // that ShoeIdentity.parse() expects joined together - see its own
+    // comment for the exact naming convention this has to match.
+    private void applyShoeMode(boolean isShoe) {
+
+        tv_item_name_label.setVisibility(isShoe ? View.GONE : View.VISIBLE);
+        et_item_name.setVisibility(isShoe ? View.GONE : View.VISIBLE);
+        container_shoe_fields.setVisibility(isShoe ? View.VISIBLE : View.GONE);
+    }
+
+    // Builds "Shoes {Gender} {Type} {Sole} {Upper} {Design} {Color} {Size}
+    // - {Code}" from the 7 shoe fields, matching ShoeIdentity's required
+    // shape exactly - see Additemactivity's own copy of this method for
+    // the same validation. The code is this item's own existing code
+    // (unchanged - this screen has no code field of its own to edit).
+    private String buildShoeName() {
+
+        String[] fields = {
+            et_shoe_gender.getText().toString().trim(),
+            et_shoe_type.getText().toString().trim(),
+            et_shoe_sole.getText().toString().trim(),
+            et_shoe_upper.getText().toString().trim(),
+            et_shoe_design.getText().toString().trim(),
+            et_shoe_color.getText().toString().trim(),
+            et_shoe_size.getText().toString().trim()
+        };
+
+        for (String field : fields) {
+
+            if (field.isEmpty()) {
+
+                Toast.makeText(this, "Fill every shoe field", Toast.LENGTH_SHORT).show();
+                return null;
+            }
+
+            if (field.contains(" ")) {
+
+                Toast.makeText(
+                    this, "Each shoe field must be a single word (no spaces)", Toast.LENGTH_SHORT
+                ).show();
+
+                return null;
+            }
+        }
+
+        return "Shoes " + fields[0] + " " + fields[1] + " " + fields[2] + " " + fields[3] +
+            " " + fields[4] + " " + fields[5] + " " + fields[6] + " - " + itemCode;
     }
 
     // =====================

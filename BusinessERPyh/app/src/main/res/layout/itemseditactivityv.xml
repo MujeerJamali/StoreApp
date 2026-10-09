@@ -20,13 +20,92 @@
             android:orientation="vertical"
             android:padding="18dp">
 
-            <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Item Name" />
+            <CheckBox
+                android:id="@+id/cb_is_shoe"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="This is a shoe (Gender/Type/Sole/Upper/Design/Color/Size)" />
+
+            <TextView
+                android:id="@+id/tv_item_name_label"
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:text="Item Name" />
             <EditText
                 android:id="@+id/et_item_name"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" 
+                android:layout_height="wrap_content"
         android:inputType="text|textNoSuggestions"
         />
+
+            <LinearLayout
+                android:id="@+id/container_shoe_fields"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView style="@style/FieldLabel" android:text="Gender" />
+                <EditText
+                    android:id="@+id/et_shoe_gender"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="e.g. Men"
+                    android:inputType="text|textNoSuggestions" />
+
+                <TextView style="@style/FieldLabel" android:text="Type" />
+                <EditText
+                    android:id="@+id/et_shoe_type"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="e.g. Sneaker"
+                    android:inputType="text|textNoSuggestions" />
+
+                <TextView style="@style/FieldLabel" android:text="Sole" />
+                <EditText
+                    android:id="@+id/et_shoe_sole"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="e.g. Rubber"
+                    android:inputType="text|textNoSuggestions" />
+
+                <TextView style="@style/FieldLabel" android:text="Upper" />
+                <EditText
+                    android:id="@+id/et_shoe_upper"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="e.g. Leather"
+                    android:inputType="text|textNoSuggestions" />
+
+                <TextView style="@style/FieldLabel" android:text="Design" />
+                <EditText
+                    android:id="@+id/et_shoe_design"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="e.g. Classic"
+                    android:inputType="text|textNoSuggestions" />
+
+                <TextView style="@style/FieldLabel" android:text="Color" />
+                <EditText
+                    android:id="@+id/et_shoe_color"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="e.g. Black"
+                    android:inputType="text|textNoSuggestions" />
+
+                <TextView style="@style/FieldLabel" android:text="Size" />
+                <EditText
+                    android:id="@+id/et_shoe_size"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="e.g. 42"
+                    android:inputType="text|textNoSuggestions" />
+
+                <TextView
+                    style="@style/FieldLabel"
+                    android:text="Each field above must be a single word (no spaces) - they're joined together to build the item name." />
+
+            </LinearLayout>
 
             <TextView style="@style/FieldLabel" android:text="Purchase Price" />
             <EditText
