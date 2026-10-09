@@ -39,6 +39,9 @@ public class DayCloseReportActivity extends Activity {
 	private TextView tv_payments_out_total;
 	private TextView tv_net_cash;
 
+	private View card_reorder_prep;
+	private TextView tv_reorder_prep;
+
 	private DatabaseHelper db;
 
 	private String selectedDate;
@@ -69,6 +72,16 @@ public class DayCloseReportActivity extends Activity {
 		tv_payments_in_total = findViewById(R.id.tv_payments_in_total);
 		tv_payments_out_total = findViewById(R.id.tv_payments_out_total);
 		tv_net_cash = findViewById(R.id.tv_net_cash);
+
+		card_reorder_prep = findViewById(R.id.card_reorder_prep);
+		tv_reorder_prep = findViewById(R.id.tv_reorder_prep);
+
+		findViewById(R.id.row_reorder_prep).setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					startActivity(new Intent(DayCloseReportActivity.this, ReorderListActivity.class));
+				}
+			});
 
 		db = new DatabaseHelper(this);
 
@@ -218,11 +231,16 @@ public class DayCloseReportActivity extends Activity {
 		final long myGeneration = ++loadGeneration;
 		final String date = selectedDate;
 
+		final boolean isToday = date.equals(dateFormat.format(new java.util.Date()));
+
 		new Thread(new Runnable() {
 				@Override
 				public void run() {
 
 					final HashMap<String, Object> summary = db.getDayCloseSummary(date);
+
+					final java.util.ArrayList<HashMap<String, Object>> reorderSuggestions =
+						isToday ? db.getReorderSuggestions(getApplicationContext()) : null;
 
 					runOnUiThread(new Runnable() {
 							@Override
@@ -233,10 +251,34 @@ public class DayCloseReportActivity extends Activity {
 								}
 
 								applySummary(summary);
+								applyReorderPrep(isToday, reorderSuggestions);
 							}
 						});
 				}
 			}).start();
+	}
+
+	// "Tomorrow's Reorder Prep" is only meaningful for today (it's a
+	// forward-looking suggestion, not something to show when reviewing a
+	// past day's close) - see DatabaseHelper.getReorderSuggestions().
+	private void applyReorderPrep(
+		boolean isToday, java.util.ArrayList<HashMap<String, Object>> suggestions) {
+
+		if (!isToday) {
+
+			card_reorder_prep.setVisibility(View.GONE);
+			return;
+		}
+
+		card_reorder_prep.setVisibility(View.VISIBLE);
+
+		int count = suggestions == null ? 0 : suggestions.size();
+
+		tv_reorder_prep.setText(
+			count == 0
+			? "Nothing needs reordering right now"
+			: count + (count == 1 ? " item worth restocking" : " items worth restocking")
+		);
 	}
 
 	private void applySummary(HashMap<String, Object> summary) {

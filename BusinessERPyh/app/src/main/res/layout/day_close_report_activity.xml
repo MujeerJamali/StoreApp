@@ -229,6 +229,42 @@
 
         </LinearLayout>
 
+        <!-- Only shown when the selected date is today - reorder prep is
+             forward-looking, not meaningful when reviewing a past day. -->
+        <LinearLayout
+            android:id="@+id/card_reorder_prep"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/row_reorder_prep"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:background="?android:attr/selectableItemBackground"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Tomorrow's Reorder Prep" />
+
+                <TextView
+                    android:id="@+id/tv_reorder_prep"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Checking..."
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
     </LinearLayout>
 
 </ScrollView>

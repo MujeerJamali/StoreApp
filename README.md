@@ -350,7 +350,10 @@ cash balance, a date picker defaulting to today but able to review any
 past day; each row taps through to that category's own list,
 pre-filtered to that one date - Sales/Purchases open Transactionactivity,
 Expenses opens Expensesactivity, Payments In/Out open Paymentactivity,
-and Net Cash Movement opens the Cash ledger) · Cash Flow Forecast
+and Net Cash Movement opens the Cash ledger - plus, only when the
+selected date is today, a "Tomorrow's Reorder Prep" card showing how
+many items the Reorder List currently has, tapping through to it) ·
+Cash Flow Forecast
 (today's real cash balance projected forward day by day using only
 Sales/Purchases already due on a future date - never a prediction from
 history, so a day with nothing due just carries the balance forward
