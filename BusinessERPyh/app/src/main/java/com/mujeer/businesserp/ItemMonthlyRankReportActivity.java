@@ -144,10 +144,17 @@ public class ItemMonthlyRankReportActivity extends Activity {
 		metricAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 		spinner_metric.setAdapter(metricAdapter);
 
+		int rememberedMetric = FilterMemory.getInt(this, "ItemMonthlyRankReport", "metric", 0);
+		spinner_metric.setSelection(rememberedMetric);
+		byProfit = rememberedMetric == 1;
+
 		spinner_metric.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
 				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
 					selectMetric(position == 1);
+					FilterMemory.setInt(
+						ItemMonthlyRankReportActivity.this, "ItemMonthlyRankReport", "metric", position
+					);
 				}
 
 				@Override
@@ -182,10 +189,19 @@ public class ItemMonthlyRankReportActivity extends Activity {
 		shoesFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 		spinner_shoes_filter.setAdapter(shoesFilterAdapter);
 
+		int rememberedShoesFilterPosition =
+			FilterMemory.getInt(this, "ItemMonthlyRankReport", "shoes_filter", 0);
+
+		spinner_shoes_filter.setSelection(rememberedShoesFilterPosition);
+		selectedShoesFilter = SHOES_FILTER_VALUES[rememberedShoesFilterPosition];
+
 		spinner_shoes_filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
 				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
 					selectedShoesFilter = SHOES_FILTER_VALUES[position];
+					FilterMemory.setInt(
+						ItemMonthlyRankReportActivity.this, "ItemMonthlyRankReport", "shoes_filter", position
+					);
 					loadReport();
 				}
 

@@ -98,6 +98,16 @@ public class MarginProfitAlertReportActivity extends Activity {
 		shoesFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 		spinner_shoes_filter.setAdapter(shoesFilterAdapter);
 
+		int rememberedShoesFilterPosition =
+			FilterMemory.getInt(this, "MarginProfitAlertReport", "shoes_filter", 0);
+
+		spinner_shoes_filter.setSelection(rememberedShoesFilterPosition);
+
+		selectedShoesFilter =
+			rememberedShoesFilterPosition == 1 ? DatabaseHelper.SHOES_FILTER_SHOES_ONLY :
+			rememberedShoesFilterPosition == 2 ? DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY :
+			DatabaseHelper.SHOES_FILTER_ALL;
+
 		spinner_shoes_filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
 				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -106,6 +116,11 @@ public class MarginProfitAlertReportActivity extends Activity {
 						position == 1 ? DatabaseHelper.SHOES_FILTER_SHOES_ONLY :
 						position == 2 ? DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY :
 						DatabaseHelper.SHOES_FILTER_ALL;
+
+					FilterMemory.setInt(
+						MarginProfitAlertReportActivity.this,
+						"MarginProfitAlertReport", "shoes_filter", position
+					);
 
 					loadReport();
 				}

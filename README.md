@@ -475,7 +475,22 @@ existing full-list DB methods, filtered client-side with the same
 already uses; invoice numbers get their own query
 (`DatabaseHelper.searchTransactionsByInvoice()`) since Sales and
 Purchases are two separate tables with no existing combined list to
-filter.
+filter. While the search box is empty, a Recent Searches list
+(`RecentSearches`) offers the last 8 queries that actually led to a
+tapped result (not every keystroke, which would fill it with partial
+text like "s"/"sh"/"sho") - tapping one re-runs it, "Clear" wipes the
+list.
+
+**Sticky report filters** (`FilterMemory`): the shoes/non-shoes filter,
+sort order, and similar stable preference spinners on Net Profit, Item
+Ranking, Item Monthly Rank, Margin & Profit Alerts, and Slow-Moving
+Stock's window remember the last choice made and restore it the next
+time that report opens - the practical version of a "favorite filter"
+for a shop that's almost always going to pick the same one. Deliberately
+**not** applied to any date/period range spinner (Today/This Month/
+Custom Range, etc.) - silently reapplying an old date range would show
+stale data without the user realizing it, so those always reset to
+their own sensible default instead.
 
 **Info Bubbles**: a reusable minimalist "i" badge (`InfoBubbleView` -
 a small circle, text "i", not an image icon, since this app removed

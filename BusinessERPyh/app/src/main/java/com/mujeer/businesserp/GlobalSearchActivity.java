@@ -7,7 +7,9 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 
@@ -24,7 +26,10 @@ import java.util.HashMap;
 // DatabaseHelper.searchTransactionsByInvoice()) since they span two
 // tables with no existing full-list method to reuse. Each of the
 // three sections is hidden independently when it has no matches, and
-// the whole results area is hidden until something is typed.
+// the whole results area is hidden until something is typed. While
+// the box is empty, a Recent Searches list (see RecentSearches) offers
+// the last few queries that actually led to a tapped result - tapping
+// one re-runs it; "Clear" wipes the list.
 // =====================
 public class GlobalSearchActivity extends Activity {
 
@@ -34,6 +39,10 @@ public class GlobalSearchActivity extends Activity {
 	private EditText et_global_search;
 	private TextView tv_global_search_empty;
 	private View container_results;
+
+	private View container_recent_searches;
+	private LinearLayout container_recent_searches_list;
+	private TextView tv_clear_recent_searches;
 
 	private TextView tv_parties_label;
 	private ListView lv_parties;
@@ -70,6 +79,10 @@ public class GlobalSearchActivity extends Activity {
 		tv_global_search_empty = findViewById(R.id.tv_global_search_empty);
 		container_results = findViewById(R.id.container_results);
 
+		container_recent_searches = findViewById(R.id.container_recent_searches);
+		container_recent_searches_list = findViewById(R.id.container_recent_searches_list);
+		tv_clear_recent_searches = findViewById(R.id.tv_clear_recent_searches);
+
 		tv_parties_label = findViewById(R.id.tv_parties_label);
 		lv_parties = findViewById(R.id.lv_parties);
 
@@ -96,6 +109,8 @@ public class GlobalSearchActivity extends Activity {
 
 					HashMap<String, Object> row = partyResults.get(position);
 
+					RecentSearches.record(GlobalSearchActivity.this, et_global_search.getText().toString());
+
 					Intent intent = new Intent(GlobalSearchActivity.this, Partyviewactivity.class);
 					intent.putExtra("party_id", (Integer) row.get("party_id"));
 
@@ -108,6 +123,8 @@ public class GlobalSearchActivity extends Activity {
 				public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 
 					HashMap<String, Object> row = itemResults.get(position);
+
+					RecentSearches.record(GlobalSearchActivity.this, et_global_search.getText().toString());
 
 					Intent intent = new Intent(GlobalSearchActivity.this, Itemviewactivity.class);
 					intent.putExtra("item_id", (Integer) row.get("item_id"));
@@ -122,6 +139,8 @@ public class GlobalSearchActivity extends Activity {
 
 					HashMap<String, Object> row = invoiceResults.get(position);
 
+					RecentSearches.record(GlobalSearchActivity.this, et_global_search.getText().toString());
+
 					Intent intent = new Intent(GlobalSearchActivity.this, Transactionviewactivity.class);
 
 					intent.putExtra(
@@ -132,6 +151,14 @@ public class GlobalSearchActivity extends Activity {
 					intent.putExtra("transaction_id", (Integer) row.get("transaction_id"));
 
 					startActivity(intent);
+				}
+			});
+
+		tv_clear_recent_searches.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					RecentSearches.clear(GlobalSearchActivity.this);
+					refreshRecentSearches();
 				}
 			});
 
@@ -149,6 +176,44 @@ public class GlobalSearchActivity extends Activity {
 					runSearch(s.toString());
 				}
 			});
+
+		refreshRecentSearches();
+	}
+
+	// Shown only while the search box is empty - a query in progress
+	// hides this in favor of the live results (or the "no matches"
+	// message), same as the plain hint text it replaces.
+	private void refreshRecentSearches() {
+
+		ArrayList<String> recent = RecentSearches.getRecent(this);
+
+		container_recent_searches_list.removeAllViews();
+
+		if (recent.isEmpty()) {
+
+			container_recent_searches.setVisibility(View.GONE);
+			return;
+		}
+
+		container_recent_searches.setVisibility(View.VISIBLE);
+
+		for (final String query : recent) {
+
+			Button row = new Button(this, null, 0, R.style.ToolRow);
+			row.setText(query);
+			row.setAllCaps(false);
+
+			row.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						et_global_search.setText(query);
+						et_global_search.setSelection(query.length());
+					}
+				}
+			);
+
+			container_recent_searches_list.addView(row);
+		}
 	}
 
 	private void runSearch(final String query) {
@@ -157,12 +222,19 @@ public class GlobalSearchActivity extends Activity {
 
 		if (query.trim().length() == 0) {
 
-			tv_global_search_empty.setText("Start typing to search.");
-			tv_global_search_empty.setVisibility(View.VISIBLE);
 			container_results.setVisibility(View.GONE);
+
+			refreshRecentSearches();
+
+			tv_global_search_empty.setText("Start typing to search.");
+			tv_global_search_empty.setVisibility(
+				container_recent_searches.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE
+			);
 
 			return;
 		}
+
+		container_recent_searches.setVisibility(View.GONE);
 
 		new Thread(new Runnable() {
 				@Override

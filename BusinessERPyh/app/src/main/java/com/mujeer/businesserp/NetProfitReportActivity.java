@@ -149,12 +149,21 @@ public class NetProfitReportActivity extends Activity {
 		itemModeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 		spinner_item_mode.setAdapter(itemModeAdapter);
 
+		int rememberedItemMode = FilterMemory.getInt(this, "NetProfitReport", "item_mode", 0);
+		spinner_item_mode.setSelection(rememberedItemMode);
+		selectedItemMode = rememberedItemMode;
+		itemProfitAdapter.setStandingMarginMode(selectedItemMode == ITEM_MODE_STANDING_MARGIN);
+
 		spinner_item_mode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
 				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
 
 					selectedItemMode = position;
 					itemProfitAdapter.setStandingMarginMode(selectedItemMode == ITEM_MODE_STANDING_MARGIN);
+
+					FilterMemory.setInt(
+						NetProfitReportActivity.this, "NetProfitReport", "item_mode", position
+					);
 
 					loadReport();
 				}
@@ -172,10 +181,17 @@ public class NetProfitReportActivity extends Activity {
 		itemSortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 		spinner_item_sort.setAdapter(itemSortAdapter);
 
+		int rememberedItemSort = FilterMemory.getInt(this, "NetProfitReport", "item_sort", 0);
+		spinner_item_sort.setSelection(rememberedItemSort);
+		itemSortAscending = rememberedItemSort == 1;
+
 		spinner_item_sort.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
 				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
 					itemSortAscending = position == 1;
+					FilterMemory.setInt(
+						NetProfitReportActivity.this, "NetProfitReport", "item_sort", position
+					);
 					loadReport();
 				}
 
@@ -192,6 +208,14 @@ public class NetProfitReportActivity extends Activity {
 		shoesFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 		spinner_item_shoes_filter.setAdapter(shoesFilterAdapter);
 
+		int rememberedShoesFilter = FilterMemory.getInt(this, "NetProfitReport", "shoes_filter", 0);
+		spinner_item_shoes_filter.setSelection(rememberedShoesFilter);
+
+		selectedShoesFilter =
+			rememberedShoesFilter == 1 ? DatabaseHelper.SHOES_FILTER_SHOES_ONLY :
+			rememberedShoesFilter == 2 ? DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY :
+			DatabaseHelper.SHOES_FILTER_ALL;
+
 		spinner_item_shoes_filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
 				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -200,6 +224,10 @@ public class NetProfitReportActivity extends Activity {
 						position == 1 ? DatabaseHelper.SHOES_FILTER_SHOES_ONLY :
 						position == 2 ? DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY :
 						DatabaseHelper.SHOES_FILTER_ALL;
+
+					FilterMemory.setInt(
+						NetProfitReportActivity.this, "NetProfitReport", "shoes_filter", position
+					);
 
 					loadReport();
 				}

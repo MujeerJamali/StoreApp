@@ -89,10 +89,19 @@ public class SlowMovingStockReportActivity extends Activity {
 		windowAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 		spinner_window.setAdapter(windowAdapter);
 
+		int rememberedWindowPosition =
+			FilterMemory.getInt(this, "SlowMovingStockReport", "window", 0);
+
+		spinner_window.setSelection(rememberedWindowPosition);
+		selectedWindowDays = WINDOW_DAYS[rememberedWindowPosition];
+
 		spinner_window.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
 				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
 					selectedWindowDays = WINDOW_DAYS[position];
+					FilterMemory.setInt(
+						SlowMovingStockReportActivity.this, "SlowMovingStockReport", "window", position
+					);
 					loadReport();
 				}
 

@@ -112,10 +112,17 @@ public class Itemrankingreportactivity extends Activity {
 		sortAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 		spinner_item_sort.setAdapter(sortAdapter);
 
+		int rememberedSortPosition = FilterMemory.getInt(this, "ItemRankingReport", "sort", 0);
+		spinner_item_sort.setSelection(rememberedSortPosition);
+		selectedSort = SORT_VALUES[rememberedSortPosition];
+
 		spinner_item_sort.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
 				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
 					selectedSort = SORT_VALUES[position];
+					FilterMemory.setInt(
+						Itemrankingreportactivity.this, "ItemRankingReport", "sort", position
+					);
 					loadReport();
 				}
 
@@ -131,10 +138,19 @@ public class Itemrankingreportactivity extends Activity {
 		shoesFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 		spinner_shoes_filter.setAdapter(shoesFilterAdapter);
 
+		int rememberedShoesFilterPosition =
+			FilterMemory.getInt(this, "ItemRankingReport", "shoes_filter", 0);
+
+		spinner_shoes_filter.setSelection(rememberedShoesFilterPosition);
+		selectedShoesFilter = SHOES_FILTER_VALUES[rememberedShoesFilterPosition];
+
 		spinner_shoes_filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override
 				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
 					selectedShoesFilter = SHOES_FILTER_VALUES[position];
+					FilterMemory.setInt(
+						Itemrankingreportactivity.this, "ItemRankingReport", "shoes_filter", position
+					);
 					loadReport();
 				}
 
