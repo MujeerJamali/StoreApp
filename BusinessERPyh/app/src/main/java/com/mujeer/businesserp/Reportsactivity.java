@@ -27,6 +27,7 @@ public class Reportsactivity extends Activity {
 	Button btn_report_dead_stock_aging;
 	Button btn_report_margin_profit_alerts;
 	Button btn_report_size_curve;
+	Button btn_report_expense_ratio_trend;
 	Button btn_report_month_over_month;
 	Button btn_report_item_monthly_rank;
 	Button btn_report_average_cart;
@@ -65,6 +66,7 @@ public class Reportsactivity extends Activity {
 		btn_report_dead_stock_aging = findViewById(R.id.btn_report_dead_stock_aging);
 		btn_report_margin_profit_alerts = findViewById(R.id.btn_report_margin_profit_alerts);
 		btn_report_size_curve = findViewById(R.id.btn_report_size_curve);
+		btn_report_expense_ratio_trend = findViewById(R.id.btn_report_expense_ratio_trend);
 		btn_report_month_over_month = findViewById(R.id.btn_report_month_over_month);
 		btn_report_item_monthly_rank = findViewById(R.id.btn_report_item_monthly_rank);
 		btn_report_average_cart = findViewById(R.id.btn_report_average_cart);
@@ -313,6 +315,19 @@ public class Reportsactivity extends Activity {
 					Intent intent = new Intent(
 						Reportsactivity.this,
 						SizeCurveAnalysisReportActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_report_expense_ratio_trend.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						Reportsactivity.this,
+						ExpenseRatioTrendReportActivity.class
 					);
 
 					startActivity(intent);

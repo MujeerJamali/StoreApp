@@ -877,6 +877,48 @@ public class Expenseeditactivity extends Activity {
 			return;
 		}
 
+		// Unusually-high flag - a warning, not a rejection, since a
+		// genuinely bigger expense for this category is entirely
+		// possible; needs at least 3 prior entries for this exact item
+		// before an average means anything, so a brand-new category
+		// never gets flagged on its first few uses.
+		HashMap<String, Object> stats = db.getExpenseAmountStatsForItem(item, expenseId);
+
+		int priorCount = (Integer) stats.get("count");
+		double average = (Double) stats.get("average");
+
+		if (priorCount >= 3 && average > 0.01 && amount > average * 2.5) {
+
+			final String finalItem = item;
+			final double finalAmount = amount;
+			final double finalPaidAmount = paidAmount;
+			final int finalPartyId = partyId;
+
+			new android.app.AlertDialog.Builder(this)
+				.setTitle("Unusually High Expense")
+				.setMessage(
+					"This is " + AmountFormat.format(amount) + " - well above the usual " +
+					AmountFormat.format(average) + " for \"" + item + "\" (over the last " +
+					priorCount + " entries). Save it anyway?"
+				)
+				.setPositiveButton("Save Anyway", new android.content.DialogInterface.OnClickListener() {
+						@Override
+						public void onClick(android.content.DialogInterface dialog, int which) {
+							doSaveExpense(finalItem, finalAmount, finalPaidAmount, finalPartyId);
+						}
+					}
+				)
+				.setNegativeButton("Cancel", null)
+				.show();
+
+			return;
+		}
+
+		doSaveExpense(item, amount, paidAmount, partyId);
+	}
+
+	private void doSaveExpense(String item, double amount, double paidAmount, int partyId) {
+
 		boolean success;
 		long savedExpenseId = expenseId;
 

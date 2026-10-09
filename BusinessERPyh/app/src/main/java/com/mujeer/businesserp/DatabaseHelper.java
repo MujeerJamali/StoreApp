@@ -8611,6 +8611,48 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return result;
 	}
 
+	// Average amount + how many prior expenses this exact item text has,
+	// excluding excludeExpenseId (the one being edited, if any) - used
+	// to flag a new/edited expense that's unusually high for its own
+	// category (Expenseeditactivity.saveExpense()). count is 0 and
+	// average is 0 when this item has never been used before (or only
+	// by the entry being edited).
+	public HashMap<String, Object> getExpenseAmountStatsForItem(String item, int excludeExpenseId) {
+
+		HashMap<String, Object> stats = new HashMap<String, Object>();
+
+		if (item == null || item.trim().length() == 0) {
+
+			stats.put("average", 0.0);
+			stats.put("count", 0);
+
+			return stats;
+		}
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT AVG(amount), COUNT(*) FROM " + TABLE_EXPENSES +
+			" WHERE item=? AND id != ?",
+			new String[]{item.trim(), String.valueOf(excludeExpenseId)}
+		);
+
+		double average = 0;
+		int count = 0;
+
+		if (cursor.moveToFirst() && !cursor.isNull(0)) {
+			average = cursor.getDouble(0);
+			count = cursor.getInt(1);
+		}
+
+		cursor.close();
+
+		stats.put("average", average);
+		stats.put("count", count);
+
+		return stats;
+	}
+
 // =====================
 // GET ALL EXPENSES
 // =====================
@@ -10528,6 +10570,71 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			" AND id NOT IN (SELECT expense_id FROM " + TABLE_PURCHASE_EXPENSE_LINKS + ")",
 			new String[]{fromDate, toDate}
 		);
+	}
+
+	// =====================
+	// EXPENSE RATIO TREND - Expenses as a % of Sales for each of the
+	// last `months` calendar months, oldest first (the current month is
+	// included even though it's partial, same "1st through today"
+	// convention Month-over-Month uses elsewhere). A rising ratio means
+	// expenses are growing faster than sales - worth watching even when
+	// both totals are individually growing.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getExpenseRatioTrend(int months) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+		SimpleDateFormat monthFormat = new SimpleDateFormat("MMM yyyy", Locale.getDefault());
+
+		Calendar monthStart = Calendar.getInstance();
+		monthStart.set(Calendar.DAY_OF_MONTH, 1);
+		monthStart.set(Calendar.HOUR_OF_DAY, 0);
+		monthStart.set(Calendar.MINUTE, 0);
+		monthStart.set(Calendar.SECOND, 0);
+		monthStart.set(Calendar.MILLISECOND, 0);
+
+		// Walk back so the oldest month in the window is first.
+		monthStart.add(Calendar.MONTH, -(months - 1));
+
+		for (int i = 0; i < months; i++) {
+
+			Calendar monthEnd = (Calendar) monthStart.clone();
+			monthEnd.add(Calendar.MONTH, 1);
+			monthEnd.add(Calendar.DAY_OF_MONTH, -1);
+
+			Calendar today = Calendar.getInstance();
+
+			if (monthEnd.after(today)) {
+				monthEnd = today;
+			}
+
+			String fromDate = dateFormat.format(monthStart.getTime());
+			String toDate = dateFormat.format(monthEnd.getTime());
+
+			double salesTotal = sumColumn(
+				db, "SELECT SUM(grand_total) FROM sales WHERE date BETWEEN ? AND ?",
+				new String[]{fromDate, toDate}
+			);
+
+			double expensesTotal = getExpenseTotalForRange(fromDate, toDate);
+
+			double ratioPercent = salesTotal > 0.01 ? expensesTotal / salesTotal * 100 : 0;
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+			row.put("month_label", monthFormat.format(monthStart.getTime()));
+			row.put("sales_total", salesTotal);
+			row.put("expenses_total", expensesTotal);
+			row.put("ratio_percent", ratioPercent);
+
+			list.add(row);
+
+			monthStart.add(Calendar.MONTH, 1);
+		}
+
+		return list;
 	}
 
 	// =====================

@@ -216,7 +216,14 @@ BusinessERPyh/                  Gradle project root
   quick shortcut) - tapping one prefills Item/Amount exactly like
   picking the item from the Item autocomplete already does; the user
   still reviews and hits Save themselves, there's no direct insert
-  from the chip.
+  from the chip. **Unusually-high flag**: saving an Expense whose
+  amount is more than 2.5x the average of that same Cost Item's last
+  3+ entries (`DatabaseHelper.getExpenseAmountStatsForItem()`) shows a
+  one-tap "Save Anyway?" warning naming the usual average - a warning,
+  not a rejection, since a genuinely bigger expense is entirely
+  possible; a brand-new Cost Item with fewer than 3 prior entries is
+  never flagged, since an average of that few data points wouldn't
+  mean anything yet.
 - **Cash** — a single ledger of all cash movement (sales, purchases,
   payments, expenses, manual adjustments); tapping a row opens its real
   source transaction. **A transaction is rejected if it would take the
@@ -447,7 +454,12 @@ each item's name via `ShoeIdentity`, not a variety group, since every
 real shoe item here is already its own exact size; a size selling more
 than its share of stock is flagged as a stockout risk, one stocked
 more than it sells as cash sitting idle, anything within 3 points
-either way shown as Balanced)
+either way shown as Balanced) · Expense Ratio Trend (Expenses as a %
+of Sales for each of the last 6 calendar months, oldest first - a
+rising ratio means expenses are growing faster than sales, worth
+watching even when both totals are individually growing; each month's
+badge is colored by whether its ratio improved or worsened vs the
+month before it)
 
 Every report list row that represents an item or a party is tappable
 and opens that item's or party's own screen (Net Profit, Item Ranking,

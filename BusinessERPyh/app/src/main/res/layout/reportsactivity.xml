@@ -238,6 +238,16 @@
             android:background="@color/stroke" />
 
         <Button
+            android:id="@+id/btn_report_expense_ratio_trend"
+            style="@style/ToolRow"
+            android:text="Expense Ratio Trend" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
             android:id="@+id/btn_report_month_over_month"
             style="@style/ToolRow"
             android:text="Month-over-Month" />
