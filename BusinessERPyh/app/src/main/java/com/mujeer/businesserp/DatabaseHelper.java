@@ -5838,6 +5838,109 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// REPORT: STOCK VALUE BY CATEGORY/AGE - "where's my money tied up".
+	// Category here is the first word of the item's name - there's no
+	// formal category field, but this shop's naming convention already
+	// groups every shoe item under "Shoes ..." the same way Stock Worth
+	// above does, and buckets everything else by whatever word the user
+	// starts each item's name with. Age is how long since the item's
+	// last sale (same signal as Slow-Moving Stock) - 0-30/31-60/61-90/
+	// 90+ days, or Never Sold - a rough proxy for how long that stock
+	// has realistically been sitting, since nothing tracks purchase-
+	// batch-level aging. Both breakdowns slice the exact same total
+	// (current stock value = balance * purchase_price, every active
+	// item with stock > 0) two different ways.
+	// =====================
+	public HashMap<String, Object> getStockValueByCategoryAndAge() {
+
+		HashMap<String, Object> result = new HashMap<String, Object>();
+
+		LinkedHashMap<String, Double> byCategory = new LinkedHashMap<String, Double>();
+
+		LinkedHashMap<String, Double> byAge = new LinkedHashMap<String, Double>();
+		byAge.put("0-30 Days", 0.0);
+		byAge.put("31-60 Days", 0.0);
+		byAge.put("61-90 Days", 0.0);
+		byAge.put("90+ Days", 0.0);
+		byAge.put("Never Sold", 0.0);
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT i.name, i.balance, i.purchase_price, MAX(s.date) AS last_sale_date " +
+			"FROM " + TABLE_ITEMS + " i " +
+			"LEFT JOIN sale_items si ON si.item_id = i.id " +
+			"LEFT JOIN sales s ON s.id = si.sale_id " +
+			"WHERE i.active = 1 AND i.balance > 0 " +
+			"GROUP BY i.id",
+			null
+		);
+
+		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+		long todayMillis = new Date().getTime();
+
+		double totalValue = 0;
+
+		while (cursor.moveToNext()) {
+
+			String name = cursor.getString(0);
+			double balance = cursor.getDouble(1);
+			double purchasePrice = cursor.getDouble(2);
+			String lastSaleDate = cursor.isNull(3) ? null : cursor.getString(3);
+
+			double value = balance * purchasePrice;
+			totalValue += value;
+
+			String category =
+				(name == null || name.trim().isEmpty()) ? "Other" : name.trim().split("\\s+")[0];
+
+			Double existingCategoryValue = byCategory.get(category);
+			byCategory.put(category, (existingCategoryValue == null ? 0.0 : existingCategoryValue) + value);
+
+			String ageBucket;
+
+			if (lastSaleDate == null) {
+
+				ageBucket = "Never Sold";
+
+			} else {
+
+				int daysSince;
+
+				try {
+
+					long diffMillis = todayMillis - dateFormat.parse(lastSaleDate).getTime();
+					daysSince = (int) (diffMillis / (1000L * 60 * 60 * 24));
+
+				} catch (Exception e) {
+
+					daysSince = 0;
+				}
+
+				if (daysSince <= 30) {
+					ageBucket = "0-30 Days";
+				} else if (daysSince <= 60) {
+					ageBucket = "31-60 Days";
+				} else if (daysSince <= 90) {
+					ageBucket = "61-90 Days";
+				} else {
+					ageBucket = "90+ Days";
+				}
+			}
+
+			byAge.put(ageBucket, byAge.get(ageBucket) + value);
+		}
+
+		cursor.close();
+
+		result.put("total_value", totalValue);
+		result.put("by_category", byCategory);
+		result.put("by_age", byAge);
+
+		return result;
+	}
+
+	// =====================
 	// REPORT: ITEM MONTHLY RANK-OF-RANKS
 	//
 	// For each calendar month touched by the date range, every item

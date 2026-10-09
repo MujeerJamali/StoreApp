@@ -367,7 +367,14 @@ stock as above but with a suggested discount tier - 10% at 30-59 days
 since last sale, 20% at 60-89, 30% at 90+ or never sold - and Stop
 Restocking is every active item currently selling at or below its own
 cost basis, i.e. restocking it at today's prices would be a loss;
-tapping a row opens that item) · Month-over-Month (This Month, 1st through
+tapping a row opens that item) · Stock Value (where current stock
+value - balance x purchase price, every active item with stock - is
+tied up, sliced two ways from the same total: by category, the first
+word of each item's name since there's no separate category field
+(naturally groups every "Shoes ..." item the same way Stock Worth
+does), and by age, days since last sale in the same 0-30/31-60/
+61-90/90+/Never Sold buckets Slow-Moving Stock uses; both lists
+sorted highest-value-first) · Month-over-Month (This Month, 1st through
 today, vs the full previous calendar month, for Sales/Net Profit/
 Expenses - each with its change and % change, colored green/red by
 whether that change is actually an improvement; Expenses is the one
