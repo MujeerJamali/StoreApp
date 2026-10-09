@@ -386,7 +386,11 @@ sorted highest-value-first) · Month-over-Month (This Month, 1st through
 today, vs the full previous calendar month, for Sales/Net Profit/
 Expenses - each with its change and % change, colored green/red by
 whether that change is actually an improvement; Expenses is the one
-metric where a decrease is the improvement)
+metric where a decrease is the improvement; below that, a Sales by
+Category breakdown of the same two periods - category is the first
+word of each sold item's name, same proxy as Stock Value's - listing
+every category seen in either period sorted by the size of its
+change, not just a top few)
 
 Every report list row that represents an item or a party is tappable
 and opens that item's or party's own screen (Net Profit, Item Ranking,

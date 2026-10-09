@@ -5000,6 +5000,44 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// SALES BY CATEGORY FOR RANGE - "category" is the first word of each
+	// sold item's name, the same proxy Stock Value's by-category
+	// breakdown uses (there's no formal category field). Used by
+	// Month-over-Month's category comparison, called once per period.
+	// =====================
+	public LinkedHashMap<String, Double> getSalesByCategoryForRange(String fromDate, String toDate) {
+
+		LinkedHashMap<String, Double> result = new LinkedHashMap<String, Double>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT i.name, SUM(si.amount) FROM sale_items si " +
+			"INNER JOIN sales s ON s.id = si.sale_id " +
+			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = si.item_id " +
+			"WHERE s.date BETWEEN ? AND ? " +
+			"GROUP BY i.id",
+			new String[]{fromDate, toDate}
+		);
+
+		while (cursor.moveToNext()) {
+
+			String name = cursor.getString(0);
+			double amount = cursor.getDouble(1);
+
+			String category =
+				(name == null || name.trim().isEmpty()) ? "Other" : name.trim().split("\\s+")[0];
+
+			Double existing = result.get(category);
+			result.put(category, (existing == null ? 0.0 : existing) + amount);
+		}
+
+		cursor.close();
+
+		return result;
+	}
+
+	// =====================
 	// REPORT: NET PROFIT BY ITEM - the same Net Profit period, broken
 	// down per item (only items with at least one sale in the period -
 	// the INNER JOINs below drop everything else on their own). Same

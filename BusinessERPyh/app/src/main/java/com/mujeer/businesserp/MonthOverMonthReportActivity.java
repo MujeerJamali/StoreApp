@@ -2,13 +2,19 @@ package com.mujeer.businesserp;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
+import java.util.TreeSet;
 
 // =====================
 // This Month (1st through today) vs Last Month (the full previous
@@ -36,6 +42,8 @@ public class MonthOverMonthReportActivity extends Activity {
 	private TextView tv_expenses_delta;
 
 	private SimpleBarChartView chart_month_over_month;
+
+	private LinearLayout container_category_comparison;
 
 	private DatabaseHelper db;
 
@@ -76,6 +84,8 @@ public class MonthOverMonthReportActivity extends Activity {
 		tv_expenses_delta = findViewById(R.id.tv_expenses_delta);
 
 		chart_month_over_month = findViewById(R.id.chart_month_over_month);
+
+		container_category_comparison = findViewById(R.id.container_category_comparison);
 
 		db = new DatabaseHelper(this);
 
@@ -120,6 +130,12 @@ public class MonthOverMonthReportActivity extends Activity {
 					final HashMap<String, Object> lastSummary =
 						db.getNetProfitSummary(lastFrom, lastTo);
 
+					final LinkedHashMap<String, Double> categoryThis =
+						db.getSalesByCategoryForRange(thisFrom, thisTo);
+
+					final LinkedHashMap<String, Double> categoryLast =
+						db.getSalesByCategoryForRange(lastFrom, lastTo);
+
 					runOnUiThread(new Runnable() {
 							@Override
 							public void run() {
@@ -131,6 +147,7 @@ public class MonthOverMonthReportActivity extends Activity {
 								tv_month_labels.setText(thisMonthLabel + " vs " + lastMonthLabel);
 
 								applyReport(thisSummary, lastSummary);
+								applyCategoryComparison(categoryThis, categoryLast);
 							}
 						});
 				}
@@ -222,5 +239,88 @@ public class MonthOverMonthReportActivity extends Activity {
 		target.setTextColor(
 			getResources().getColor(isImprovement ? R.color.success : R.color.danger)
 		);
+	}
+
+	// Merges every category seen in either period (a category with
+	// sales only last month, e.g. something that's stopped selling, is
+	// just as worth surfacing as one only seen this month), sorts by
+	// the size of the change, and shows all of them - this report's
+	// category list is always small enough that there's no need to cap
+	// it to a "top N".
+	private void applyCategoryComparison(
+		LinkedHashMap<String, Double> categoryThis, LinkedHashMap<String, Double> categoryLast) {
+
+		container_category_comparison.removeAllViews();
+
+		TreeSet<String> allCategories = new TreeSet<String>(categoryThis.keySet());
+		allCategories.addAll(categoryLast.keySet());
+
+		ArrayList<Map.Entry<String, Double>> deltas = new ArrayList<Map.Entry<String, Double>>();
+
+		for (String category : allCategories) {
+
+			double thisValue = categoryThis.containsKey(category) ? categoryThis.get(category) : 0.0;
+			double lastValue = categoryLast.containsKey(category) ? categoryLast.get(category) : 0.0;
+
+			deltas.add(new java.util.AbstractMap.SimpleEntry<String, Double>(
+				category, thisValue - lastValue
+			));
+		}
+
+		java.util.Collections.sort(
+			deltas,
+			new java.util.Comparator<Map.Entry<String, Double>>() {
+				@Override
+				public int compare(Map.Entry<String, Double> a, Map.Entry<String, Double> b) {
+					return Double.compare(Math.abs(b.getValue()), Math.abs(a.getValue()));
+				}
+			}
+		);
+
+		for (int i = 0; i < deltas.size(); i++) {
+
+			String category = deltas.get(i).getKey();
+			double delta = deltas.get(i).getValue();
+
+			double thisValue = categoryThis.containsKey(category) ? categoryThis.get(category) : 0.0;
+			double lastValue = categoryLast.containsKey(category) ? categoryLast.get(category) : 0.0;
+
+			View row = LayoutInflater.from(this).inflate(
+				R.layout.discount_stop_restock_row, container_category_comparison, false
+			);
+
+			TextView tv_name = row.findViewById(R.id.tv_row_name);
+			TextView tv_detail = row.findViewById(R.id.tv_row_detail);
+			TextView tv_badge = row.findViewById(R.id.tv_row_badge);
+
+			tv_name.setText(category);
+
+			tv_detail.setText(
+				"This: " + AmountFormat.format(thisValue) + "  Last: " + AmountFormat.format(lastValue)
+			);
+
+			tv_badge.setText(
+				(delta >= 0 ? "+" : "") + AmountFormat.format(delta)
+			);
+
+			tv_badge.setTextColor(
+				getResources().getColor(delta >= 0 ? R.color.success : R.color.danger)
+			);
+
+			container_category_comparison.addView(row);
+
+			if (i < deltas.size() - 1) {
+
+				View divider = new View(this);
+
+				divider.setLayoutParams(new LinearLayout.LayoutParams(
+					LinearLayout.LayoutParams.MATCH_PARENT, 1
+				));
+
+				divider.setBackgroundColor(getResources().getColor(R.color.stroke));
+
+				container_category_comparison.addView(divider);
+			}
+		}
 	}
 }
