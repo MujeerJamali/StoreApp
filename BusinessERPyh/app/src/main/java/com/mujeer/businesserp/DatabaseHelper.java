@@ -10403,6 +10403,22 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		db.delete(TABLE_DRAFTS, null, null);
 		db.delete(TABLE_DISPLAY_SHOES, null, null);
 		db.delete(TABLE_SAMPLE_SHOES, null, null);
+
+		// item_clearance/loyalty_points_ledger/reorder_suggestion_log all
+		// key off item_id/party_id, both wiped and reinserted with fresh
+		// ids right below - left uncleared, these would silently
+		// strand (orphaned rows pointing at an id nothing reuses) or
+		// worse, misattach to whatever different item/party the backup
+		// happens to reassign that same id to next. item_clearance and
+		// loyalty_points_ledger are both restored fresh from the backup
+		// right after this method returns (see importItemClearance()/
+		// importLoyaltyPoints()); reorder_suggestion_log is never part
+		// of the Vyapar round-trip at all (see its own Vyapar-inclusion
+		// comment), so it simply starts empty on the restored side.
+		db.delete(TABLE_ITEM_CLEARANCE, null, null);
+		db.delete(TABLE_LOYALTY_POINTS, null, null);
+		db.delete(TABLE_REORDER_SUGGESTION_LOG, null, null);
+
 		db.delete(TABLE_ITEMS, null, null);
 		db.delete(TABLE_PARTIES, null, null);
 		db.delete(TABLE_IMPORT_LOG, null, null);
