@@ -84,6 +84,34 @@ BusinessERPyh/                  Gradle project root
   already-deleted data's temporary echo with no analog in Vyapar, not
   standing user data like a Draft, and its snapshot's embedded
   party_id/item_id values are only meaningful in this exact database.
+- **Reorder List** (Dashboard Tools card, pinnable as a Favorite) —
+  what's worth restocking right now, computed by `DatabaseHelper.
+  getReorderSuggestions()` from each item's (or, for a variety item,
+  each individual combo's - a size 8 and size 9 of the same shoe are
+  reordered separately) recent sales speed vs its current stock, using
+  every input in **Reorder Settings** (gear icon on the same screen):
+  the sales-speed window, a safety-stock %, a default supplier lead
+  time, and a min/max order quantity - all user-editable, with
+  reasonable defaults, not hardcoded. A unit with no sales history
+  still qualifies if its own manual Reorder Threshold (Edit Item
+  screen) says it's low, the same signal the Low Stock report uses.
+  Nothing on this screen is final: each suggestion's quantity is a
+  plain editable field, a checkbox excludes it, and "Ignore" dismisses
+  it outright - only checked rows get used by **Convert Checked to
+  Draft Purchase(s)**, which groups them by their inferred supplier
+  (each item's most recent Purchase's party) and creates one draft
+  Purchase per supplier, still needing to be opened from Drafts and
+  actually saved before it touches stock or cash. If cash-awareness is
+  on (Reorder Settings, default on), converting a batch that would
+  exceed the available cash - either the real live balance or a
+  manually entered figure, the user's choice - asks for confirmation
+  first rather than silently blocking it. Every accept/ignore decision
+  is logged to `reorder_suggestion_log` for a future pass to read back
+  and improve future suggestions from (e.g. a suggestion that was
+  ignored repeatedly, or that led to overstock); that log is
+  deliberately **not** part of the Vyapar backup round-trip, same
+  reasoning as Recently Deleted above - it's the automation's own
+  operational memory, not a business record.
 - **Cost Items / Linking Expenses to Purchases** — Expenses double as the
   source of a purchase's landed costs (petrol, shipping, packaging, ...);
   there's no separate "Purchase Cost" record to create. Cost Items is

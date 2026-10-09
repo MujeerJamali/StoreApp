@@ -73,7 +73,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // backs the Low Stock report/notification.
     // Bumped 23 -> 24 to add the recently_deleted table - backs the
     // Recently Deleted/undo screen for Purchases/Sales.
-    public static final int DATABASE_VERSION = 24;
+    // Bumped 24 -> 25 to add reorder_suggestion_log - backs the Reorder
+    // List's learning loop (see getReorderSuggestions()/
+    // recordReorderDecision()). Deliberately NOT included in the Vyapar
+    // export/import round-trip, same reasoning as recently_deleted
+    // below: it's the automation's own operational memory, not a
+    // business record - a restore starts the learning loop fresh
+    // rather than needing to carry it across.
+    public static final int DATABASE_VERSION = 25;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -153,6 +160,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// buildSaleSnapshot()/buildPurchaseSnapshot() and
 	// restoreSaleFromSnapshot()/restorePurchaseFromSnapshot().
 	public static final String TABLE_RECENTLY_DELETED = "recently_deleted";
+
+	// See DATABASE_VERSION's bump comment above for what this tracks and
+	// why it's excluded from the Vyapar round-trip.
+	public static final String TABLE_REORDER_SUGGESTION_LOG = "reorder_suggestion_log";
 
 	public static final String DRAFT_TYPE_SALE = "sale";
 	public static final String DRAFT_TYPE_PURCHASE = "purchase";
@@ -488,6 +499,27 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
 			"item_id INTEGER NOT NULL, " +
 			"combo_id INTEGER NOT NULL" +
+			")"
+		);
+
+		// One row per reorder suggestion ever shown, and what happened to
+		// it - backs the learning loop in getReorderSuggestions(). outcome
+		// is one of "accepted" (converted to a draft purchase), "ignored"
+		// (left unconverted past its own suggested_date), "overstocked"
+		// (set later, if the item is still sitting on stock well above
+		// its threshold a while after this suggestion), or
+		// "ran_out_before_restock" (set later, if the item hit zero stock
+		// before a following purchase arrived). null outcome = not yet
+		// resolved either way.
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_REORDER_SUGGESTION_LOG + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"item_id INTEGER NOT NULL, " +
+			"combo_id INTEGER, " +
+			"suggested_date TEXT NOT NULL, " +
+			"suggested_qty REAL NOT NULL, " +
+			"outcome TEXT, " +
+			"outcome_date TEXT" +
 			")"
 		);
 
@@ -5076,6 +5108,245 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		cursor.close();
 
 		return list;
+	}
+
+	// =====================
+	// REORDER SUGGESTIONS - see ReorderSettings for every formula input
+	// this uses, and that class's own comment for why they're
+	// SharedPreferences rather than a database table.
+	//
+	// Operates per sellable unit, not per parent item: a shoe-style item
+	// with variety combos (Gender/Type/Sole/Upper/Design/Color/Size all
+	// bundled into one combo - see TABLE_VARIETY_COMBOS) gets one
+	// suggestion per combo it actually carries, since a size 8 and a
+	// size 9 of the same model are different things to reorder. An item
+	// with no variety groups at all is its own single unit.
+	//
+	// For each unit:
+	//   velocity = units sold in the last velocityWindowDays / that many days
+	//   leadTimeDemand = velocity * leadTimeDays
+	//   reorderPoint = leadTimeDemand * (1 + safetyStockPercent/100)
+	//   suggestedQty = (reorderPoint + leadTimeDemand) - currentStock,
+	//     i.e. replenish back up to covering one full lead time beyond
+	//     the reorder point, then clamped to [minOrderQty, maxOrderQty]
+	//     (maxOrderQty 0 = uncapped)
+	//
+	// A unit also qualifies with zero sales history if its *item*-level
+	// manual reorder_threshold (Itemseditactivity) is set and its own
+	// stock is at or below it - the same signal the Low Stock report
+	// already uses above, kept as a floor so a unit with too little
+	// history to compute a velocity still gets suggested once flagged.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getReorderSuggestions(Context context) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		int velocityWindowDays = ReorderSettings.getVelocityWindowDays(context);
+		double safetyStockPercent = ReorderSettings.getSafetyStockPercent(context);
+		int leadTimeDays = ReorderSettings.getDefaultLeadTimeDays(context);
+		double minOrderQty = ReorderSettings.getMinOrderQty(context);
+		double maxOrderQty = ReorderSettings.getMaxOrderQty(context);
+
+		Calendar windowStart = Calendar.getInstance();
+		windowStart.add(Calendar.DAY_OF_MONTH, -velocityWindowDays);
+
+		String windowStartDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+			.format(windowStart.getTime());
+
+		Cursor itemCursor = db.rawQuery(
+			"SELECT id, code, name, balance, purchase_price, reorder_threshold FROM " +
+			TABLE_ITEMS + " WHERE active = 1",
+			null
+		);
+
+		while (itemCursor.moveToNext()) {
+
+			int itemId = itemCursor.getInt(0);
+			String code = itemCursor.getString(1);
+			String name = itemCursor.getString(2);
+			double itemBalance = itemCursor.getDouble(3);
+			double purchasePrice = itemCursor.getDouble(4);
+			double manualThreshold = itemCursor.getDouble(5);
+
+			ArrayList<HashMap<String, Object>> combos = getVarietyCombos(itemId);
+
+			if (combos.isEmpty()) {
+
+				HashMap<String, Object> suggestion = buildReorderSuggestion(
+					db, itemId, 0, null, code, name, itemBalance, purchasePrice,
+					manualThreshold, windowStartDate, velocityWindowDays, leadTimeDays,
+					safetyStockPercent, minOrderQty, maxOrderQty
+				);
+
+				if (suggestion != null) {
+					list.add(suggestion);
+				}
+
+			} else {
+
+				for (HashMap<String, Object> combo : combos) {
+
+					int comboId = (Integer) combo.get("id");
+					double comboBalance = (Double) combo.get("balance");
+					String comboLabel = (String) combo.get("label");
+
+					HashMap<String, Object> suggestion = buildReorderSuggestion(
+						db, itemId, comboId, comboLabel, code, name, comboBalance,
+						purchasePrice, manualThreshold, windowStartDate,
+						velocityWindowDays, leadTimeDays, safetyStockPercent,
+						minOrderQty, maxOrderQty
+					);
+
+					if (suggestion != null) {
+						list.add(suggestion);
+					}
+				}
+			}
+		}
+
+		itemCursor.close();
+
+		Collections.sort(list, new Comparator<HashMap<String, Object>>() {
+			@Override
+			public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+				return String.valueOf(a.get("name"))
+					.compareToIgnoreCase(String.valueOf(b.get("name")));
+			}
+		});
+
+		return list;
+	}
+
+	private HashMap<String, Object> buildReorderSuggestion(
+		SQLiteDatabase db, int itemId, int comboId, String comboLabel, String code,
+		String name, double currentStock, double purchasePrice, double manualThreshold,
+		String windowStartDate, int velocityWindowDays, int leadTimeDays,
+		double safetyStockPercent, double minOrderQty, double maxOrderQty) {
+
+		double unitsSold;
+
+		if (comboId > 0) {
+
+			unitsSold = sumColumn(
+				db,
+				"SELECT COALESCE(SUM(si.qty), 0) FROM sale_items si " +
+				"INNER JOIN sales s ON s.id = si.sale_id " +
+				"WHERE si.combo_id = ? AND s.date >= ?",
+				new String[]{String.valueOf(comboId), windowStartDate}
+			);
+
+		} else {
+
+			unitsSold = sumColumn(
+				db,
+				"SELECT COALESCE(SUM(si.qty), 0) FROM sale_items si " +
+				"INNER JOIN sales s ON s.id = si.sale_id " +
+				"WHERE si.item_id = ? AND (si.combo_id IS NULL OR si.combo_id = 0) " +
+				"AND s.date >= ?",
+				new String[]{String.valueOf(itemId), windowStartDate}
+			);
+		}
+
+		double velocity = unitsSold / velocityWindowDays;
+		double leadTimeDemand = velocity * leadTimeDays;
+		double reorderPoint = leadTimeDemand * (1 + safetyStockPercent / 100.0);
+
+		boolean belowVelocityReorderPoint = velocity > 0 && currentStock <= reorderPoint;
+		boolean belowManualThreshold =
+			manualThreshold > 0 && currentStock <= manualThreshold;
+
+		if (!belowVelocityReorderPoint && !belowManualThreshold) {
+			return null;
+		}
+
+		double targetStock = Math.max(reorderPoint + leadTimeDemand, manualThreshold);
+		double suggestedQty = targetStock - currentStock;
+
+		if (suggestedQty <= 0) {
+			return null;
+		}
+
+		if (suggestedQty < minOrderQty) {
+			suggestedQty = minOrderQty;
+		}
+
+		if (maxOrderQty > 0 && suggestedQty > maxOrderQty) {
+			suggestedQty = maxOrderQty;
+		}
+
+		HashMap<String, Object> supplier = getLastSupplier(db, itemId);
+
+		HashMap<String, Object> row = new HashMap<String, Object>();
+		row.put("item_id", itemId);
+		row.put("combo_id", comboId > 0 ? comboId : null);
+		row.put("combo_label", comboLabel);
+		row.put("code", code);
+		row.put("name", name);
+		row.put("current_stock", currentStock);
+		row.put("velocity_per_day", velocity);
+		row.put("suggested_qty", suggestedQty);
+		row.put("estimated_cost", suggestedQty * purchasePrice);
+		row.put("supplier_party_id", supplier.get("party_id"));
+		row.put("supplier_party_name", supplier.get("party_name"));
+
+		return row;
+	}
+
+	// The supplier (party) of this item's most recent purchase, if any -
+	// used to batch the Reorder List by who you'd actually order from. An
+	// item never purchased yet (e.g. opening stock entered directly) has
+	// no supplier to infer, so it falls into its own "No Supplier" group
+	// on that screen.
+	private HashMap<String, Object> getLastSupplier(SQLiteDatabase db, int itemId) {
+
+		Cursor cursor = db.rawQuery(
+			"SELECT p.party_id, pt.name FROM " + TABLE_PURCHASE_ITEMS + " pi " +
+			"INNER JOIN " + TABLE_PURCHASES + " p ON p.id = pi.purchase_id " +
+			"INNER JOIN " + TABLE_PARTIES + " pt ON pt.id = p.party_id " +
+			"WHERE pi.item_id = ? ORDER BY p.date DESC, p.time DESC LIMIT 1",
+			new String[]{String.valueOf(itemId)}
+		);
+
+		HashMap<String, Object> result = new HashMap<String, Object>();
+
+		if (cursor.moveToFirst()) {
+			result.put("party_id", cursor.getInt(0));
+			result.put("party_name", cursor.getString(1));
+		} else {
+			result.put("party_id", null);
+			result.put("party_name", "No Supplier");
+		}
+
+		cursor.close();
+
+		return result;
+	}
+
+	// Records what happened to a shown suggestion - "accepted" when the
+	// user converts it to a draft Purchase, "ignored" when they dismiss it
+	// outright. The outcome/outcome_date columns double as the learning
+	// signal a later pass reads back (see reorder_suggestion_log's own
+	// comment) to eventually also detect "overstocked"/
+	// "ran_out_before_restock" once enough time has passed to judge those.
+	public void recordReorderDecision(
+		int itemId, Integer comboId, double suggestedQty, String outcome) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+			.format(new Date());
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.put("combo_id", comboId);
+		values.put("suggested_date", today);
+		values.put("suggested_qty", suggestedQty);
+		values.put("outcome", outcome);
+		values.put("outcome_date", today);
+
+		db.insert(TABLE_REORDER_SUGGESTION_LOG, null, values);
 	}
 
 	// =====================

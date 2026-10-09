@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView style="@style/PageTitle" android:text="Reorder Settings" />
+
+        <TextView
+            style="@style/FieldLabel"
+            android:layout_marginTop="0dp"
+            android:layout_marginBottom="12dp"
+            android:text="Every input the Reorder List's suggestion formula uses. Changes apply the next time that screen loads." />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Sales-speed window (days)" />
+            <EditText
+                android:id="@+id/et_velocity_window_days"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. 30"
+                android:inputType="number" />
+
+            <TextView style="@style/FieldLabel" android:text="Safety stock (%)" />
+            <EditText
+                android:id="@+id/et_safety_stock_percent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. 20"
+                android:inputType="numberDecimal" />
+
+            <TextView style="@style/FieldLabel" android:text="Default supplier lead time (days)" />
+            <EditText
+                android:id="@+id/et_lead_time_days"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. 7"
+                android:inputType="number" />
+
+            <TextView style="@style/FieldLabel" android:text="Minimum order quantity" />
+            <EditText
+                android:id="@+id/et_min_order_qty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. 1"
+                android:inputType="numberDecimal" />
+
+            <TextView style="@style/FieldLabel" android:text="Maximum order quantity (0 = no cap)" />
+            <EditText
+                android:id="@+id/et_max_order_qty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. 0"
+                android:inputType="numberDecimal" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <CheckBox
+                android:id="@+id/cb_cash_aware"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="Factor cash-in-hand into suggestions" />
+
+            <CheckBox
+                android:id="@+id/cb_manual_cash_override"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Use a manually entered cash amount instead of the real cash balance" />
+
+            <TextView style="@style/FieldLabel" android:text="Manual available cash" />
+            <EditText
+                android:id="@+id/et_manual_cash_amount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. 50000"
+                android:inputType="numberDecimal" />
+
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_save_reorder_settings"
+            style="@style/AppButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Save" />
+
+        <Button
+            android:id="@+id/btn_reset_reorder_settings"
+            style="@style/AppButton.Danger"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Reset to Defaults" />
+
+    </LinearLayout>
+
+</ScrollView>

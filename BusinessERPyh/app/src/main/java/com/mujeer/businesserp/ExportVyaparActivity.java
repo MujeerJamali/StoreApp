@@ -231,6 +231,14 @@ public class ExportVyaparActivity extends Activity {
 			// draft's embedded ids - carrying it over would risk
 			// restoring a transaction against the wrong party/item in
 			// the destination database.
+			//
+			// Also deliberately NOT exported: TABLE_REORDER_SUGGESTION_LOG
+			// - see its own DATABASE_VERSION bump comment in
+			// DatabaseHelper. It's the Reorder List's own operational
+			// memory (what was suggested and what happened to it), not a
+			// business record - same reasoning as recently_deleted above,
+			// and for the same id-remapping reason a restore just starts
+			// that learning loop fresh rather than carrying it over.
 
 			vyb.setTransactionSuccessful();
 			vyb.endTransaction();
