@@ -9779,6 +9779,147 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// CASH PROJECTION BY SELECTED PERIOD - like Cash Flow Forecast
+	// above, but a single from/to summary instead of a day-by-day list,
+	// and it also factors in recurring expenses expected in that window
+	// (simulated day by day with the exact same due-check logic
+	// generateDueRecurringExpenses() uses, just without actually
+	// inserting anything) and, separately, what restocking everything
+	// currently on the Reorder List would cost - shown as its own
+	// what-if line since nothing there is committed yet. See
+	// ReorderListActivity for why that cost needs a Context (reads
+	// ReorderSettings).
+	// =====================
+	public HashMap<String, Object> getCashProjection(
+		android.content.Context context, String fromDate, String toDate) {
+
+		HashMap<String, Object> result = new HashMap<String, Object>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		double startingCash = getCashBalance();
+
+		double duesIn = sumColumn(
+			db,
+			"SELECT SUM(balance) FROM sales WHERE balance > 0.01 AND due_date BETWEEN ? AND ?",
+			new String[]{fromDate, toDate}
+		);
+
+		double billsOut = sumColumn(
+			db,
+			"SELECT SUM(grand_total - amount_paid) FROM " + TABLE_PURCHASES +
+			" WHERE (grand_total - amount_paid) > 0.01 AND due_date BETWEEN ? AND ?",
+			new String[]{fromDate, toDate}
+		);
+
+		double recurringExpensesOut = getProjectedRecurringExpenseTotal(fromDate, toDate);
+
+		double reorderCostEstimate = 0;
+
+		ArrayList<HashMap<String, Object>> reorderSuggestions = getReorderSuggestions(context);
+
+		for (HashMap<String, Object> suggestion : reorderSuggestions) {
+			reorderCostEstimate += (Double) suggestion.get("estimated_cost");
+		}
+
+		double projectedCash = startingCash + duesIn - billsOut - recurringExpensesOut;
+
+		result.put("starting_cash", startingCash);
+		result.put("dues_in", duesIn);
+		result.put("bills_out", billsOut);
+		result.put("recurring_expenses_out", recurringExpensesOut);
+		result.put("projected_cash", projectedCash);
+		result.put("reorder_cost_estimate", reorderCostEstimate);
+		result.put("projected_cash_after_reorder", projectedCash - reorderCostEstimate);
+
+		return result;
+	}
+
+	// Simulates every active recurring_expenses rule day by day across
+	// [fromDate, toDate] (inclusive, capped at 366 days) using the same
+	// due-check switch generateDueRecurringExpenses() uses, summing what
+	// would be generated - a projection only, nothing is inserted.
+	private double getProjectedRecurringExpenseTotal(String fromDate, String toDate) {
+
+		ArrayList<HashMap<String, Object>> rules = getRecurringExpenses();
+
+		SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+
+		double total = 0;
+
+		for (HashMap<String, Object> rule : rules) {
+
+			if (!(Boolean) rule.get("active")) {
+				continue;
+			}
+
+			int frequency = (Integer) rule.get("frequency");
+			double amount = (Double) rule.get("amount");
+			Integer dayOfWeek = (Integer) rule.get("day_of_week");
+			Integer dayOfMonth = (Integer) rule.get("day_of_month");
+
+			HashSet<String> specificDates = new HashSet<String>();
+			String specificDatesRaw = (String) rule.get("specific_dates");
+
+			if (specificDatesRaw != null && specificDatesRaw.trim().length() > 0) {
+				for (String oneDate : specificDatesRaw.split(",")) {
+					specificDates.add(oneDate.trim());
+				}
+			}
+
+			Calendar cal = Calendar.getInstance();
+
+			try {
+				cal.setTime(isoFormat.parse(fromDate));
+			} catch (Exception e) {
+				continue;
+			}
+
+			for (int i = 0; i < RECURRING_CATCHUP_LIMIT; i++) {
+
+				String dateStr = isoFormat.format(cal.getTime());
+
+				if (dateStr.compareTo(toDate) > 0) {
+					break;
+				}
+
+				boolean due;
+
+				switch (frequency) {
+
+					case RECURRING_DAILY:
+						due = true;
+						break;
+
+					case RECURRING_WEEKLY:
+						due = dayOfWeek != null && cal.get(Calendar.DAY_OF_WEEK) == dayOfWeek;
+						break;
+
+					case RECURRING_MONTHLY:
+						due = dayOfMonth != null && isMonthlyDue(cal, dayOfMonth);
+						break;
+
+					case RECURRING_SPECIFIC_DATES:
+						due = specificDates.contains(dateStr);
+						break;
+
+					default:
+						due = false;
+						break;
+				}
+
+				if (due) {
+					total += amount;
+				}
+
+				cal.add(Calendar.DAY_OF_MONTH, 1);
+			}
+		}
+
+		return total;
+	}
+
+	// =====================
 	// DAILY SALES TREND - one row per day for the last N days (oldest
 	// first), including a day with zero sales, for the Dashboard's
 	// trend sparkline. Deliberately a plain day-by-day total (not

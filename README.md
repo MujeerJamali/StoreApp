@@ -358,6 +358,14 @@ Cash Flow Forecast
 Sales/Purchases already due on a future date - never a prediction from
 history, so a day with nothing due just carries the balance forward
 unchanged; a Next 7/14/30/60 Days horizon spinner, default 30 Days) ·
+Cash Projection (today's cash balance projected across a from/to
+period you pick, defaulting to today through +30 days - adds Sales/
+Purchases due in that exact window, plus recurring expenses expected
+to fall in it, simulated day by day with the same due-check logic
+that actually generates them, not an average; a separate "What If"
+line shows what restocking everything currently on the Reorder List
+would cost and what cash would be left after, since that's not
+committed yet - see `DatabaseHelper.getCashProjection()`) ·
 Slow-Moving Stock (every active item still carrying stock that hasn't
 sold within a 30/60/90/180 Days window, oldest/never-sold first - a
 never-sold item always qualifies regardless of how young it is; tapping

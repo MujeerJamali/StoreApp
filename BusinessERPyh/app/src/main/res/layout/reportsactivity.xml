@@ -188,6 +188,16 @@
             android:background="@color/stroke" />
 
         <Button
+            android:id="@+id/btn_report_cash_projection"
+            style="@style/ToolRow"
+            android:text="Cash Projection" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
             android:id="@+id/btn_report_month_over_month"
             style="@style/ToolRow"
             android:text="Month-over-Month" />
