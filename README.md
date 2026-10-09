@@ -120,6 +120,17 @@ BusinessERPyh/                  Gradle project root
   already-deleted data's temporary echo with no analog in Vyapar, not
   standing user data like a Draft, and its snapshot's embedded
   party_id/item_id values are only meaningful in this exact database.
+  **Undo-beyond-delete**: editing a Purchase or Sale snapshots the
+  pre-edit row + line items into the same trash the instant before
+  Update applies (`snapshotSaleBeforeEdit()`/
+  `snapshotPurchaseBeforeEdit()`, type `sale_edit`/`purchase_edit`), so
+  an accidental edit is just as undoable as a delete - the Recently
+  Deleted screen shows these mixed in with deleted entries ("Edited"
+  vs "Deleted"), and tapping one (`undoSaleEdit()`/
+  `undoPurchaseEdit()`) deletes the current edited row exactly like a
+  normal delete would, then re-inserts the pre-edit snapshot the same
+  way restoring a deletion does - so undoing an edit and restoring a
+  delete share the same re-insertion code underneath.
 - **Reorder List** (Dashboard Tools card, pinnable as a Favorite) —
   what's worth restocking right now, computed by `DatabaseHelper.
   getReorderSuggestions()` from each item's (or, for a variety item,

@@ -11,8 +11,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 // List adapter for RecentlyDeletedActivity - each row is one deleted
-// Purchase/Sale still in the trash. Tap restores it, long-press
-// permanently deletes it (see the Activity's own listeners).
+// OR edited Purchase/Sale still in the trash. Tap restores/undoes it,
+// long-press permanently deletes it (see the Activity's own
+// listeners).
 public class RecentlyDeletedAdapter extends BaseAdapter {
 
 	private final Activity activity;
@@ -57,9 +58,13 @@ public class RecentlyDeletedAdapter extends BaseAdapter {
 
 		String type = (String) row.get("type");
 
+		boolean isPurchase = "purchase".equals(type) || "purchase_edit".equals(type);
+		boolean isEdit = "sale_edit".equals(type) || "purchase_edit".equals(type);
+
 		tv_meta.setText(
-			(("purchase".equals(type)) ? "Purchase" : "Sale") +
-			" · Deleted " + RelativeDate.format((String) row.get("deleted_date"))
+			(isPurchase ? "Purchase" : "Sale") +
+			(isEdit ? " · Edited " : " · Deleted ") +
+			RelativeDate.format((String) row.get("deleted_date"))
 		);
 
 		return convertView;

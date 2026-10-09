@@ -3250,6 +3250,13 @@ public class Transactioneditactivity extends Activity {
 
 				purchaseId = transactionId;
 
+			// Snapshot the pre-edit row/items so this update can be
+			// undone from Recently Deleted (see
+			// DatabaseHelper.snapshotPurchaseBeforeEdit()/undoPurchaseEdit()) -
+			// must happen before updatePurchase()/deletePurchaseItems()
+			// below change anything.
+			db.snapshotPurchaseBeforeEdit(purchaseId);
+
 			boolean success = db.updatePurchase(
 			purchaseId,
 		partyId,
@@ -4402,6 +4409,13 @@ public class Transactioneditactivity extends Activity {
 			"due_date",
 			(subtotal - paidAmount) > 0.01 ? et_due_date.getText().toString().trim() : null
 		);
+
+		// Snapshot the pre-edit row/items so this update can be undone
+		// from Recently Deleted (see
+		// DatabaseHelper.snapshotSaleBeforeEdit()/undoSaleEdit()) - must
+		// happen before updateSale()/deleteSaleItems() below change
+		// anything.
+		db.snapshotSaleBeforeEdit(transactionId);
 
 		db.updateSale(
 			transactionId,

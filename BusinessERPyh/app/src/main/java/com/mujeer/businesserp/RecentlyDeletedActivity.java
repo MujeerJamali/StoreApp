@@ -14,14 +14,18 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 // =====================
-// Every deleted Purchase/Sale still in the trash (see
+// Every deleted OR edited Purchase/Sale still in the trash - undo-
+// beyond-delete: alongside the original delete snapshots (see
 // DatabaseHelper.snapshotAndDeletePurchase()/snapshotAndDeleteSale(),
-// the wrappers Transactionactivity now calls instead of deleting
-// directly). Tapping a row restores it exactly as it was, including
-// re-applying the same balance effects a fresh save would have made;
-// long-pressing a row purges it immediately instead of waiting for the
-// 30-day auto-purge (BusinessERPApplication.onCreate() ->
-// DatabaseHelper.purgeOldRecentlyDeleted()).
+// the wrappers Transactionactivity calls instead of deleting directly),
+// Transactioneditactivity also snapshots the pre-edit row/items right
+// before an Update applies (snapshotSaleBeforeEdit()/
+// snapshotPurchaseBeforeEdit()), so an accidental edit is just as
+// undoable as a delete. Tapping a row restores/undoes it exactly as it
+// was, including re-applying the same balance effects a fresh save
+// would have made; long-pressing a row purges it immediately instead
+// of waiting for the 30-day auto-purge (BusinessERPApplication.
+// onCreate() -> DatabaseHelper.purgeOldRecentlyDeleted()).
 // =====================
 public class RecentlyDeletedActivity extends Activity {
 
@@ -60,25 +64,40 @@ public class RecentlyDeletedActivity extends Activity {
 
 					final HashMap<String, Object> row = trashList.get(position);
 					final int trashId = (Integer) row.get("id");
-					final boolean isPurchase = "purchase".equals(row.get("type"));
+					final String type = (String) row.get("type");
+					final boolean isPurchase = "purchase".equals(type) || "purchase_edit".equals(type);
+					final boolean isEdit = "sale_edit".equals(type) || "purchase_edit".equals(type);
 
 					new AlertDialog.Builder(RecentlyDeletedActivity.this)
-						.setTitle("Restore this " + (isPurchase ? "purchase" : "sale") + "?")
-						.setMessage(
-							"Brings back \"" + row.get("label") + "\" and re-applies its " +
-							"original stock/balance effects."
+						.setTitle(
+							isEdit
+							? "Undo this edit?"
+							: "Restore this " + (isPurchase ? "purchase" : "sale") + "?"
 						)
-						.setPositiveButton("Restore", new DialogInterface.OnClickListener() {
+						.setMessage(
+							isEdit
+							? "Reverts \"" + row.get("label") + "\" back to how it was before this edit, " +
+								"re-applying its earlier stock/balance effects."
+							: "Brings back \"" + row.get("label") + "\" and re-applies its " +
+								"original stock/balance effects."
+						)
+						.setPositiveButton(isEdit ? "Undo" : "Restore", new DialogInterface.OnClickListener() {
 								@Override
 								public void onClick(DialogInterface dialog, int which) {
 
-									boolean restored = isPurchase ?
-										db.restorePurchaseFromTrash(trashId) :
-										db.restoreSaleFromTrash(trashId);
+									boolean restored =
+										isEdit
+										? (isPurchase ?
+											db.undoPurchaseEdit(trashId) : db.undoSaleEdit(trashId))
+										: (isPurchase ?
+											db.restorePurchaseFromTrash(trashId) : db.restoreSaleFromTrash(trashId));
 
 									Toast.makeText(
 										RecentlyDeletedActivity.this,
-										restored ? "Restored" : "Could not restore - it may already be gone.",
+										restored
+											? (isEdit ? "Edit undone" : "Restored")
+											: "Could not " + (isEdit ? "undo" : "restore") +
+												" - it may already be gone.",
 										Toast.LENGTH_SHORT
 									).show();
 

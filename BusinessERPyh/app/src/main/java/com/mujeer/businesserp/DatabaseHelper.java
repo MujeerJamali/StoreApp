@@ -7205,33 +7205,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		try {
 
-			JSONObject root = new JSONObject(json);
-			JSONObject saleJson = root.getJSONObject("sale");
-
-			db.insertOrThrow("sales", null, jsonToContentValues(saleJson));
-
-			JSONArray items = root.getJSONArray("items");
-
-			for (int i = 0; i < items.length(); i++) {
-
-				JSONObject itemJson = items.getJSONObject(i);
-
-				db.insertOrThrow("sale_items", null, jsonToContentValues(itemJson));
-
-				int itemId = itemJson.getInt("item_id");
-				double qty = itemJson.getDouble("qty");
-
-				adjustItemBalance(db, itemId, -qty);
-
-				if (!itemJson.isNull("combo_id")) {
-					adjustComboBalance(db, itemJson.getInt("combo_id"), -qty);
-				}
-			}
-
-			int partyId = saleJson.getInt("party_id");
-			double oldDue = saleJson.getDouble("balance");
-
-			adjustPartyBalance(db, partyId, oldDue);
+			reinsertSaleSnapshot(db, new JSONObject(json));
 
 			deleteRecentlyDeletedPermanently(trashId);
 
@@ -7267,33 +7241,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		try {
 
-			JSONObject root = new JSONObject(json);
-			JSONObject purchaseJson = root.getJSONObject("purchase");
-
-			db.insertOrThrow(TABLE_PURCHASES, null, jsonToContentValues(purchaseJson));
-
-			JSONArray items = root.getJSONArray("items");
-
-			for (int i = 0; i < items.length(); i++) {
-
-				JSONObject itemJson = items.getJSONObject(i);
-
-				db.insertOrThrow(TABLE_PURCHASE_ITEMS, null, jsonToContentValues(itemJson));
-
-				int itemId = itemJson.getInt("item_id");
-				double qty = itemJson.getDouble("quantity");
-
-				adjustItemBalance(db, itemId, qty);
-
-				if (!itemJson.isNull("combo_id")) {
-					adjustComboBalance(db, itemJson.getInt("combo_id"), qty);
-				}
-			}
-
-			int partyId = purchaseJson.getInt("party_id");
-			double oldDue = purchaseJson.getDouble("grand_total") - purchaseJson.getDouble("amount_paid");
-
-			adjustPartyBalance(db, partyId, -oldDue);
+			reinsertPurchaseSnapshot(db, new JSONObject(json));
 
 			deleteRecentlyDeletedPermanently(trashId);
 
@@ -7308,6 +7256,290 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		} finally {
 
 			db.endTransaction();
+		}
+	}
+
+	// Shared re-insertion step for restoreSaleFromTrash() and
+	// undoSaleEdit() - inserts the snapshotted sale/sale_items back
+	// with their original ids and re-applies the balance effects a
+	// fresh save of them would have made.
+	private void reinsertSaleSnapshot(SQLiteDatabase db, JSONObject root) throws JSONException {
+
+		JSONObject saleJson = root.getJSONObject("sale");
+
+		db.insertOrThrow("sales", null, jsonToContentValues(saleJson));
+
+		JSONArray items = root.getJSONArray("items");
+
+		for (int i = 0; i < items.length(); i++) {
+
+			JSONObject itemJson = items.getJSONObject(i);
+
+			db.insertOrThrow("sale_items", null, jsonToContentValues(itemJson));
+
+			int itemId = itemJson.getInt("item_id");
+			double qty = itemJson.getDouble("qty");
+
+			adjustItemBalance(db, itemId, -qty);
+
+			if (!itemJson.isNull("combo_id")) {
+				adjustComboBalance(db, itemJson.getInt("combo_id"), -qty);
+			}
+		}
+
+		int partyId = saleJson.getInt("party_id");
+		double oldDue = saleJson.getDouble("balance");
+
+		adjustPartyBalance(db, partyId, oldDue);
+	}
+
+	// Shared re-insertion step for restorePurchaseFromTrash() and
+	// undoPurchaseEdit().
+	private void reinsertPurchaseSnapshot(SQLiteDatabase db, JSONObject root) throws JSONException {
+
+		JSONObject purchaseJson = root.getJSONObject("purchase");
+
+		db.insertOrThrow(TABLE_PURCHASES, null, jsonToContentValues(purchaseJson));
+
+		JSONArray items = root.getJSONArray("items");
+
+		for (int i = 0; i < items.length(); i++) {
+
+			JSONObject itemJson = items.getJSONObject(i);
+
+			db.insertOrThrow(TABLE_PURCHASE_ITEMS, null, jsonToContentValues(itemJson));
+
+			int itemId = itemJson.getInt("item_id");
+			double qty = itemJson.getDouble("quantity");
+
+			adjustItemBalance(db, itemId, qty);
+
+			if (!itemJson.isNull("combo_id")) {
+				adjustComboBalance(db, itemJson.getInt("combo_id"), qty);
+			}
+		}
+
+		int partyId = purchaseJson.getInt("party_id");
+		double oldDue = purchaseJson.getDouble("grand_total") - purchaseJson.getDouble("amount_paid");
+
+		adjustPartyBalance(db, partyId, -oldDue);
+	}
+
+	// =====================
+	// UNDO-BEYOND-DELETE - the same Recently Deleted trash also holds a
+	// "before edit" snapshot (type "sale_edit"/"purchase_edit", taken by
+	// snapshotSaleBeforeEdit()/snapshotPurchaseBeforeEdit() right before
+	// Transactioneditactivity's Update button applies the new values),
+	// so an accidental edit is just as undoable as a delete, not only a
+	// delete. Undoing one deletes the CURRENT (post-edit) row exactly as
+	// a normal delete would - deleteSaleItems()/deleteSale() already
+	// reverse its balance effects - then re-inserts the pre-edit
+	// snapshot via the same reinsertSaleSnapshot()/
+	// reinsertPurchaseSnapshot() restoreXFromTrash() itself uses, so the
+	// old values' balance effects come back exactly as they were.
+	// =====================
+	public boolean undoSaleEdit(int trashId) {
+
+		String json = getRecentlyDeletedSnapshot(trashId);
+
+		if (json == null) {
+			return false;
+		}
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.beginTransaction();
+
+		try {
+
+			JSONObject root = new JSONObject(json);
+			String saleId = String.valueOf(root.getJSONObject("sale").getInt("id"));
+
+			deleteSaleItems(saleId);
+			deleteSale(saleId);
+
+			reinsertSaleSnapshot(db, root);
+
+			deleteRecentlyDeletedPermanently(trashId);
+
+			db.setTransactionSuccessful();
+
+			return true;
+
+		} catch (JSONException e) {
+
+			return false;
+
+		} finally {
+
+			db.endTransaction();
+		}
+	}
+
+	public boolean undoPurchaseEdit(int trashId) {
+
+		String json = getRecentlyDeletedSnapshot(trashId);
+
+		if (json == null) {
+			return false;
+		}
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.beginTransaction();
+
+		try {
+
+			JSONObject root = new JSONObject(json);
+			int purchaseId = root.getJSONObject("purchase").getInt("id");
+
+			deletePurchase(purchaseId);
+
+			reinsertPurchaseSnapshot(db, root);
+
+			deleteRecentlyDeletedPermanently(trashId);
+
+			db.setTransactionSuccessful();
+
+			return true;
+
+		} catch (JSONException e) {
+
+			return false;
+
+		} finally {
+
+			db.endTransaction();
+		}
+	}
+
+	// Snapshots a Sale's current row + line items (type "sale_edit")
+	// immediately before Transactioneditactivity applies an edit to it
+	// - see undoSaleEdit(). Label mirrors Transactionactivity's own
+	// labelForTransaction() format ("Sale #<invoice> - <party>").
+	public void snapshotSaleBeforeEdit(int saleId) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		try {
+
+			JSONObject root = new JSONObject();
+
+			Cursor saleCursor = db.rawQuery(
+				"SELECT * FROM sales WHERE id=?", new String[]{String.valueOf(saleId)}
+			);
+
+			if (saleCursor.moveToFirst()) {
+				root.put("sale", rowToJson(saleCursor));
+			}
+
+			saleCursor.close();
+
+			JSONArray items = new JSONArray();
+
+			Cursor itemsCursor = db.rawQuery(
+				"SELECT * FROM sale_items WHERE sale_id=?", new String[]{String.valueOf(saleId)}
+			);
+
+			while (itemsCursor.moveToNext()) {
+				items.put(rowToJson(itemsCursor));
+			}
+
+			itemsCursor.close();
+
+			root.put("items", items);
+
+			String label = "Sale";
+
+			Cursor labelCursor = db.rawQuery(
+				"SELECT s.invoice_no, p.name FROM sales s LEFT JOIN " + TABLE_PARTIES +
+				" p ON p.id = s.party_id WHERE s.id=?",
+				new String[]{String.valueOf(saleId)}
+			);
+
+			if (labelCursor.moveToFirst()) {
+
+				String invoice = labelCursor.getString(0);
+				String partyName = labelCursor.getString(1);
+
+				label = "Sale #" + invoice +
+					(partyName != null && partyName.length() > 0 ? " - " + partyName : "");
+			}
+
+			labelCursor.close();
+
+			String nowDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+			String nowTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
+
+			insertRecentlyDeleted("sale_edit", label, root.toString(), nowDate, nowTime);
+
+		} catch (JSONException e) {
+			// Never blocks the edit itself - losing undo for this one
+			// edit is far better than refusing to let it save.
+		}
+	}
+
+	// Mirror of snapshotSaleBeforeEdit() for a Purchase.
+	public void snapshotPurchaseBeforeEdit(int purchaseId) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		try {
+
+			JSONObject root = new JSONObject();
+
+			Cursor purchaseCursor = db.rawQuery(
+				"SELECT * FROM " + TABLE_PURCHASES + " WHERE id=?",
+				new String[]{String.valueOf(purchaseId)}
+			);
+
+			if (purchaseCursor.moveToFirst()) {
+				root.put("purchase", rowToJson(purchaseCursor));
+			}
+
+			purchaseCursor.close();
+
+			JSONArray items = new JSONArray();
+
+			Cursor itemsCursor = db.rawQuery(
+				"SELECT * FROM " + TABLE_PURCHASE_ITEMS + " WHERE purchase_id=?",
+				new String[]{String.valueOf(purchaseId)}
+			);
+
+			while (itemsCursor.moveToNext()) {
+				items.put(rowToJson(itemsCursor));
+			}
+
+			itemsCursor.close();
+
+			root.put("items", items);
+
+			String label = "Purchase";
+
+			Cursor labelCursor = db.rawQuery(
+				"SELECT pu.invoice_number, p.name FROM " + TABLE_PURCHASES + " pu LEFT JOIN " +
+				TABLE_PARTIES + " p ON p.id = pu.party_id WHERE pu.id=?",
+				new String[]{String.valueOf(purchaseId)}
+			);
+
+			if (labelCursor.moveToFirst()) {
+
+				String code = labelCursor.getString(0);
+				String partyName = labelCursor.getString(1);
+
+				label = "Purchase #" + code +
+					(partyName != null && partyName.length() > 0 ? " - " + partyName : "");
+			}
+
+			labelCursor.close();
+
+			String nowDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+			String nowTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
+
+			insertRecentlyDeleted("purchase_edit", label, root.toString(), nowDate, nowTime);
+
+		} catch (JSONException e) {
+			// Never blocks the edit itself.
 		}
 	}
 
