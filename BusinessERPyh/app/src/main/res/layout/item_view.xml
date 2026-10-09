@@ -35,6 +35,16 @@
     </LinearLayout>
 
     <TextView
+        android:id="@+id/tv_item_trend"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="6dp"
+        android:text=""
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/tv_item_stock"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

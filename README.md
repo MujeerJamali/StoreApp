@@ -220,7 +220,18 @@ BusinessERPyh/                  Gradle project root
   archive; the manual export is still what moving a backup to another
   device is for. A successful automatic backup resets the reminder's
   countdown too, so in normal use the reminder should rarely ever
-  actually need to nag.
+  actually need to nag. A fourth, `ReorderDigestNotifier`, checks weekly
+  rather than daily - a fresh Reorder List isn't worth a notification
+  every single day - and opens straight to Reorder List when there's
+  anything in it.
+- **Trending flags** (Items screen) — each item row shows a small ▲/▼
+  next to its stock when `DatabaseHelper.getItemTrends()` finds its last
+  7 days of sales meaningfully faster (▲, an early stock-out warning,
+  possibly before it's even hit its Reorder Threshold) or slower (▼, an
+  early overbuy warning) than the 7 days before that. An item with no
+  sales in the earlier window has nothing to compare against and stays
+  unflagged. Computed in one pass across every item, not a query per
+  row, so it doesn't slow the list down.
 - **Data tools** — bulk Excel import for purchases and items; full backup
   export/import in Vyapar's `.vyb` format. Alongside standard Vyapar data
   (parties, items, purchases, sales, payments, expenses, party transfers),

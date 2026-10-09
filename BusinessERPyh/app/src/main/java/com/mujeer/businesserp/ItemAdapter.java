@@ -53,6 +53,7 @@ public class ItemAdapter extends BaseAdapter implements Filterable {
         TextView tvCode = convertView.findViewById(R.id.tv_item_code);
         TextView tvName = convertView.findViewById(R.id.tv_item_name);
         TextView tvStock = convertView.findViewById(R.id.tv_item_stock);
+        TextView tvTrend = convertView.findViewById(R.id.tv_item_trend);
 
         HashMap<String, Object> item = filteredList.get(position);
 
@@ -75,6 +76,25 @@ public class ItemAdapter extends BaseAdapter implements Filterable {
             tvStock.setTextColor(activity.getResources().getColor(R.color.danger));
         } else {
             tvStock.setTextColor(activity.getResources().getColor(R.color.mod_items));
+        }
+
+        String trend = (String) item.get("trend");
+
+        if ("up".equals(trend)) {
+
+            tvTrend.setVisibility(View.VISIBLE);
+            tvTrend.setText("▲");
+            tvTrend.setTextColor(activity.getResources().getColor(R.color.danger));
+
+        } else if ("down".equals(trend)) {
+
+            tvTrend.setVisibility(View.VISIBLE);
+            tvTrend.setText("▼");
+            tvTrend.setTextColor(activity.getResources().getColor(R.color.text_secondary));
+
+        } else {
+
+            tvTrend.setVisibility(View.GONE);
         }
 
         return convertView;

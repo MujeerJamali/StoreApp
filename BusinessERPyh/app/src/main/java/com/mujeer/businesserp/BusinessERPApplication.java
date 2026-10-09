@@ -17,6 +17,7 @@ public class BusinessERPApplication extends Application {
 		CreditDueNotifier.checkAndNotifyIfNeeded(getApplicationContext());
 		LowStockNotifier.checkAndNotifyIfNeeded(getApplicationContext());
 		BackupReminderNotifier.checkAndNotifyIfNeeded(getApplicationContext());
+		ReorderDigestNotifier.checkAndNotifyIfNeeded(getApplicationContext());
 
 		// Idempotent - re-registering the same alarm on every app open
 		// just replaces its schedule, never stacks duplicates.

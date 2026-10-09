@@ -147,6 +147,18 @@ public class Itemsactivity extends Activity {
 
         itemList = db.getItems(selectedItemFilter);
 
+        HashMap<Integer, String> trends = db.getItemTrends();
+
+        for (HashMap<String, Object> item : itemList) {
+
+            Integer itemId = (Integer) item.get("id");
+            String trend = itemId == null ? null : trends.get(itemId);
+
+            if (trend != null) {
+                item.put("trend", trend);
+            }
+        }
+
         adapter = new ItemAdapter(
 			this,
 			itemList

@@ -5350,6 +5350,69 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// TRENDING FLAGS - compares each item's last 7 days of sales against
+	// the 7 days before that, at the whole-item level (summed across any
+	// variety combos) since this is an early-warning signal for the
+	// item's own list row, not a per-size reordering decision the way
+	// getReorderSuggestions() is. "up" is an early stock-out warning -
+	// selling meaningfully faster than before, maybe before it's even
+	// hit its reorder point yet. "down" is an early overbuy warning -
+	// slowing down, worth knowing before committing to a big reorder.
+	// An item with no sales in the earlier 7-day window has nothing to
+	// compare against and is left unflagged either way. Computed in one
+	// pass across every item with any sales history, so a list screen
+	// can show the flag without a query per row.
+	// =====================
+	public HashMap<Integer, String> getItemTrends() {
+
+		HashMap<Integer, String> trends = new HashMap<Integer, String>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Calendar last7Start = Calendar.getInstance();
+		last7Start.add(Calendar.DAY_OF_MONTH, -7);
+
+		Calendar previous7Start = Calendar.getInstance();
+		previous7Start.add(Calendar.DAY_OF_MONTH, -14);
+
+		String last7StartDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+			.format(last7Start.getTime());
+
+		String previous7StartDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+			.format(previous7Start.getTime());
+
+		Cursor cursor = db.rawQuery(
+			"SELECT si.item_id, " +
+			"SUM(CASE WHEN s.date >= ? THEN si.qty ELSE 0 END) AS last7, " +
+			"SUM(CASE WHEN s.date >= ? AND s.date < ? THEN si.qty ELSE 0 END) AS previous7 " +
+			"FROM sale_items si INNER JOIN sales s ON s.id = si.sale_id " +
+			"GROUP BY si.item_id",
+			new String[]{last7StartDate, previous7StartDate, last7StartDate}
+		);
+
+		while (cursor.moveToNext()) {
+
+			int itemId = cursor.getInt(0);
+			double last7 = cursor.getDouble(1);
+			double previous7 = cursor.getDouble(2);
+
+			if (previous7 <= 0) {
+				continue;
+			}
+
+			if (last7 > previous7 * 1.3) {
+				trends.put(itemId, "up");
+			} else if (last7 < previous7 * 0.7) {
+				trends.put(itemId, "down");
+			}
+		}
+
+		cursor.close();
+
+		return trends;
+	}
+
+	// =====================
 	// SLOW-MOVING STOCK - every active item still carrying stock whose
 	// most recent Sale (if it has ever had one) falls before the cutoff
 	// date, oldest/never-sold first. An item with stock that's never
