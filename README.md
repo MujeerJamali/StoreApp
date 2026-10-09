@@ -164,12 +164,24 @@ BusinessERPyh/                  Gradle project root
   exceed the available cash - either the real live balance or a
   manually entered figure, the user's choice - asks for confirmation
   first rather than silently blocking it. Every accept/ignore decision
-  is logged to `reorder_suggestion_log` for a future pass to read back
-  and improve future suggestions from (e.g. a suggestion that was
-  ignored repeatedly, or that led to overstock); that log is
-  deliberately **not** part of the Vyapar backup round-trip, same
-  reasoning as Recently Deleted above - it's the automation's own
-  operational memory, not a business record. Since there's no in-app
+  is logged to `reorder_suggestion_log`, and this is an actual closed
+  learning loop, not just a log: every time the Reorder List loads,
+  `resolvePendingReorderOutcomes()` first judges every decision old
+  enough to fairly judge (21 days - roughly a lead time plus a selling
+  window) - an "accepted" suggestion where most of what was ordered is
+  still sitting unsold gets upgraded to "overstocked"; an "ignored"
+  one where stock has since hit zero gets upgraded to
+  "ran_out_before_restock"; anything that didn't go wrong is simply
+  left as "accepted"/"ignored" forever, which is this loop's way of
+  recording "that call was right." `getLearningAdjustmentMultiplier()`
+  is what actually reads this back: each item/combo's last 5 resolved
+  decisions nudge its own future suggested quantity - down a step per
+  "overstocked", up a step per "ran_out_before_restock" (clamped to
+  0.5x-1.75x so a run of either can't spiral), applied on top of the
+  seasonal multiplier above. That log is deliberately **not** part of
+  the Vyapar backup round-trip, same reasoning as Recently Deleted
+  above - it's the automation's own operational memory, not a business
+  record. Since there's no in-app
   screen that lists this raw log, Reorder Settings has its own
   **Export History (.csv)** button (`DatabaseHelper.
   getReorderSuggestionLogForExport()`) that writes every logged

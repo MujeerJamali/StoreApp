@@ -5837,6 +5837,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// =====================
 	public ArrayList<HashMap<String, Object>> getReorderSuggestions(Context context) {
 
+		// Judges every old-enough past decision before computing anything
+		// new, so this run's own learning multiplier (see
+		// getLearningAdjustmentMultiplier()) reflects the latest verdicts
+		// rather than lagging a run behind.
+		resolvePendingReorderOutcomes();
+
 		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
 
 		SQLiteDatabase db = this.getReadableDatabase();
@@ -5969,7 +5975,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		double seasonalMultiplier =
 			getSeasonalMultiplier(db, itemId, comboId > 0 ? comboId : null, velocity);
 
-		suggestedQty = suggestedQty * seasonalMultiplier;
+		double learningMultiplier =
+			getLearningAdjustmentMultiplier(db, itemId, comboId > 0 ? comboId : null);
+
+		suggestedQty = suggestedQty * seasonalMultiplier * learningMultiplier;
 
 		if (suggestedQty < minOrderQty) {
 			suggestedQty = minOrderQty;
@@ -5994,6 +6003,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		row.put("supplier_party_id", supplier.get("party_id"));
 		row.put("supplier_party_name", supplier.get("party_name"));
 		row.put("seasonal_multiplier", seasonalMultiplier);
+		row.put("learning_multiplier", learningMultiplier);
+		row.put("manual_threshold_triggered", belowManualThreshold && !belowVelocityReorderPoint);
 
 		if (velocity > 0) {
 
@@ -6135,6 +6146,181 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("outcome_date", today);
 
 		db.insert(TABLE_REORDER_SUGGESTION_LOG, null, values);
+	}
+
+	// =====================
+	// REORDER LEARNING LOOP - the part reorder_suggestion_log's own
+	// CREATE TABLE comment above describes but recordReorderDecision()
+	// alone never actually closes: an "accepted"/"ignored" row is only
+	// a decision, not a verdict on whether that decision was right.
+	// resolvePendingReorderOutcomes() judges every decision old enough
+	// to judge fairly and, only when it actually turned out wrong,
+	// upgrades its outcome in place to "overstocked" (accepted, but
+	// most of it is still sitting unsold) or "ran_out_before_restock"
+	// (ignored, and stock is now at/below zero) - left as plain
+	// "accepted"/"ignored" forever otherwise, which is this loop's way
+	// of recording "that call was right." getLearningAdjustmentMultiplier()
+	// is what getReorderSuggestions() actually reads this history back
+	// through: each of an item/combo's last REORDER_LEARNING_HISTORY_LIMIT
+	// resolved decisions nudges its future suggested quantity - down a
+	// step for each "overstocked", up a step for each
+	// "ran_out_before_restock" - which is what makes rows #2/#3/#4 of
+	// the approved feature list ("adjusts quantity based on accept/
+	// ignore," "backs off when overstocked," "pads when it ran out
+	// early") actually true instead of just logged and forgotten.
+	// =====================
+
+	// How long to wait after a decision before judging it - long enough
+	// for a real purchase-and-sell-through cycle (a lead time plus a
+	// velocity window's worth of selling), short enough that the
+	// learning loop still reacts within a season.
+	private static final int REORDER_OUTCOME_RESOLUTION_DAYS = 21;
+
+	// An "accepted" suggestion counts as overstocked once this much of
+	// what was ordered is still sitting unsold by the resolution date -
+	// deliberately not 100%: some natural carrying stock is normal, a
+	// reorder that barely sold through at all is the actual problem.
+	private static final double REORDER_OVERSTOCK_REMAINING_FRACTION = 0.7;
+
+	// Only the most recent decisions per item/combo feed the multiplier,
+	// so a mistake from months ago doesn't keep swaying suggestions
+	// forever once the pattern has moved on.
+	private static final int REORDER_LEARNING_HISTORY_LIMIT = 5;
+
+	// Each overstocked/ran-out-before-restock verdict nudges the
+	// multiplier by this much; MIN/MAX keep a run of either from
+	// collapsing suggestions to near-zero or exploding them.
+	private static final double REORDER_LEARNING_STEP = 0.15;
+	private static final double REORDER_LEARNING_MULTIPLIER_MIN = 0.5;
+	private static final double REORDER_LEARNING_MULTIPLIER_MAX = 1.75;
+
+	public void resolvePendingReorderOutcomes() {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		Calendar cutoff = Calendar.getInstance();
+		cutoff.add(Calendar.DAY_OF_MONTH, -REORDER_OUTCOME_RESOLUTION_DAYS);
+
+		String cutoffDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+			.format(cutoff.getTime());
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, item_id, combo_id, suggested_qty, outcome FROM " +
+			TABLE_REORDER_SUGGESTION_LOG +
+			" WHERE outcome IN ('accepted','ignored') AND suggested_date <= ?",
+			new String[]{cutoffDate}
+		);
+
+		// Collected first, then written after the cursor closes - this
+		// loop both reads and writes the same table, and a cursor isn't
+		// guaranteed stable across writes to the table it's reading.
+		ArrayList<HashMap<String, Object>> toResolve = new ArrayList<HashMap<String, Object>>();
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+			row.put("id", cursor.getInt(0));
+			row.put("item_id", cursor.getInt(1));
+			row.put("combo_id", cursor.isNull(2) ? null : cursor.getInt(2));
+			row.put("suggested_qty", cursor.getDouble(3));
+			row.put("outcome", cursor.getString(4));
+
+			toResolve.add(row);
+		}
+
+		cursor.close();
+
+		String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+			.format(new Date());
+
+		for (HashMap<String, Object> row : toResolve) {
+
+			int logId = (Integer) row.get("id");
+			int itemId = (Integer) row.get("item_id");
+			Integer comboId = (Integer) row.get("combo_id");
+			double suggestedQty = (Double) row.get("suggested_qty");
+			String outcome = (String) row.get("outcome");
+
+			double currentStock = (comboId != null && comboId > 0) ?
+				sumColumn(db, "SELECT balance FROM " + TABLE_VARIETY_COMBOS + " WHERE id=?",
+					new String[]{String.valueOf(comboId)}) :
+				sumColumn(db, "SELECT balance FROM " + TABLE_ITEMS + " WHERE id=?",
+					new String[]{String.valueOf(itemId)});
+
+			String resolvedOutcome = null;
+
+			if ("accepted".equals(outcome) &&
+				currentStock >= suggestedQty * REORDER_OVERSTOCK_REMAINING_FRACTION) {
+
+				resolvedOutcome = "overstocked";
+
+			} else if ("ignored".equals(outcome) && currentStock <= 0) {
+
+				resolvedOutcome = "ran_out_before_restock";
+			}
+
+			if (resolvedOutcome != null) {
+
+				ContentValues values = new ContentValues();
+				values.put("outcome", resolvedOutcome);
+				values.put("outcome_date", today);
+
+				db.update(
+					TABLE_REORDER_SUGGESTION_LOG, values, "id=?",
+					new String[]{String.valueOf(logId)}
+				);
+			}
+		}
+	}
+
+	private double getLearningAdjustmentMultiplier(
+		SQLiteDatabase db, int itemId, Integer comboId) {
+
+		String whereClause;
+		String[] args;
+
+		if (comboId != null && comboId > 0) {
+
+			whereClause = "combo_id=?";
+			args = new String[]{String.valueOf(comboId)};
+
+		} else {
+
+			whereClause = "item_id=? AND (combo_id IS NULL OR combo_id=0)";
+			args = new String[]{String.valueOf(itemId)};
+		}
+
+		Cursor cursor = db.rawQuery(
+			"SELECT outcome FROM " + TABLE_REORDER_SUGGESTION_LOG +
+			" WHERE " + whereClause + " AND outcome IS NOT NULL" +
+			" ORDER BY id DESC LIMIT " + REORDER_LEARNING_HISTORY_LIMIT,
+			args
+		);
+
+		double multiplier = 1.0;
+
+		while (cursor.moveToNext()) {
+
+			String outcome = cursor.getString(0);
+
+			if ("overstocked".equals(outcome)) {
+				multiplier -= REORDER_LEARNING_STEP;
+			} else if ("ran_out_before_restock".equals(outcome)) {
+				multiplier += REORDER_LEARNING_STEP;
+			}
+		}
+
+		cursor.close();
+
+		if (multiplier < REORDER_LEARNING_MULTIPLIER_MIN) {
+			multiplier = REORDER_LEARNING_MULTIPLIER_MIN;
+		}
+
+		if (multiplier > REORDER_LEARNING_MULTIPLIER_MAX) {
+			multiplier = REORDER_LEARNING_MULTIPLIER_MAX;
+		}
+
+		return multiplier;
 	}
 
 	// Every reorder_suggestion_log row, newest first, with the item's
