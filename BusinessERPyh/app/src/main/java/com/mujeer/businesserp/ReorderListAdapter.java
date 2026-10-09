@@ -90,10 +90,23 @@ public class ReorderListAdapter extends BaseAdapter {
 		double currentStock = row.get("current_stock") == null ? 0 : (Double) row.get("current_stock");
 		double velocity = row.get("velocity_per_day") == null ? 0 : (Double) row.get("velocity_per_day");
 
-		tv_stock.setText(
+		String stockLine =
 			"Current stock: " + AmountFormat.formatPlain(currentStock) +
-			"  (selling ~" + AmountFormat.format(velocity) + "/day)"
-		);
+			"  (selling ~" + AmountFormat.format(velocity) + "/day)";
+
+		Object runsOutDate = row.get("runs_out_date");
+
+		if (runsOutDate != null) {
+			stockLine += "\nRuns out around " + runsOutDate;
+		}
+
+		Double seasonalMultiplier = (Double) row.get("seasonal_multiplier");
+
+		if (seasonalMultiplier != null && seasonalMultiplier > 1.0) {
+			stockLine += "  • seasonal boost applied";
+		}
+
+		tv_stock.setText(stockLine);
 
 		double suggestedQty = row.get("suggested_qty") == null ? 0 : (Double) row.get("suggested_qty");
 

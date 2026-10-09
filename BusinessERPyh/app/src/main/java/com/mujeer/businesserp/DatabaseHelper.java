@@ -5268,6 +5268,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			return null;
 		}
 
+		double seasonalMultiplier =
+			getSeasonalMultiplier(db, itemId, comboId > 0 ? comboId : null, velocity);
+
+		suggestedQty = suggestedQty * seasonalMultiplier;
+
 		if (suggestedQty < minOrderQty) {
 			suggestedQty = minOrderQty;
 		}
@@ -5290,8 +5295,93 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		row.put("estimated_cost", suggestedQty * purchasePrice);
 		row.put("supplier_party_id", supplier.get("party_id"));
 		row.put("supplier_party_name", supplier.get("party_name"));
+		row.put("seasonal_multiplier", seasonalMultiplier);
+
+		if (velocity > 0) {
+
+			int daysOfStockLeft = (int) Math.floor(currentStock / velocity);
+
+			Calendar runOutDate = Calendar.getInstance();
+			runOutDate.add(Calendar.DAY_OF_MONTH, daysOfStockLeft);
+
+			row.put(
+				"runs_out_date",
+				new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(runOutDate.getTime())
+			);
+
+		} else {
+
+			row.put("runs_out_date", null);
+		}
 
 		return row;
+	}
+
+	// Compares this calendar month's average total sales in past years
+	// (any year but the current one) against what the recent velocity
+	// would project for a month, to catch a recurring seasonal spike
+	// (e.g. this item always sells faster in a certain month) before the
+	// plain recent-velocity formula above would react to it. Returns 1.0
+	// (no adjustment) whenever there isn't at least one past year's worth
+	// of data for this exact month, or the recent velocity is already
+	// zero - this is a bonus signal on top of the velocity formula, not a
+	// replacement for it, and a brand-new shop with no history yet simply
+	// gets no seasonal adjustment rather than a divide-by-zero. Capped at
+	// 2x so one unusually large past month can't blow out the suggestion.
+	private double getSeasonalMultiplier(
+		SQLiteDatabase db, int itemId, Integer comboId, double currentVelocity) {
+
+		if (currentVelocity <= 0) {
+			return 1.0;
+		}
+
+		String currentMonth = new SimpleDateFormat("MM", Locale.getDefault()).format(new Date());
+		String currentYearMonth =
+			new SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(new Date());
+
+		String whereClause;
+		String[] args;
+
+		if (comboId != null && comboId > 0) {
+
+			whereClause = "si.combo_id = ?";
+			args = new String[]{String.valueOf(comboId), currentMonth, currentYearMonth};
+
+		} else {
+
+			whereClause = "si.item_id = ? AND (si.combo_id IS NULL OR si.combo_id = 0)";
+			args = new String[]{String.valueOf(itemId), currentMonth, currentYearMonth};
+		}
+
+		Cursor cursor = db.rawQuery(
+			"SELECT COALESCE(SUM(si.qty), 0), COUNT(DISTINCT strftime('%Y', s.date)) " +
+			"FROM sale_items si INNER JOIN sales s ON s.id = si.sale_id " +
+			"WHERE " + whereClause + " AND strftime('%m', s.date) = ? " +
+			"AND strftime('%Y-%m', s.date) != ?",
+			args
+		);
+
+		double pastMonthTotal = 0;
+		int yearCount = 0;
+
+		if (cursor.moveToFirst()) {
+			pastMonthTotal = cursor.getDouble(0);
+			yearCount = cursor.getInt(1);
+		}
+
+		cursor.close();
+
+		if (yearCount == 0 || pastMonthTotal <= 0) {
+			return 1.0;
+		}
+
+		double avgPastMonthTotal = pastMonthTotal / yearCount;
+		int daysInMonth = Calendar.getInstance().getActualMaximum(Calendar.DAY_OF_MONTH);
+		double avgPastMonthVelocity = avgPastMonthTotal / daysInMonth;
+
+		double ratio = avgPastMonthVelocity / currentVelocity;
+
+		return ratio > 1.3 ? Math.min(ratio, 2.0) : 1.0;
 	}
 
 	// The supplier (party) of this item's most recent purchase, if any -

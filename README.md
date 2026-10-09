@@ -95,7 +95,16 @@ BusinessERPyh/                  Gradle project root
   reasonable defaults, not hardcoded. A unit with no sales history
   still qualifies if its own manual Reorder Threshold (Edit Item
   screen) says it's low, the same signal the Low Stock report uses.
-  Nothing on this screen is final: each suggestion's quantity is a
+  Two more signals adjust a suggestion before it's shown: a seasonal
+  check (`getSeasonalMultiplier()`) compares this calendar month's
+  average sales in past years against what the recent velocity alone
+  would project, and scales the suggested quantity up (capped at 2x)
+  when a past-years pattern says this month typically sells faster -
+  a shop with no history yet simply gets no adjustment rather than a
+  guess; and each row shows a plain-language "runs out around
+  [date]" estimate from dividing current stock by recent velocity, so
+  the urgency doesn't require doing that math yourself. Nothing on
+  this screen is final: each suggestion's quantity is a
   plain editable field, a checkbox excludes it, and "Ignore" dismisses
   it outright - only checked rows get used by **Convert Checked to
   Draft Purchase(s)**, which groups them by their inferred supplier
