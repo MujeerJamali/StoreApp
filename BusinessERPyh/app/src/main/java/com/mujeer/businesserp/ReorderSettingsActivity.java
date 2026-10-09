@@ -8,9 +8,10 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.Toast;
 
-// Every input ReorderListActivity's suggestion formula uses - see
-// ReorderSettings for the defaults and why they live in SharedPreferences
-// rather than a database table.
+// Every input ReorderListActivity's suggestion formula uses, plus the
+// non-shoe turnover multiplier Slow-Moving Stock/Discount This Week/
+// Dead Stock Aging share - see ReorderSettings for the defaults and
+// why they live in SharedPreferences rather than a database table.
 public class ReorderSettingsActivity extends Activity {
 
 	private EditText et_velocity_window_days;
@@ -21,6 +22,7 @@ public class ReorderSettingsActivity extends Activity {
 	private CheckBox cb_cash_aware;
 	private CheckBox cb_manual_cash_override;
 	private EditText et_manual_cash_amount;
+	private EditText et_non_shoe_turnover_multiplier;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -37,6 +39,7 @@ public class ReorderSettingsActivity extends Activity {
 		cb_cash_aware = findViewById(R.id.cb_cash_aware);
 		cb_manual_cash_override = findViewById(R.id.cb_manual_cash_override);
 		et_manual_cash_amount = findViewById(R.id.et_manual_cash_amount);
+		et_non_shoe_turnover_multiplier = findViewById(R.id.et_non_shoe_turnover_multiplier);
 
 		Button btn_save = findViewById(R.id.btn_save_reorder_settings);
 		Button btn_reset = findViewById(R.id.btn_reset_reorder_settings);
@@ -82,6 +85,9 @@ public class ReorderSettingsActivity extends Activity {
 
 		et_manual_cash_amount.setText(
 			AmountFormat.formatPlain(ReorderSettings.getManualCashOverrideAmount(this)));
+
+		et_non_shoe_turnover_multiplier.setText(
+			AmountFormat.formatPlain(ReorderSettings.getNonShoeTurnoverMultiplier(this)));
 	}
 
 	private void save() {
@@ -111,10 +117,22 @@ public class ReorderSettingsActivity extends Activity {
 				manualCashAmount = Double.parseDouble(manualCashText);
 			}
 
+			double nonShoeTurnoverMultiplier = Double.parseDouble(
+				et_non_shoe_turnover_multiplier.getText().toString().trim());
+
 			if (velocityWindowDays <= 0 || leadTimeDays <= 0) {
 
 				Toast.makeText(
 					this, "Window and lead time must be greater than 0", Toast.LENGTH_SHORT
+				).show();
+
+				return;
+			}
+
+			if (nonShoeTurnoverMultiplier <= 0) {
+
+				Toast.makeText(
+					this, "Non-shoe turnover multiplier must be greater than 0", Toast.LENGTH_SHORT
 				).show();
 
 				return;
@@ -128,6 +146,7 @@ public class ReorderSettingsActivity extends Activity {
 			ReorderSettings.setCashAwareEnabled(this, cb_cash_aware.isChecked());
 			ReorderSettings.setManualCashOverrideEnabled(this, cb_manual_cash_override.isChecked());
 			ReorderSettings.setManualCashOverrideAmount(this, manualCashAmount);
+			ReorderSettings.setNonShoeTurnoverMultiplier(this, nonShoeTurnoverMultiplier);
 
 			Toast.makeText(this, "Reorder settings saved", Toast.LENGTH_SHORT).show();
 
@@ -160,6 +179,9 @@ public class ReorderSettingsActivity extends Activity {
 		cb_cash_aware.setChecked(ReorderSettings.DEFAULT_CASH_AWARE_ENABLED);
 		cb_manual_cash_override.setChecked(false);
 		et_manual_cash_amount.setText("0");
+
+		et_non_shoe_turnover_multiplier.setText(
+			AmountFormat.formatPlain(ReorderSettings.DEFAULT_NON_SHOE_TURNOVER_MULTIPLIER));
 
 		Toast.makeText(this, "Reset - tap Save to keep these", Toast.LENGTH_SHORT).show();
 	}

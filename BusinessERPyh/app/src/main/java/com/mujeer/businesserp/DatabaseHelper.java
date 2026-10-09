@@ -5499,6 +5499,117 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// SIZE-CURVE ANALYSIS (shoes) - how this shop's shoe sales split
+	// across sizes vs how its current stock splits across those same
+	// sizes, so a size selling a disproportionate share of volume but
+	// carrying a thin slice of stock (a stockout risk) - or the
+	// reverse, cash tied up on a size that barely moves - stands out.
+	// Size isn't a variety group for this shop's real catalog - it's
+	// parsed straight out of the item name via ShoeIdentity (see that
+	// class), since every real shoe item here is its own exact size,
+	// not a parent item with size combos. Lifetime totals, not a
+	// period - this is a structural "where should the next buy lean"
+	// question, not a trend.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getSizeCurveAnalysis() {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		HashMap<String, Double> soldBySize = new HashMap<String, Double>();
+		HashMap<String, Double> stockBySize = new HashMap<String, Double>();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT i.name, i.balance, COALESCE(SUM(si.qty), 0) AS qty_sold " +
+			"FROM " + TABLE_ITEMS + " i " +
+			"LEFT JOIN sale_items si ON si.item_id = i.id " +
+			"WHERE i.name LIKE 'Shoe%' " +
+			"GROUP BY i.id",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			String name = cursor.getString(0);
+			double balance = cursor.getDouble(1);
+			double qtySold = cursor.getDouble(2);
+
+			ShoeIdentity identity = ShoeIdentity.parse(name);
+
+			if (identity == null) {
+				continue;
+			}
+
+			String size = identity.size;
+
+			soldBySize.put(size, (soldBySize.containsKey(size) ? soldBySize.get(size) : 0.0) + qtySold);
+			stockBySize.put(size, (stockBySize.containsKey(size) ? stockBySize.get(size) : 0.0) + balance);
+		}
+
+		cursor.close();
+
+		TreeSet<String> allSizes = new TreeSet<String>(soldBySize.keySet());
+		allSizes.addAll(stockBySize.keySet());
+
+		double totalSold = 0;
+		double totalStock = 0;
+
+		for (String size : allSizes) {
+			totalSold += soldBySize.containsKey(size) ? soldBySize.get(size) : 0.0;
+			totalStock += stockBySize.containsKey(size) ? stockBySize.get(size) : 0.0;
+		}
+
+		ArrayList<HashMap<String, Object>> result = new ArrayList<HashMap<String, Object>>();
+
+		for (String size : allSizes) {
+
+			double sold = soldBySize.containsKey(size) ? soldBySize.get(size) : 0.0;
+			double stock = stockBySize.containsKey(size) ? stockBySize.get(size) : 0.0;
+
+			double soldPercent = totalSold > 0.01 ? sold / totalSold * 100 : 0;
+			double stockPercent = totalStock > 0.01 ? stock / totalStock * 100 : 0;
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+			row.put("size", size);
+			row.put("qty_sold", sold);
+			row.put("stock", stock);
+			row.put("sold_percent", soldPercent);
+			row.put("stock_percent", stockPercent);
+			row.put("mismatch_points", soldPercent - stockPercent);
+
+			result.add(row);
+		}
+
+		Collections.sort(result, new Comparator<HashMap<String, Object>>() {
+				@Override
+				public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+					return compareSizeLabels((String) a.get("size"), (String) b.get("size"));
+				}
+			}
+		);
+
+		return result;
+	}
+
+	// Sorts size labels numerically when both parse as a number (the
+	// common case - "7", "8.5", "10") so the curve reads smallest to
+	// largest, falling back to plain alphabetical for anything that
+	// doesn't (e.g. a non-numeric size label).
+	private int compareSizeLabels(String a, String b) {
+
+		try {
+
+			double numA = Double.parseDouble(a);
+			double numB = Double.parseDouble(b);
+
+			return Double.compare(numA, numB);
+
+		} catch (NumberFormatException e) {
+
+			return a.compareTo(b);
+		}
+	}
+
+	// =====================
 	// REPORT: SHOES VS NON-SHOES - sales and profit for a period, split
 	// by the same "item name starts with 'Shoe'" rule as everywhere else
 	// (Item Ranking's shoes filter, Stock Worth). Both metrics are
@@ -5999,104 +6110,157 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 	// =====================
 	// SLOW-MOVING STOCK - every active item still carrying stock whose
-	// most recent Sale (if it has ever had one) falls before the cutoff
-	// date, oldest/never-sold first. An item with stock that's never
-	// sold at all (last_sale_date IS NULL) always qualifies regardless
-	// of how young the item is - there's no "too new to judge" grace
-	// period, since a never-sold item sitting on stock is exactly what
-	// this report exists to surface.
+	// most recent Sale (if it has ever had one) falls before the cutoff,
+	// oldest/never-sold first. An item with stock that's never sold at
+	// all (last_sale_date IS NULL) always qualifies regardless of how
+	// young the item is - there's no "too new to judge" grace period,
+	// since a never-sold item sitting on stock is exactly what this
+	// report exists to surface.
+	//
+	// A non-shoe item's days-since-sale is divided by
+	// ReorderSettings.getNonShoeTurnoverMultiplier() (default 3x) before
+	// being compared against days or bucketed by a caller (Discount This
+	// Week/Dead Stock Aging) - this shop's general merchandise (Clothes/
+	// Toys/Home/Tools) naturally turns over slower than its shoes, so a
+	// tool sitting 90 days is only as "slow" as a shoe sitting 30. Both
+	// the raw days ("days_since_sale", for truthful display - "last sold
+	// X days ago" should never lie) and the adjusted figure
+	// ("effective_days_since_sale", for every threshold/bucket decision)
+	// are returned.
 	// =====================
-	public ArrayList<HashMap<String, Object>> getSlowMovingStock(int days) {
+	public ArrayList<HashMap<String, Object>> getSlowMovingStock(Context context, int days) {
 
 		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
 
 		SQLiteDatabase db = this.getReadableDatabase();
 
-		Calendar cutoff = Calendar.getInstance();
-		cutoff.add(Calendar.DAY_OF_MONTH, -days);
+		double nonShoeMultiplier = ReorderSettings.getNonShoeTurnoverMultiplier(context);
 
-		String cutoffDate =
-			new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cutoff.getTime());
+		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+		long todayMillis = new Date().getTime();
 
+		// No date cutoff at the SQL level any more - a non-shoe item's
+		// cutoff is a multiple of a shoe's, which isn't expressible as a
+		// single WHERE clause, so every active in-stock item is fetched
+		// and the category-adjusted cutoff is applied in Java instead.
 		Cursor cursor = db.rawQuery(
 			"SELECT i.id, i.code, i.name, i.balance, MAX(s.date) AS last_sale_date " +
 			"FROM " + TABLE_ITEMS + " i " +
 			"LEFT JOIN sale_items si ON si.item_id = i.id " +
 			"LEFT JOIN sales s ON s.id = si.sale_id " +
 			"WHERE i.active = 1 AND i.balance > 0 " +
-			"GROUP BY i.id " +
-			"HAVING last_sale_date IS NULL OR last_sale_date < ? " +
-			"ORDER BY last_sale_date ASC, i.name ASC",
-			new String[]{cutoffDate}
+			"GROUP BY i.id",
+			null
 		);
 
 		while (cursor.moveToNext()) {
 
 			HashMap<String, Object> row = new HashMap<String, Object>();
 
-			row.put("item_id", cursor.getInt(0));
-			row.put("code", cursor.getString(1));
-			row.put("name", cursor.getString(2));
-			row.put("balance", cursor.getDouble(3));
-			row.put("last_sale_date", cursor.isNull(4) ? null : cursor.getString(4));
+			String name = cursor.getString(2);
+			String lastSaleDate = cursor.isNull(4) ? null : cursor.getString(4);
 
-			list.add(row);
-		}
-
-		cursor.close();
-
-		return list;
-	}
-
-	// =====================
-	// REPORT: DISCOUNT THIS WEEK - reuses getSlowMovingStock(30) (every
-	// active item with stock and no sale in 30+ days) and annotates each
-	// with a suggested discount tier based on how long it's actually
-	// been sitting: 30-59 days = 10%, 60-89 = 20%, 90+ (or never sold at
-	// all) = 30%. These tiers are a starting suggestion, not a rule the
-	// app enforces anywhere - the user still sets the actual sale price.
-	// =====================
-	public ArrayList<HashMap<String, Object>> getDiscountCandidates() {
-
-		ArrayList<HashMap<String, Object>> list = getSlowMovingStock(30);
-
-		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-		long todayMillis = new Date().getTime();
-
-		for (HashMap<String, Object> row : list) {
-
-			String lastSaleDate = (String) row.get("last_sale_date");
-
-			int daysSince;
+			int daysSinceSale;
 
 			if (lastSaleDate == null) {
 
-				daysSince = -1;
+				daysSinceSale = -1;
 
 			} else {
 
 				try {
 
 					long diffMillis = todayMillis - dateFormat.parse(lastSaleDate).getTime();
-					daysSince = (int) (diffMillis / (1000L * 60 * 60 * 24));
+					daysSinceSale = (int) (diffMillis / (1000L * 60 * 60 * 24));
 
 				} catch (Exception e) {
 
-					daysSince = 30;
+					daysSinceSale = 0;
 				}
 			}
 
+			boolean isShoe = name != null && name.startsWith("Shoe");
+
+			int effectiveDaysSinceSale =
+				daysSinceSale < 0 || isShoe
+				? daysSinceSale
+				: (int) (daysSinceSale / nonShoeMultiplier);
+
+			if (effectiveDaysSinceSale >= 0 && effectiveDaysSinceSale < days) {
+				continue;
+			}
+
+			row.put("item_id", cursor.getInt(0));
+			row.put("code", cursor.getString(1));
+			row.put("name", name);
+			row.put("balance", cursor.getDouble(3));
+			row.put("last_sale_date", lastSaleDate);
+			row.put("days_since_sale", daysSinceSale);
+			row.put("effective_days_since_sale", effectiveDaysSinceSale);
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		Collections.sort(list, new Comparator<HashMap<String, Object>>() {
+				@Override
+				public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+
+					int effectiveA = (Integer) a.get("effective_days_since_sale");
+					int effectiveB = (Integer) b.get("effective_days_since_sale");
+
+					// Never-sold (-1) is the most urgent, so it sorts first -
+					// same as it sorting first under the old "last_sale_date
+					// ASC" (NULL first) ordering.
+					if (effectiveA < 0 && effectiveB < 0) {
+						return 0;
+					}
+
+					if (effectiveA < 0) {
+						return -1;
+					}
+
+					if (effectiveB < 0) {
+						return 1;
+					}
+
+					return Integer.compare(effectiveB, effectiveA);
+				}
+			}
+		);
+
+		return list;
+	}
+
+	// =====================
+	// REPORT: DISCOUNT THIS WEEK - reuses getSlowMovingStock(context, 30)
+	// (every active item with stock and no sale in 30+ effective days)
+	// and annotates each with a suggested discount tier based on its
+	// effective_days_since_sale (category-adjusted - see
+	// getSlowMovingStock()): 30-59 = 10%, 60-89 = 20%, 90+ (or never sold
+	// at all) = 30%. These tiers are a starting suggestion, not a rule
+	// the app enforces anywhere - the user still sets the actual sale
+	// price.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getDiscountCandidates(Context context) {
+
+		ArrayList<HashMap<String, Object>> list = getSlowMovingStock(context, 30);
+
+		for (HashMap<String, Object> row : list) {
+
+			int effectiveDays = (Integer) row.get("effective_days_since_sale");
+
 			int suggestedDiscountPercent;
 
-			if (daysSince < 0 || daysSince >= 90) {
+			if (effectiveDays < 0 || effectiveDays >= 90) {
 				suggestedDiscountPercent = 30;
-			} else if (daysSince >= 60) {
+			} else if (effectiveDays >= 60) {
 				suggestedDiscountPercent = 20;
 			} else {
 				suggestedDiscountPercent = 10;
 			}
 
-			row.put("days_since_sale", daysSince);
 			row.put("suggested_discount_percent", suggestedDiscountPercent);
 		}
 
@@ -6150,54 +6314,31 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 	// =====================
 	// REPORT: DEAD STOCK AGING - every active item with stock that
-	// hasn't sold in 60+ days (a stricter cutoff than Slow-Moving
-	// Stock's 30-day default), bucketed into 60-89/90-119/120+ days,
-	// or Never Sold. Reuses the same day-count logic Discount This Week
-	// already does, just with a different cutoff and bucketing.
+	// hasn't sold in 60+ effective days (a stricter cutoff than Slow-
+	// Moving Stock's 30-day default), bucketed into 60-89/90-119/120+
+	// days, or Never Sold - all against effective_days_since_sale, same
+	// category-adjusted figure Discount This Week buckets on.
 	// =====================
-	public ArrayList<HashMap<String, Object>> getDeadStockAging() {
+	public ArrayList<HashMap<String, Object>> getDeadStockAging(Context context) {
 
-		ArrayList<HashMap<String, Object>> list = getSlowMovingStock(60);
-
-		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-		long todayMillis = new Date().getTime();
+		ArrayList<HashMap<String, Object>> list = getSlowMovingStock(context, 60);
 
 		for (HashMap<String, Object> row : list) {
 
-			String lastSaleDate = (String) row.get("last_sale_date");
-
-			int daysSince;
-
-			if (lastSaleDate == null) {
-
-				daysSince = -1;
-
-			} else {
-
-				try {
-
-					long diffMillis = todayMillis - dateFormat.parse(lastSaleDate).getTime();
-					daysSince = (int) (diffMillis / (1000L * 60 * 60 * 24));
-
-				} catch (Exception e) {
-
-					daysSince = 60;
-				}
-			}
+			int effectiveDays = (Integer) row.get("effective_days_since_sale");
 
 			String ageBucket;
 
-			if (daysSince < 0) {
+			if (effectiveDays < 0) {
 				ageBucket = "Never Sold";
-			} else if (daysSince < 90) {
+			} else if (effectiveDays < 90) {
 				ageBucket = "60-89 Days";
-			} else if (daysSince < 120) {
+			} else if (effectiveDays < 120) {
 				ageBucket = "90-119 Days";
 			} else {
 				ageBucket = "120+ Days";
 			}
 
-			row.put("days_since_sale", daysSince);
 			row.put("age_bucket", ageBucket);
 
 			HashMap<String, Object> clearance = getClearanceForItem((Integer) row.get("item_id"));

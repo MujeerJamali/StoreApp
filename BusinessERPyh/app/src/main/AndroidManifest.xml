@@ -181,6 +181,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".SizeCurveAnalysisReportActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".CostItemEditActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />

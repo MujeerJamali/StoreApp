@@ -54,7 +54,7 @@ public class SlowMovingStockReportActivity extends Activity {
 
 		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
 		info_bubble.setInfo(
-			"Slow-Moving Stock", "Every active item still carrying stock that hasn't sold within the selected window, oldest/never-sold first - a never-sold item always qualifies regardless of how young it is."
+			"Slow-Moving Stock", "Every active item still carrying stock that hasn't sold within the selected window, oldest/never-sold first - a never-sold item always qualifies regardless of how young it is. A non-shoe item gets 3x as long before it counts as slow (configurable in Reorder Settings), since this shop's general merchandise naturally turns over slower than its shoes."
 		);
 
 		spinner_window = findViewById(R.id.spinner_window);
@@ -120,7 +120,7 @@ public class SlowMovingStockReportActivity extends Activity {
 				public void run() {
 
 					final ArrayList<HashMap<String, Object>> result =
-						db.getSlowMovingStock(windowDays);
+						db.getSlowMovingStock(SlowMovingStockReportActivity.this, windowDays);
 
 					runOnUiThread(new Runnable() {
 							@Override

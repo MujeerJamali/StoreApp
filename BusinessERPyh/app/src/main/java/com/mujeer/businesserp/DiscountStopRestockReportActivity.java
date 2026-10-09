@@ -43,7 +43,7 @@ public class DiscountStopRestockReportActivity extends Activity {
 		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
 		info_bubble.setInfo(
 			"Discount & Stop-Restocking",
-			"Discount This Week: slow-moving stock (no sale in 30+ days), oldest first, each with a suggested discount tier (10/20/30%) based on how long it's been sitting. Stop Restocking: active items currently selling at or below their own cost - restocking at today's prices would be a loss."
+			"Discount This Week: slow-moving stock (no sale in 30+ effective days), oldest first, each with a suggested discount tier (10/20/30%) based on how long it's been sitting - a non-shoe item gets 3x as long before counting as slow (configurable in Reorder Settings), since general merchandise naturally turns over slower than shoes. Stop Restocking: active items currently selling at or below their own cost - restocking at today's prices would be a loss."
 		);
 
 		tv_discount_empty = findViewById(R.id.tv_discount_empty);
@@ -72,7 +72,7 @@ public class DiscountStopRestockReportActivity extends Activity {
 				public void run() {
 
 					final ArrayList<HashMap<String, Object>> discountCandidates =
-						db.getDiscountCandidates();
+						db.getDiscountCandidates(DiscountStopRestockReportActivity.this);
 
 					final ArrayList<HashMap<String, Object>> stopRestockingCandidates =
 						db.getStopRestockingCandidates();

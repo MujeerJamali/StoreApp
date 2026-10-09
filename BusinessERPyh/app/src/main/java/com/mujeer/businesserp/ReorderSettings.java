@@ -21,6 +21,7 @@ class ReorderSettings {
 	private static final String KEY_CASH_AWARE_ENABLED = "cash_aware_enabled";
 	private static final String KEY_MANUAL_CASH_OVERRIDE_ENABLED = "manual_cash_override_enabled";
 	private static final String KEY_MANUAL_CASH_OVERRIDE_AMOUNT = "manual_cash_override_amount";
+	private static final String KEY_NON_SHOE_TURNOVER_MULTIPLIER = "non_shoe_turnover_multiplier";
 
 	// Defaults - chosen to be reasonable for a small single-store shop
 	// re-ordering every week or two, not tuned to any real sales data yet.
@@ -30,6 +31,15 @@ class ReorderSettings {
 	static final double DEFAULT_MIN_ORDER_QTY = 1;
 	static final double DEFAULT_MAX_ORDER_QTY = 0; // 0 = no cap
 	static final boolean DEFAULT_CASH_AWARE_ENABLED = true;
+
+	// This shop's general merchandise (Clothes/Toys/Home/Tools) naturally
+	// turns over slower than its shoes (70% of volume, fast-moving) - a
+	// tool sitting 90 days isn't "dead stock" the way a shoe would be at
+	// that age. 3.0 means a non-shoe item gets 3x as long before Slow-
+	// Moving Stock/Discount This Week/Dead Stock Aging treat it the same
+	// as a shoe would at a given cutoff - see
+	// DatabaseHelper.getSlowMovingStock().
+	static final double DEFAULT_NON_SHOE_TURNOVER_MULTIPLIER = 3.0;
 
 	private static SharedPreferences prefs(Context context) {
 		return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -110,6 +120,18 @@ class ReorderSettings {
 
 	static void setManualCashOverrideAmount(Context context, double amount) {
 		prefs(context).edit().putFloat(KEY_MANUAL_CASH_OVERRIDE_AMOUNT, (float) amount).apply();
+	}
+
+	// How many times longer a non-shoe item gets before Slow-Moving
+	// Stock/Discount This Week/Dead Stock Aging treat it the same as a
+	// shoe would at a given cutoff - see DatabaseHelper.getSlowMovingStock().
+	static double getNonShoeTurnoverMultiplier(Context context) {
+		return prefs(context).getFloat(
+			KEY_NON_SHOE_TURNOVER_MULTIPLIER, (float) DEFAULT_NON_SHOE_TURNOVER_MULTIPLIER);
+	}
+
+	static void setNonShoeTurnoverMultiplier(Context context, double multiplier) {
+		prefs(context).edit().putFloat(KEY_NON_SHOE_TURNOVER_MULTIPLIER, (float) multiplier).apply();
 	}
 
 	// The actual cash figure the reorder engine should respect right now,

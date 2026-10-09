@@ -101,6 +101,36 @@
 
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:text="Non-shoe turnover multiplier" />
+
+            <TextView
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:layout_marginBottom="6dp"
+                android:textStyle="normal"
+                android:text="How many times longer a non-shoe item (Clothes/Toys/Home/Tools) gets before Slow-Moving Stock, Discount This Week, and Dead Stock Aging treat it the same as a shoe would - this shop's general merchandise naturally turns over slower than its shoes." />
+
+            <EditText
+                android:id="@+id/et_non_shoe_turnover_multiplier"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. 3"
+                android:inputType="numberDecimal" />
+
+        </LinearLayout>
+
         <Button
             android:id="@+id/btn_save_reorder_settings"
             style="@style/AppButton"

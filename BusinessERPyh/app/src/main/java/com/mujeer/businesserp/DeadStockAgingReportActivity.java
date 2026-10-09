@@ -47,7 +47,7 @@ public class DeadStockAgingReportActivity extends Activity {
 		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
 		info_bubble.setInfo(
 			"Dead Stock Aging",
-			"Stock sitting unsold for 60+ days, bucketed into 60-89/90-119/120+ days (or Never Sold). Start a clearance on any item to mark it down and track how much of it sells after - the percent shown is how much of the stock on hand when clearance began has sold since."
+			"Stock sitting unsold for 60+ effective days, bucketed into 60-89/90-119/120+ days (or Never Sold) - a non-shoe item gets 3x as long before counting as dead stock (configurable in Reorder Settings), since general merchandise naturally turns over slower than shoes. Start a clearance on any item to mark it down and track how much of it sells after - the percent shown is how much of the stock on hand when clearance began has sold since."
 		);
 
 		tv_clearances_empty = findViewById(R.id.tv_clearances_empty);
@@ -75,7 +75,8 @@ public class DeadStockAgingReportActivity extends Activity {
 				@Override
 				public void run() {
 
-					final ArrayList<HashMap<String, Object>> deadStock = db.getDeadStockAging();
+					final ArrayList<HashMap<String, Object>> deadStock =
+						db.getDeadStockAging(DeadStockAgingReportActivity.this);
 					final ArrayList<HashMap<String, Object>> clearances = db.getActiveClearances();
 
 					runOnUiThread(new Runnable() {

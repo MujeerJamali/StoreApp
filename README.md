@@ -128,7 +128,9 @@ BusinessERPyh/                  Gradle project root
   every input in **Reorder Settings** (gear icon on the same screen):
   the sales-speed window, a safety-stock %, a default supplier lead
   time, and a min/max order quantity - all user-editable, with
-  reasonable defaults, not hardcoded. A unit with no sales history
+  reasonable defaults, not hardcoded. Reorder Settings also holds the
+  non-shoe turnover multiplier (default 3x) that Slow-Moving Stock/
+  Discount This Week/Dead Stock Aging share - see those reports below. A unit with no sales history
   still qualifies if its own manual Reorder Threshold (Edit Item
   screen) says it's low, the same signal the Low Stock report uses.
   Two more signals adjust a suggestion before it's shown: a seasonal
@@ -371,14 +373,20 @@ would cost and what cash would be left after, since that's not
 committed yet - see `DatabaseHelper.getCashProjection()`) ·
 Slow-Moving Stock (every active item still carrying stock that hasn't
 sold within a 30/60/90/180 Days window, oldest/never-sold first - a
-never-sold item always qualifies regardless of how young it is; tapping
-a row opens that item) · Discount & Stop-Restocking (two independent
-lists on one screen: Discount This Week reuses the same slow-moving
-stock as above but with a suggested discount tier - 10% at 30-59 days
-since last sale, 20% at 60-89, 30% at 90+ or never sold - and Stop
-Restocking is every active item currently selling at or below its own
-cost basis, i.e. restocking it at today's prices would be a loss;
-tapping a row opens that item) · Stock Value (where current stock
+never-sold item always qualifies regardless of how young it is; a
+non-shoe item's days-since-sale is divided by Reorder Settings' non-
+shoe turnover multiplier (default 3x) before being compared against
+the window, since this shop's general merchandise (Clothes/Toys/Home/
+Tools) naturally turns over slower than its shoes - the window shown
+is always the item's real, truthful last-sold date, only the cutoff
+comparison is adjusted; tapping a row opens that item) · Discount &
+Stop-Restocking (two independent lists on one screen: Discount This
+Week reuses the same slow-moving stock as above but with a suggested
+discount tier - 10% at 30-59 effective days since last sale, 20% at
+60-89, 30% at 90+ or never sold, same category-adjusted effective days
+as Slow-Moving Stock - and Stop Restocking is every active item
+currently selling at or below its own cost basis, i.e. restocking it
+at today's prices would be a loss; tapping a row opens that item) · Stock Value (where current stock
 value - balance x purchase price, every active item with stock - is
 tied up, sliced two ways from the same total: by category, the first
 word of each item's name since there's no separate category field
@@ -399,9 +407,10 @@ that showed up in the same Sale, ranked by how often - and, the
 reverse direction, what it's rarely bought together with - every
 other sold item, ranked by that same co-occurrence count ascending, a
 possible missed cross-sell opportunity) · Dead Stock Aging (every
-active item with stock that hasn't sold in 60+ days - a stricter cutoff
-than Slow-Moving Stock's 30-day default - bucketed into 60-89/90-119/
-120+ days or Never Sold; tap Start Clearance on any row to mark it down
+active item with stock that hasn't sold in 60+ effective days - a
+stricter cutoff than Slow-Moving Stock's 30-day default, same category-
+adjusted effective days as above - bucketed into 60-89/90-119/120+ days
+or Never Sold; tap Start Clearance on any row to mark it down
 at a chosen discount %, which moves it into an Active Clearances
 section tracking how much of the stock on hand when clearance began
 has sold since, until End Clearance or it's all gone) · Margin &
@@ -410,7 +419,14 @@ shoes/non-shoes filter: Margin Erosion lists every item that sold in
 both months whose margin % dropped 5+ points, biggest drop first;
 Biggest Profit Swings lists the top 10 items by the size of their
 profit change vs last month, up or down; see Notifications below for
-the daily alert this same check also feeds)
+the daily alert this same check also feeds) · Size-Curve Analysis
+(shoes only, lifetime not period-based: every shoe size's share of
+sales vs its share of current stock - Size is parsed straight out of
+each item's name via `ShoeIdentity`, not a variety group, since every
+real shoe item here is already its own exact size; a size selling more
+than its share of stock is flagged as a stockout risk, one stocked
+more than it sells as cash sitting idle, anything within 3 points
+either way shown as Balanced)
 
 Every report list row that represents an item or a party is tappable
 and opens that item's or party's own screen (Net Profit, Item Ranking,
