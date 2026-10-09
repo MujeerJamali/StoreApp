@@ -269,6 +269,23 @@ BusinessERPyh/                  Gradle project root
   screen's normal validation. The Drafts screen lists every parked
   entry; tapping one reopens the right editor prefilled from it, and
   the draft is deleted once it's actually saved for real.
+- **Crash-Safe Draft Autosave** — a silent, separate safety net on top
+  of the explicit Drafts feature above: while composing a brand-new
+  Sale, Purchase, Payment, or Expense (never while editing an existing
+  committed one), that editor screen quietly autosaves what's on it
+  every 20 seconds, as long as there's at least a party or an
+  item/amount entered. If the app is killed or crashes mid-entry, the
+  next time that same kind of "Add" screen is opened fresh it offers to
+  **Resume** or **Discard** whatever was last autosaved. A real Save or
+  an explicit "Save as Draft" clears the autosave immediately - it's
+  only there to protect against never reaching either one. It's one
+  slot per entry type (`DatabaseHelper.DRAFT_TYPE_*`), overwritten in
+  place rather than piling up, stored in the same `drafts` table as a
+  real parked draft but flagged `is_autosave=1` so it never shows up in
+  the Drafts list itself. Being the automation's own safety net rather
+  than a business record the user created, it's deliberately **not**
+  part of the Vyapar backup round-trip, same reasoning as the reorder
+  suggestion log and Recently Deleted.
 - **Generate Entries** — bulk-create sale/purchase/payment/expense entries
   across a date range via a calendar tap UI. A generated Sale or Purchase
   is always a 100% credit transaction (no paid-amount concept in this

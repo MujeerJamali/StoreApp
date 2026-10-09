@@ -466,7 +466,11 @@ public class Transactioneditactivity extends Activity {
 
 			if (draftId != -1) {
 				loadDraft(draftId);
+			} else {
+				maybePromptResumeAutosave();
 			}
+
+			autosaveHandler.postDelayed(autosaveRunnable, 20_000);
 		}
 
 		lv_transaction_items.setOnItemLongClickListener(
@@ -629,6 +633,7 @@ public class Transactioneditactivity extends Activity {
 		super.onDestroy();
 
 		timeTickHandler.removeCallbacks(timeTickRunnable);
+		autosaveHandler.removeCallbacks(autosaveRunnable);
 	}
 
 	@Override
@@ -1686,6 +1691,16 @@ public class Transactioneditactivity extends Activity {
 
 		HashMap<String, Object> data = DraftCodec.decode((String) draftRow.get("data"));
 
+		applyDraftData(data);
+	}
+
+	// Shared by loadDraft() (a real, user-chosen draft from the Drafts
+	// list) and the crash-safety autosave resume prompt (see
+	// maybePromptResumeAutosave()) - both restore the exact same field
+	// set, built by buildDraftData() below.
+	@SuppressWarnings("unchecked")
+	private void applyDraftData(HashMap<String, Object> data) {
+
 		Integer partyId = (Integer) data.get("party_id");
 
 		if (partyId != null) {
@@ -1769,7 +1784,15 @@ public class Transactioneditactivity extends Activity {
 	// only the fields this screen has, generically enough that both
 	// Purchase and Sale use the same method.
 	// =====================
-	private void saveDraft() {
+	// Builds whatever is currently on screen into a draft-shaped map,
+	// deliberately with none of the validation a real save requires
+	// (missing party, no items, an amount that doesn't parse - all fine
+	// here, since finishing the entry later is exactly what a draft is
+	// for). Shared by saveDraft() (the user's own explicit "Save as
+	// Draft") and the periodic crash-safety autosave tick (see
+	// autosaveTick()) - mirrors only the fields this screen has,
+	// generically enough that both Purchase and Sale use it as-is.
+	private HashMap<String, Object> buildDraftData() {
 
 		HashMap<String, Object> data = new HashMap<String, Object>();
 
@@ -1801,6 +1824,17 @@ public class Transactioneditactivity extends Activity {
 			);
 		}
 
+		return data;
+	}
+
+	private void saveDraft() {
+
+		HashMap<String, Object> data = buildDraftData();
+
+		// Recomputed rather than reused from buildDraftData() - only
+		// needed here for the label shown in the Drafts list.
+		int partyPosition = getSelectedPartyPosition();
+
 		String encoded = DraftCodec.encode(data);
 
 		if (encoded == null) {
@@ -1825,14 +1859,20 @@ public class Transactioneditactivity extends Activity {
 			" - " + partyLabel + " - " + transactionItemList.size() +
 			(transactionItemList.size() == 1 ? " item" : " items");
 
+		String type = transactionType == TYPE_PURCHASE ?
+			DatabaseHelper.DRAFT_TYPE_PURCHASE : DatabaseHelper.DRAFT_TYPE_SALE;
+
 		db.insertDraft(
-			transactionType == TYPE_PURCHASE ?
-				DatabaseHelper.DRAFT_TYPE_PURCHASE : DatabaseHelper.DRAFT_TYPE_SALE,
+			type,
 			label,
 			encoded,
 			et_date.getText().toString(),
 			et_time.getText().toString()
 		);
+
+		// This explicit draft now holds the entry - the silent autosave
+		// safety net for this type is no longer needed.
+		DraftAutosave.clear(db, type);
 
 		android.widget.Toast.makeText(
 			this,
@@ -1841,6 +1881,96 @@ public class Transactioneditactivity extends Activity {
 		).show();
 
 		finishOrGoToDashboard();
+	}
+
+	// =====================
+	// CRASH-SAFE AUTOSAVE - a silent, periodic safety net for a brand-
+	// new (not-yet-committed) Sale/Purchase, completely separate from
+	// the user's own explicit "Save as Draft" above. Ticks every 20s
+	// while this screen is open (started/stopped alongside
+	// timeTickHandler - see onCreate()/onDestroy()), and writes nothing
+	// when there's nothing worth protecting yet (an untouched, still-
+	// blank screen) so a real autosave from a previous crashed session
+	// is never silently overwritten with an empty one on the way back
+	// in. Never shown in DraftsActivity, never part of the Vyapar
+	// round-trip - see DatabaseHelper.DATABASE_VERSION's comment.
+	// =====================
+	android.os.Handler autosaveHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+	Runnable autosaveRunnable = new Runnable() {
+			@Override
+			public void run() {
+				autosaveTick();
+				autosaveHandler.postDelayed(this, 20_000);
+			}
+		};
+
+	private void autosaveTick() {
+
+		if (isEditMode) {
+			return;
+		}
+
+		if (parties == null || transactionItemList == null) {
+			return;
+		}
+
+		boolean hasParty = getSelectedPartyPosition() != -1;
+		boolean hasItems = !transactionItemList.isEmpty();
+
+		if (!hasParty && !hasItems) {
+			return;
+		}
+
+		String type = transactionType == TYPE_PURCHASE ?
+			DatabaseHelper.DRAFT_TYPE_PURCHASE : DatabaseHelper.DRAFT_TYPE_SALE;
+
+		DraftAutosave.save(
+			db, type, buildDraftData(),
+			et_date.getText().toString(), et_time.getText().toString());
+	}
+
+	// Offers to resume a silent autosave left behind by a session that
+	// never reached a real Save/"Save as Draft" - e.g. a crash, or the
+	// app being killed while this screen was open. Only ever checked
+	// for a brand-new entry (never editing an existing transaction),
+	// and never when a specific draft was already explicitly requested
+	// via the "draft_id" intent extra - that explicit choice wins.
+	private void maybePromptResumeAutosave() {
+
+		String type = transactionType == TYPE_PURCHASE ?
+			DatabaseHelper.DRAFT_TYPE_PURCHASE : DatabaseHelper.DRAFT_TYPE_SALE;
+
+		final DraftAutosave.Pending pending = DraftAutosave.getPending(db, type);
+
+		if (pending == null) {
+			return;
+		}
+
+		new AlertDialog.Builder(this)
+			.setTitle("Resume unsaved entry?")
+			.setMessage(
+				"This app closed before you finished a " +
+				(transactionType == TYPE_PURCHASE ? "Purchase" : "Sale") +
+				" you were entering on " + pending.date + " at " + pending.time +
+				". Resume it, or discard it and start fresh.")
+			.setCancelable(false)
+			.setPositiveButton("Resume", new android.content.DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(android.content.DialogInterface dialog, int which) {
+						applyDraftData(pending.data);
+					}
+				})
+			.setNegativeButton("Discard", new android.content.DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(android.content.DialogInterface dialog, int which) {
+
+						String type = transactionType == TYPE_PURCHASE ?
+							DatabaseHelper.DRAFT_TYPE_PURCHASE : DatabaseHelper.DRAFT_TYPE_SALE;
+
+						DraftAutosave.clear(db, type);
+					}
+				})
+			.show();
 	}
 
 	// =====================
@@ -3407,6 +3537,10 @@ public class Transactioneditactivity extends Activity {
 			draftId = -1;
 		}
 
+		// A real Purchase just got committed - the autosave safety net
+		// (if any) is no longer needed.
+		DraftAutosave.clear(db, DatabaseHelper.DRAFT_TYPE_PURCHASE);
+
 		android.widget.Toast.makeText(
 		this,
 		isEditMode ? "Purchase updated" : "Purchase saved",
@@ -4159,6 +4293,10 @@ public class Transactioneditactivity extends Activity {
 			db.deleteDraft(draftId);
 			draftId = -1;
 		}
+
+		// A real Sale just got committed - the autosave safety net (if
+		// any) is no longer needed.
+		DraftAutosave.clear(db, DatabaseHelper.DRAFT_TYPE_SALE);
 
 		// Loyalty points - only for a brand-new Sale (see this method's
 		// own "only ever runs for a brand-new Sale" note below), never

@@ -243,7 +243,11 @@ public class Paymenteditactivity extends Activity {
 
 			if (draftId != -1) {
 				loadDraft(draftId);
+			} else {
+				maybePromptResumeAutosave();
 			}
+
+			autosaveHandler.postDelayed(autosaveRunnable, 20_000);
 
 			loadCashBaseline(0);
 
@@ -524,6 +528,13 @@ public class Paymenteditactivity extends Activity {
 
 		HashMap<String, Object> data = DraftCodec.decode((String) draftRow.get("data"));
 
+		applyDraftData(data);
+	}
+
+	// Shared by loadDraft() (a real, user-chosen draft) and the crash-
+	// safety autosave resume prompt (see maybePromptResumeAutosave()).
+	private void applyDraftData(HashMap<String, Object> data) {
+
 		if (data.get("type") != null) {
 			setSelectedType((Integer) data.get("type"));
 		}
@@ -554,7 +565,9 @@ public class Paymenteditactivity extends Activity {
 	// savePayment()'s validation applies here, a draft is allowed to be
 	// incomplete until it's actually saved for real.
 	// =====================
-	private void saveDraft() {
+	// Shared by saveDraft() and the periodic crash-safety autosave tick
+	// (see autosaveTick()).
+	private HashMap<String, Object> buildDraftData() {
 
 		HashMap<String, Object> data = new HashMap<String, Object>();
 
@@ -564,6 +577,13 @@ public class Paymenteditactivity extends Activity {
 		data.put("time", et_time.getText().toString());
 		data.put("amount", et_amount.getText().toString());
 		data.put("notes", et_notes.getText().toString());
+
+		return data;
+	}
+
+	private void saveDraft() {
+
+		HashMap<String, Object> data = buildDraftData();
 
 		String encoded = DraftCodec.encode(data);
 
@@ -591,9 +611,82 @@ public class Paymenteditactivity extends Activity {
 			et_time.getText().toString()
 		);
 
+		// This explicit draft now holds the entry - the silent autosave
+		// safety net is no longer needed.
+		DraftAutosave.clear(db, DatabaseHelper.DRAFT_TYPE_PAYMENT);
+
 		Toast.makeText(this, "Saved as draft", Toast.LENGTH_SHORT).show();
 
 		finish();
+	}
+
+	// =====================
+	// CRASH-SAFE AUTOSAVE - see Transactioneditactivity's own copy of
+	// this comment for the full reasoning; this is the Payment screen's
+	// identical application of the same pattern.
+	// =====================
+	private final android.os.Handler autosaveHandler =
+		new android.os.Handler(android.os.Looper.getMainLooper());
+
+	private final Runnable autosaveRunnable = new Runnable() {
+			@Override
+			public void run() {
+				autosaveTick();
+				autosaveHandler.postDelayed(this, 20_000);
+			}
+		};
+
+	private void autosaveTick() {
+
+		boolean hasParty = !et_party.getText().toString().trim().isEmpty();
+		boolean hasAmount = !et_amount.getText().toString().trim().isEmpty();
+
+		if (!hasParty && !hasAmount) {
+			return;
+		}
+
+		DraftAutosave.save(
+			db, DatabaseHelper.DRAFT_TYPE_PAYMENT, buildDraftData(),
+			et_date.getText().toString(), et_time.getText().toString());
+	}
+
+	private void maybePromptResumeAutosave() {
+
+		final DraftAutosave.Pending pending =
+			DraftAutosave.getPending(db, DatabaseHelper.DRAFT_TYPE_PAYMENT);
+
+		if (pending == null) {
+			return;
+		}
+
+		new android.app.AlertDialog.Builder(this)
+			.setTitle("Resume unsaved entry?")
+			.setMessage(
+				"This app closed before you finished a Payment you were entering on " +
+				pending.date + " at " + pending.time +
+				". Resume it, or discard it and start fresh.")
+			.setCancelable(false)
+			.setPositiveButton("Resume", new android.content.DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(android.content.DialogInterface dialog, int which) {
+						applyDraftData(pending.data);
+					}
+				})
+			.setNegativeButton("Discard", new android.content.DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(android.content.DialogInterface dialog, int which) {
+						DraftAutosave.clear(db, DatabaseHelper.DRAFT_TYPE_PAYMENT);
+					}
+				})
+			.show();
+	}
+
+	@Override
+	protected void onDestroy() {
+
+		super.onDestroy();
+
+		autosaveHandler.removeCallbacks(autosaveRunnable);
 	}
 
 	private void savePayment() {
@@ -713,6 +806,10 @@ public class Paymenteditactivity extends Activity {
 				db.deleteDraft(draftId);
 				draftId = -1;
 			}
+
+			// A real Payment just got committed - the autosave safety
+			// net (if any) is no longer needed.
+			DraftAutosave.clear(db, DatabaseHelper.DRAFT_TYPE_PAYMENT);
 
 			Toast.makeText(
 				this,

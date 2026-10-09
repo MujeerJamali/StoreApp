@@ -95,7 +95,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // Real standing user data, so it's included in the Vyapar
     // round-trip (kb_names.full_name_appearance - see
     // ExportVyaparActivity.exportParties()).
-    public static final int DATABASE_VERSION = 28;
+    // Bumped 28 -> 29 to add drafts.is_autosave - tells a silent crash-
+    // safety autosave row (saveAutosaveDraft()/getAutosaveDraft()/
+    // clearAutosaveDraft(), one slot per DRAFT_TYPE_*, overwritten in
+    // place) apart from a real "Save as Draft" row the user explicitly
+    // parked and expects to see in DraftsActivity - getAllDrafts() now
+    // excludes is_autosave=1 rows. This is the automation's own
+    // operational safety net, not a business record the user created,
+    // so it's deliberately NOT part of the Vyapar round-trip, same
+    // reasoning as reorder_suggestion_log/recently_deleted.
+    public static final int DATABASE_VERSION = 29;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -483,7 +492,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"label TEXT NOT NULL, " +
 			"data TEXT NOT NULL, " +
 			"date TEXT NOT NULL, " +
-			"time TEXT NOT NULL" +
+			"time TEXT NOT NULL, " +
+			// 0 = a real draft the user chose to park (shown in
+			// DraftsActivity); 1 = a silent crash-safety autosave slot
+			// (one per DRAFT_TYPE_*, never shown there) - see
+			// DATABASE_VERSION's comment.
+			"is_autosave INTEGER NOT NULL DEFAULT 0" +
 			")"
 		);
 
@@ -647,6 +661,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		// recognizing a walk-in customer later - see DATABASE_VERSION's
 		// comment and Partieseditactivity.
 		addColumnIfMissing(db, TABLE_PARTIES, "appearance_notes", "TEXT");
+
+		// Tells a silent crash-safety autosave row apart from a real
+		// "Save as Draft" row - see DATABASE_VERSION's comment.
+		addColumnIfMissing(db, TABLE_DRAFTS, "is_autosave", "INTEGER NOT NULL DEFAULT 0");
 
 		dropPurchaseCodeColumnIfPresent(db);
 	}
@@ -10752,6 +10770,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		Cursor cursor = db.rawQuery(
 			"SELECT id, type, label, date, time FROM " + TABLE_DRAFTS +
+			" WHERE is_autosave=0" +
 			" ORDER BY date DESC, time DESC, id DESC",
 			null
 		);
@@ -10805,6 +10824,67 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		SQLiteDatabase db = this.getWritableDatabase();
 
 		db.delete(TABLE_DRAFTS, "id=?", new String[]{String.valueOf(id)});
+	}
+
+	// =====================
+	// AUTOSAVE DRAFTS - a silent, crash-safety-only sibling of the
+	// drafts above (same table, is_autosave=1), one slot per
+	// DRAFT_TYPE_*, overwritten in place rather than accumulating rows -
+	// see DraftAutosave and DATABASE_VERSION's comment. Never shown in
+	// DraftsActivity (getAllDrafts() excludes is_autosave=1 rows) and
+	// never part of the Vyapar round-trip.
+	// =====================
+	public void saveAutosaveDraft(String type, String data, String date, String time) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.delete(
+			TABLE_DRAFTS,
+			"type=? AND is_autosave=1",
+			new String[]{type}
+		);
+
+		ContentValues values = new ContentValues();
+		values.put("type", type);
+		values.put("label", "Autosave");
+		values.put("data", data);
+		values.put("date", date);
+		values.put("time", time);
+		values.put("is_autosave", 1);
+
+		db.insert(TABLE_DRAFTS, null, values);
+	}
+
+	public HashMap<String, Object> getAutosaveDraft(String type) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT data, date, time FROM " + TABLE_DRAFTS +
+			" WHERE type=? AND is_autosave=1 LIMIT 1",
+			new String[]{type}
+		);
+
+		HashMap<String, Object> row = null;
+
+		if (cursor.moveToFirst()) {
+
+			row = new HashMap<String, Object>();
+			row.put("data", cursor.getString(0));
+			row.put("date", cursor.getString(1));
+			row.put("time", cursor.getString(2));
+		}
+
+		cursor.close();
+
+		return row;
+	}
+
+	public void clearAutosaveDraft(String type) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.delete(TABLE_DRAFTS, "type=? AND is_autosave=1", new String[]{type});
 	}
 
 	// =====================
