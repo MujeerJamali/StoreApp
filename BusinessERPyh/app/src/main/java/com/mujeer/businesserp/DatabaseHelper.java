@@ -80,7 +80,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // below: it's the automation's own operational memory, not a
     // business record - a restore starts the learning loop fresh
     // rather than needing to carry it across.
-    public static final int DATABASE_VERSION = 25;
+    // Bumped 25 -> 26 to add item_clearance - backs the Dead Stock
+    // Aging report's clearance workflow (see startClearance()/
+    // endClearance()/getActiveClearances()). Unlike reorder_suggestion_
+    // log above, this IS real standing user data (an active clearance
+    // decision), so it's included in the Vyapar round-trip.
+    public static final int DATABASE_VERSION = 26;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -164,6 +169,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// See DATABASE_VERSION's bump comment above for what this tracks and
 	// why it's excluded from the Vyapar round-trip.
 	public static final String TABLE_REORDER_SUGGESTION_LOG = "reorder_suggestion_log";
+
+	// An item currently marked down for clearance - one row per item
+	// (PRIMARY KEY item_id, not AUTOINCREMENT, since an item can only be
+	// in clearance once at a time; starting a new clearance on an item
+	// already in one replaces its row). starting_balance is the stock
+	// level when clearance began, so progress can be shown as how much
+	// of that has sold since.
+	public static final String TABLE_ITEM_CLEARANCE = "item_clearance";
 
 	public static final String DRAFT_TYPE_SALE = "sale";
 	public static final String DRAFT_TYPE_PURCHASE = "purchase";
@@ -520,6 +533,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"suggested_qty REAL NOT NULL, " +
 			"outcome TEXT, " +
 			"outcome_date TEXT" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_ITEM_CLEARANCE + " (" +
+			"item_id INTEGER PRIMARY KEY, " +
+			"started_date TEXT NOT NULL, " +
+			"discount_percent REAL NOT NULL, " +
+			"starting_balance REAL NOT NULL" +
 			")"
 		);
 
@@ -2395,6 +2417,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("combo_id", comboId);
 
 		return db.insert(TABLE_SAMPLE_SHOES, null, values);
+	}
+
+	// Bulk-import counterpart of startClearance() - operates on the
+	// given db and takes the exact started_date/starting_balance from
+	// the backup instead of computing them fresh, so a restore recreates
+	// the clearance exactly as it was, not as a brand-new one starting
+	// today.
+	public long insertItemClearanceBulk(
+		SQLiteDatabase db, int itemId, String startedDate, double discountPercent,
+		double startingBalance) {
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.put("started_date", startedDate);
+		values.put("discount_percent", discountPercent);
+		values.put("starting_balance", startingBalance);
+
+		return db.insertWithOnConflict(
+			TABLE_ITEM_CLEARANCE, null, values, SQLiteDatabase.CONFLICT_REPLACE
+		);
 	}
 
 	public void removeSampleShoeById(int id) {
@@ -5942,6 +5984,166 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			row.put("sale_price", salePrice);
 			row.put("margin", salePrice - costBasis);
 			row.put("balance", cursor.getDouble(6));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// =====================
+	// REPORT: DEAD STOCK AGING - every active item with stock that
+	// hasn't sold in 60+ days (a stricter cutoff than Slow-Moving
+	// Stock's 30-day default), bucketed into 60-89/90-119/120+ days,
+	// or Never Sold. Reuses the same day-count logic Discount This Week
+	// already does, just with a different cutoff and bucketing.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getDeadStockAging() {
+
+		ArrayList<HashMap<String, Object>> list = getSlowMovingStock(60);
+
+		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+		long todayMillis = new Date().getTime();
+
+		for (HashMap<String, Object> row : list) {
+
+			String lastSaleDate = (String) row.get("last_sale_date");
+
+			int daysSince;
+
+			if (lastSaleDate == null) {
+
+				daysSince = -1;
+
+			} else {
+
+				try {
+
+					long diffMillis = todayMillis - dateFormat.parse(lastSaleDate).getTime();
+					daysSince = (int) (diffMillis / (1000L * 60 * 60 * 24));
+
+				} catch (Exception e) {
+
+					daysSince = 60;
+				}
+			}
+
+			String ageBucket;
+
+			if (daysSince < 0) {
+				ageBucket = "Never Sold";
+			} else if (daysSince < 90) {
+				ageBucket = "60-89 Days";
+			} else if (daysSince < 120) {
+				ageBucket = "90-119 Days";
+			} else {
+				ageBucket = "120+ Days";
+			}
+
+			row.put("days_since_sale", daysSince);
+			row.put("age_bucket", ageBucket);
+
+			HashMap<String, Object> clearance = getClearanceForItem((Integer) row.get("item_id"));
+			row.put("clearance", clearance);
+		}
+
+		return list;
+	}
+
+	// Starts (or replaces, if already in one) clearance on an item at the
+	// given discount %, snapshotting its current stock as the baseline
+	// clearance progress is measured against.
+	public void startClearance(int itemId, double discountPercent) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		double currentBalance = getItemBalance(db, itemId);
+
+		String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+			.format(new Date());
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.put("started_date", today);
+		values.put("discount_percent", discountPercent);
+		values.put("starting_balance", currentBalance);
+
+		db.insertWithOnConflict(
+			TABLE_ITEM_CLEARANCE, null, values, SQLiteDatabase.CONFLICT_REPLACE
+		);
+	}
+
+	public void endClearance(int itemId) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.delete(TABLE_ITEM_CLEARANCE, "item_id=?", new String[]{String.valueOf(itemId)});
+	}
+
+	private HashMap<String, Object> getClearanceForItem(int itemId) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT started_date, discount_percent, starting_balance FROM " +
+			TABLE_ITEM_CLEARANCE + " WHERE item_id=?",
+			new String[]{String.valueOf(itemId)}
+		);
+
+		HashMap<String, Object> result = null;
+
+		if (cursor.moveToFirst()) {
+
+			result = new HashMap<String, Object>();
+			result.put("started_date", cursor.getString(0));
+			result.put("discount_percent", cursor.getDouble(1));
+			result.put("starting_balance", cursor.getDouble(2));
+		}
+
+		cursor.close();
+
+		return result;
+	}
+
+	// Every item currently in clearance, with its progress - how much of
+	// the starting balance has sold since clearance began (current
+	// balance is read fresh each time, not stored).
+	public ArrayList<HashMap<String, Object>> getActiveClearances() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT ic.item_id, i.code, i.name, i.balance, ic.started_date, " +
+			"ic.discount_percent, ic.starting_balance FROM " + TABLE_ITEM_CLEARANCE + " ic " +
+			"INNER JOIN " + TABLE_ITEMS + " i ON i.id = ic.item_id " +
+			"ORDER BY ic.started_date ASC",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+
+			double currentBalance = cursor.getDouble(3);
+			double startingBalance = cursor.getDouble(6);
+			double sold = startingBalance - currentBalance;
+
+			row.put("item_id", cursor.getInt(0));
+			row.put("code", cursor.getString(1));
+			row.put("name", cursor.getString(2));
+			row.put("current_balance", currentBalance);
+			row.put("started_date", cursor.getString(4));
+			row.put("discount_percent", cursor.getDouble(5));
+			row.put("starting_balance", startingBalance);
+
+			row.put(
+				"percent_cleared",
+				startingBalance > 0 ? Math.max(0, Math.min(100, sold / startingBalance * 100)) : 0
+			);
 
 			list.add(row);
 		}

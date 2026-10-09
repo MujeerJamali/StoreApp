@@ -218,6 +218,7 @@ public class ExportVyaparActivity extends Activity {
 			exportWantedItems(local, vyb);
 			exportDisplayShoes(local, vyb);
 			exportSampleShoes(local, vyb);
+			exportItemClearance(local, vyb);
 
 			// Deliberately NOT exported: TABLE_RECENTLY_DELETED. Unlike
 			// every table above, it holds already-deleted data's
@@ -644,6 +645,19 @@ public class ExportVyaparActivity extends Activity {
 			"id INTEGER PRIMARY KEY, " +
 			"item_id INTEGER, " +
 			"combo_id INTEGER" +
+			")"
+		);
+
+		// Items currently marked down for clearance (see
+		// DatabaseHelper.TABLE_ITEM_CLEARANCE) - item_id is itself the
+		// primary key (an item can only be in one clearance at a time),
+		// copied straight across like every other businesserp_* table.
+		vyb.execSQL(
+			"CREATE TABLE businesserp_item_clearance (" +
+			"item_id INTEGER PRIMARY KEY, " +
+			"started_date TEXT, " +
+			"discount_percent REAL, " +
+			"starting_balance REAL" +
 			")"
 		);
 	}
@@ -1300,6 +1314,30 @@ public class ExportVyaparActivity extends Activity {
 			values.put("combo_id", c.getLong(2));
 
 			vyb.insert("businesserp_sample_shoes", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// ITEM CLEARANCE -> businesserp_item_clearance (1:1 copy)
+	// =====================
+	private static void exportItemClearance(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery(
+			"SELECT item_id, started_date, discount_percent, starting_balance FROM item_clearance",
+			null
+		);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("item_id", c.getLong(0));
+			values.put("started_date", c.getString(1));
+			values.put("discount_percent", c.getDouble(2));
+			values.put("starting_balance", c.getDouble(3));
+
+			vyb.insert("businesserp_item_clearance", null, values);
 		}
 
 		c.close();

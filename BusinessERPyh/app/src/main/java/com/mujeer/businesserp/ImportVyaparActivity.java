@@ -125,6 +125,7 @@ public class ImportVyaparActivity extends Activity {
         int wantedItemsImported, wantedItemsDuplicate;
         int displayShoesImported, displayShoesDuplicate;
         int sampleShoesImported, sampleShoesDuplicate;
+        int itemClearanceImported, itemClearanceDuplicate;
     }
 
     @Override
@@ -311,6 +312,7 @@ public class ImportVyaparActivity extends Activity {
             boolean hasDisplayShoesTable = tableExists(vyaparDb, "businesserp_display_shoes");
             boolean hasSampleShoesTable = tableExists(vyaparDb, "businesserp_sample_shoes");
             boolean hasDraftsTable = tableExists(vyaparDb, "businesserp_drafts");
+            boolean hasItemClearanceTable = tableExists(vyaparDb, "businesserp_item_clearance");
 
             helper = new DatabaseHelper(this);
             helper.beginTransaction();
@@ -439,6 +441,12 @@ public class ImportVyaparActivity extends Activity {
                 importSampleShoes(vyaparDb, helper, db, itemIdMap, varietyComboIdMap, skipped, counts);
             }
 
+            if (hasItemClearanceTable) {
+
+                setStatus("Importing item clearance...");
+                importItemClearance(vyaparDb, helper, db, itemIdMap, skipped, counts);
+            }
+
             setStatus("Logging unsupported transaction types...");
             logUnsupportedTypes(vyaparDb, skipped);
 
@@ -552,6 +560,10 @@ public class ImportVyaparActivity extends Activity {
                     if (finalCounts.sampleShoesImported > 0 || finalCounts.sampleShoesDuplicate > 0) {
                         summary.append("Sample shoes: " + finalCounts.sampleShoesImported
 									   + " imported, " + finalCounts.sampleShoesDuplicate + " already imported\n");
+                    }
+                    if (finalCounts.itemClearanceImported > 0 || finalCounts.itemClearanceDuplicate > 0) {
+                        summary.append("Item clearance: " + finalCounts.itemClearanceImported
+									   + " imported, " + finalCounts.itemClearanceDuplicate + " already imported\n");
                     }
 
                     summary.append("\nRows not imported: " + finalSkippedCount);
@@ -2341,6 +2353,60 @@ public class ImportVyaparActivity extends Activity {
 
             helper.markImportKeyUsedBulk(db, importKey);
             counts.sampleShoesImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // ITEM CLEARANCE (businesserp_item_clearance) - only present when
+    // hasItemClearanceTable was true. item_id is NOT NULL (it's this
+    // table's own primary key - see TABLE_ITEM_CLEARANCE) - a row whose
+    // item no longer exists in this backup is dropped rather than left
+    // dangling.
+    // =====================
+    private void importItemClearance(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> itemIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT item_id, started_date, discount_percent, starting_balance " +
+            "FROM businesserp_item_clearance", null);
+
+        while (c.moveToNext()) {
+
+            long vybItemId = c.getLong(0);
+            String startedDate = c.getString(1);
+            double discountPercent = c.getDouble(2);
+            double startingBalance = c.getDouble(3);
+
+            String importKey = "vyb_item_clearance_" + vybItemId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.itemClearanceDuplicate++;
+                continue;
+            }
+
+            Integer itemId = resolveItem(helper, db, itemIdMap, vybItemId);
+
+            if (itemId == null) {
+
+                addSkipped(
+                    skipped, "item_clearance", vybItemId,
+                    "Its item no longer exists in this backup"
+                );
+
+                continue;
+            }
+
+            helper.insertItemClearanceBulk(db, itemId, startedDate, discountPercent, startingBalance);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.itemClearanceImported++;
         }
 
         c.close();

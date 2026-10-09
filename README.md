@@ -395,7 +395,13 @@ item, see what it's frequently bought together with - other items
 that showed up in the same Sale, ranked by how often - and, the
 reverse direction, what it's rarely bought together with - every
 other sold item, ranked by that same co-occurrence count ascending, a
-possible missed cross-sell opportunity)
+possible missed cross-sell opportunity) · Dead Stock Aging (every
+active item with stock that hasn't sold in 60+ days - a stricter cutoff
+than Slow-Moving Stock's 30-day default - bucketed into 60-89/90-119/
+120+ days or Never Sold; tap Start Clearance on any row to mark it down
+at a chosen discount %, which moves it into an Active Clearances
+section tracking how much of the stock on hand when clearance began
+has sold since, until End Clearance or it's all gone)
 
 Every report list row that represents an item or a party is tappable
 and opens that item's or party's own screen (Net Profit, Item Ranking,

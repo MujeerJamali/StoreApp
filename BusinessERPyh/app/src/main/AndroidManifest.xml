@@ -171,6 +171,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".DeadStockAgingReportActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".CostItemEditActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />
