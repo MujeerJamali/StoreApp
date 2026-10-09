@@ -45,6 +45,16 @@ BusinessERPyh/                  Gradle project root
   instead of the user typing the whole formatted string by hand.
   Editing an existing item that already matches the convention
   auto-checks the box and pre-fills the 7 fields from its current name.
+- **Swipe navigation** — on the plain Add Sale / Add Purchase / Add
+  Expense screens (never while editing an existing one, so a swipe
+  can't be mistaken for navigating away from in-progress edits), a
+  long, fast, mostly-vertical swipe cycles Sale → Purchase → Expense →
+  Sale on swipe up, reverse on swipe down (see `SwipeNavigationHelper`).
+  Tuned (distance + velocity thresholds) so ordinary scrolling or
+  tapping inside the form is never mistaken for the gesture, and it
+  always opens a fresh screen rather than finishing the current one,
+  so nothing typed is ever lost to a swipe - the previous screen just
+  sits in the back stack, reachable with a normal Back press.
 - **Purchases / Sales** — line-item transactions, size dropdowns on sale
   items only show sizes with stock, bulk Excel import for purchases. The
   Add/Edit Item dialog's Quantity, Price and Total fields are linked live:

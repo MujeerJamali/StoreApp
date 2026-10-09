@@ -67,6 +67,8 @@ public class Expenseeditactivity extends Activity {
 	private double cashBaseline = 0;
 	private boolean cashBaselineLoaded = false;
 
+	private SwipeNavigationHelper swipeNavigationHelper;
+
 	// Guards against the "Full Paid" checkbox's own listener reacting to
 	// a programmatic setText() the same way it would a real user tap -
 	// same convention as Transactioneditactivity's cb_full_paid.
@@ -234,6 +236,29 @@ public class Expenseeditactivity extends Activity {
 		);
 
 		btn_save_draft.setVisibility(expenseId == 0 ? View.VISIBLE : View.GONE);
+
+		// Swipe-up/down cycles Sale -> Purchase -> Expense -> Sale (and
+		// reverse on swipe down) - only on the plain Add flow, never
+		// while editing an existing expense, so a swipe can't be
+		// mistaken for navigating away from in-progress edits.
+		if (expenseId == 0) {
+
+			swipeNavigationHelper = new SwipeNavigationHelper(
+				this,
+				new Runnable() {
+					@Override
+					public void run() {
+						navigateToAddSale();
+					}
+				},
+				new Runnable() {
+					@Override
+					public void run() {
+						navigateToAddPurchase();
+					}
+				}
+			);
+		}
 
 		btn_save_draft.setOnClickListener(
 			new View.OnClickListener() {
@@ -1025,5 +1050,32 @@ public class Expenseeditactivity extends Activity {
 
 		dialog.show();
 	}
-	
+
+	@Override
+	public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+
+		if (swipeNavigationHelper != null) {
+			swipeNavigationHelper.onTouchEvent(ev);
+		}
+
+		return super.dispatchTouchEvent(ev);
+	}
+
+	// Starts a fresh instance rather than finishing this one, so nothing
+	// typed here is ever lost to a swipe - this screen just sits in the
+	// back stack, reachable with a normal Back press.
+	private void navigateToAddSale() {
+
+		Intent intent = new Intent(this, Transactioneditactivity.class);
+		intent.putExtra("transaction_type", Transactioneditactivity.TYPE_SALE);
+		startActivity(intent);
+	}
+
+	private void navigateToAddPurchase() {
+
+		Intent intent = new Intent(this, Transactioneditactivity.class);
+		intent.putExtra("transaction_type", Transactioneditactivity.TYPE_PURCHASE);
+		startActivity(intent);
+	}
+
 }

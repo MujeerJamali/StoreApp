@@ -30,8 +30,11 @@ import java.util.Map;
 public class Transactioneditactivity extends Activity {
 
 
-	private static final int TYPE_PURCHASE = 0;
-	private static final int TYPE_SALE = 1;
+	// Package-private (not private) so Expenseeditactivity's swipe
+	// navigation can pass these as the "transaction_type" extra without
+	// a magic number.
+	static final int TYPE_PURCHASE = 0;
+	static final int TYPE_SALE = 1;
 
 	// Used when the user types an item name in the add-item dialog that
 	// doesn't match anything and chooses to create it: Additemactivity is
@@ -48,6 +51,8 @@ public class Transactioneditactivity extends Activity {
 	private int transactionType = TYPE_PURCHASE;
 	private boolean isEditMode = false;
 	private int transactionId = -1;
+
+	private SwipeNavigationHelper swipeNavigationHelper;
 
 	// Set when this screen was opened from the Drafts list to finish a
 	// parked Sale/Purchase - once the real save succeeds, this draft row
@@ -187,6 +192,49 @@ public class Transactioneditactivity extends Activity {
 			-1
 		);
 
+		// Swipe-up/down cycles Sale -> Purchase -> Expense -> Sale (and
+		// reverse on swipe down) - only on the plain Add flow, never
+		// while editing an existing transaction, so a swipe can't be
+		// mistaken for navigating away from in-progress edits.
+		if (!isEditMode) {
+
+			if (transactionType == TYPE_SALE) {
+
+				swipeNavigationHelper = new SwipeNavigationHelper(
+					this,
+					new Runnable() {
+						@Override
+						public void run() {
+							navigateToAddPurchase();
+						}
+					},
+					new Runnable() {
+						@Override
+						public void run() {
+							navigateToAddExpense();
+						}
+					}
+				);
+
+			} else {
+
+				swipeNavigationHelper = new SwipeNavigationHelper(
+					this,
+					new Runnable() {
+						@Override
+						public void run() {
+							navigateToAddExpense();
+						}
+					},
+					new Runnable() {
+						@Override
+						public void run() {
+							navigateToAddSale();
+						}
+					}
+				);
+			}
+		}
 
 		actv_party = findViewById(R.id.actv_party);
         et_date = findViewById(R.id.et_date);
@@ -581,6 +629,38 @@ public class Transactioneditactivity extends Activity {
 		super.onDestroy();
 
 		timeTickHandler.removeCallbacks(timeTickRunnable);
+	}
+
+	@Override
+	public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+
+		if (swipeNavigationHelper != null) {
+			swipeNavigationHelper.onTouchEvent(ev);
+		}
+
+		return super.dispatchTouchEvent(ev);
+	}
+
+	// Starts a fresh instance rather than finishing this one, so nothing
+	// typed here is ever lost to a swipe - the previous Add screen just
+	// sits in the back stack, reachable with a normal Back press.
+	private void navigateToAddSale() {
+
+		Intent intent = new Intent(this, Transactioneditactivity.class);
+		intent.putExtra("transaction_type", TYPE_SALE);
+		startActivity(intent);
+	}
+
+	private void navigateToAddPurchase() {
+
+		Intent intent = new Intent(this, Transactioneditactivity.class);
+		intent.putExtra("transaction_type", TYPE_PURCHASE);
+		startActivity(intent);
+	}
+
+	private void navigateToAddExpense() {
+
+		startActivity(new Intent(this, Expenseeditactivity.class));
 	}
 
 	@Override
