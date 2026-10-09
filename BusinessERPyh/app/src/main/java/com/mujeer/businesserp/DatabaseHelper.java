@@ -5689,6 +5689,106 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// REPORT: DISCOUNT THIS WEEK - reuses getSlowMovingStock(30) (every
+	// active item with stock and no sale in 30+ days) and annotates each
+	// with a suggested discount tier based on how long it's actually
+	// been sitting: 30-59 days = 10%, 60-89 = 20%, 90+ (or never sold at
+	// all) = 30%. These tiers are a starting suggestion, not a rule the
+	// app enforces anywhere - the user still sets the actual sale price.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getDiscountCandidates() {
+
+		ArrayList<HashMap<String, Object>> list = getSlowMovingStock(30);
+
+		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+		long todayMillis = new Date().getTime();
+
+		for (HashMap<String, Object> row : list) {
+
+			String lastSaleDate = (String) row.get("last_sale_date");
+
+			int daysSince;
+
+			if (lastSaleDate == null) {
+
+				daysSince = -1;
+
+			} else {
+
+				try {
+
+					long diffMillis = todayMillis - dateFormat.parse(lastSaleDate).getTime();
+					daysSince = (int) (diffMillis / (1000L * 60 * 60 * 24));
+
+				} catch (Exception e) {
+
+					daysSince = 30;
+				}
+			}
+
+			int suggestedDiscountPercent;
+
+			if (daysSince < 0 || daysSince >= 90) {
+				suggestedDiscountPercent = 30;
+			} else if (daysSince >= 60) {
+				suggestedDiscountPercent = 20;
+			} else {
+				suggestedDiscountPercent = 10;
+			}
+
+			row.put("days_since_sale", daysSince);
+			row.put("suggested_discount_percent", suggestedDiscountPercent);
+		}
+
+		return list;
+	}
+
+	// =====================
+	// REPORT: STOP RESTOCKING - every active item whose Sale Price is at
+	// or below its own cost basis (purchase_price + extra_cost_per_unit,
+	// the same basis Net Profit/Item Monthly Rank use) right now - i.e.
+	// restocking it at today's prices would be selling at a loss or
+	// break-even. A snapshot of right now, same as Low Stock; it doesn't
+	// look at sales history the way Discount This Week does.
+	// =====================
+	public ArrayList<HashMap<String, Object>> getStopRestockingCandidates() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, code, name, purchase_price, extra_cost_per_unit, sale_price, balance FROM " +
+			TABLE_ITEMS +
+			" WHERE active = 1 AND sale_price <= (purchase_price + extra_cost_per_unit) " +
+			"ORDER BY name ASC",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+
+			double costBasis = cursor.getDouble(3) + cursor.getDouble(4);
+			double salePrice = cursor.getDouble(5);
+
+			row.put("item_id", cursor.getInt(0));
+			row.put("code", cursor.getString(1));
+			row.put("name", cursor.getString(2));
+			row.put("cost_basis", costBasis);
+			row.put("sale_price", salePrice);
+			row.put("margin", salePrice - costBasis);
+			row.put("balance", cursor.getDouble(6));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// =====================
 	// REPORT: STOCK WORTH - current stock quantity times purchase_price,
 	// split into shoes/non-shoes by the same name-prefix rule as
 	// everywhere else. This is always a snapshot of right now: the app

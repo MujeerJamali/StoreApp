@@ -361,7 +361,13 @@ unchanged; a Next 7/14/30/60 Days horizon spinner, default 30 Days) ·
 Slow-Moving Stock (every active item still carrying stock that hasn't
 sold within a 30/60/90/180 Days window, oldest/never-sold first - a
 never-sold item always qualifies regardless of how young it is; tapping
-a row opens that item) · Month-over-Month (This Month, 1st through
+a row opens that item) · Discount & Stop-Restocking (two independent
+lists on one screen: Discount This Week reuses the same slow-moving
+stock as above but with a suggested discount tier - 10% at 30-59 days
+since last sale, 20% at 60-89, 30% at 90+ or never sold - and Stop
+Restocking is every active item currently selling at or below its own
+cost basis, i.e. restocking it at today's prices would be a loss;
+tapping a row opens that item) · Month-over-Month (This Month, 1st through
 today, vs the full previous calendar month, for Sales/Net Profit/
 Expenses - each with its change and % change, colored green/red by
 whether that change is actually an improvement; Expenses is the one
