@@ -191,6 +191,18 @@ BusinessERPyh/                  Gradle project root
   reason, e.g. a goodwill credit or a redemption) for manual
   corrections. Real standing user data (a customer's earned rewards),
   so it's included in the Vyapar backup round-trip.
+- **Party Appearance / Description** — an optional free-form notes field
+  (e.g. "Tall, beard, usually wears a blue cap") to help recognize a
+  walk-in customer later. Editable only from the full Party edit screen
+  (`Partieseditactivity`), deliberately left off the quick "+Add New
+  Party" flow so that stays name-only and fast, same reasoning as the
+  Varieties/appearance fields kept off quick-add elsewhere in the app.
+  Shown read-only on the Party view screen in its own card, which is
+  hidden entirely when a party has no notes. Real standing user data, so
+  it's included in the Vyapar backup round-trip
+  (`kb_names.full_name_appearance` — gated by `columnExists()` on
+  import so a backup made before this field existed still restores
+  cleanly, with imported parties simply getting no notes).
 - **Cost Items / Linking Expenses to Purchases** — Expenses double as the
   source of a purchase's landed costs (petrol, shipping, packaging, ...);
   there's no separate "Purchase Cost" record to create. Cost Items is

@@ -751,13 +751,23 @@ public class ImportVyaparActivity extends Activity {
         ArrayList<SkippedRow> skipped,
         Counts counts) {
 
+        // full_name_appearance is this app's own extension (see
+        // ExportVyaparActivity) - absent from a real Vyapar backup, or one
+        // exported before the appearance-notes field existed, in which
+        // case every imported party simply gets no notes rather than
+        // failing the whole restore.
+        boolean hasAppearanceColumn = columnExists(vyaparDb, "kb_names", "full_name_appearance");
+
         Cursor c = vyaparDb.rawQuery(
-            "SELECT name_id, full_name FROM kb_names WHERE name_type=1", null);
+            "SELECT name_id, full_name" +
+            (hasAppearanceColumn ? ", full_name_appearance" : "") + " " +
+            "FROM kb_names WHERE name_type=1", null);
 
         while (c.moveToNext()) {
 
             long nameId = c.getLong(0);
             String fullName = c.getString(1);
+            String appearanceNotes = (hasAppearanceColumn && !c.isNull(2)) ? c.getString(2) : null;
             String importKey = "vyb_party_" + nameId;
 
             if (helper.isImportKeyUsedBulk(db, importKey)) {
@@ -777,7 +787,7 @@ public class ImportVyaparActivity extends Activity {
                 continue;
             }
 
-            int localId = (int) helper.getOrCreatePartyIdBulk(db, fullName.trim());
+            int localId = helper.getOrCreatePartyIdBulk(db, fullName.trim(), appearanceNotes);
 
             helper.markImportKeyUsedBulk(db, importKey);
             helper.saveVybLocalId(db, "party", nameId, localId);

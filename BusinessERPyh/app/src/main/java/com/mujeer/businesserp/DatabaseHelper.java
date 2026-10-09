@@ -90,7 +90,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // getLoyaltyPointsBalance()/adjustLoyaltyPoints()). Real standing
     // user data (a customer's earned rewards), so it's included in the
     // Vyapar round-trip, same reasoning as item_clearance above.
-    public static final int DATABASE_VERSION = 27;
+    // Bumped 27 -> 28 to add parties.appearance_notes - free-form notes
+    // for recognizing a walk-in customer later (see Partieseditactivity).
+    // Real standing user data, so it's included in the Vyapar
+    // round-trip (kb_names.full_name_appearance - see
+    // ExportVyaparActivity.exportParties()).
+    public static final int DATABASE_VERSION = 28;
 
     // Tables
     public static final String TABLE_PARTIES = "parties";
@@ -257,7 +262,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"CREATE TABLE IF NOT EXISTS " + TABLE_PARTIES + " (" +
 			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
 			"name TEXT NOT NULL UNIQUE, " +
-			"balance REAL NOT NULL DEFAULT 0" +
+			"balance REAL NOT NULL DEFAULT 0, " +
+			"appearance_notes TEXT" +
 			");"
         );
 
@@ -636,6 +642,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		if (oldVersion < 19) {
 			backfillCostItemsFromExistingItemText(db);
 		}
+
+		// Free-form appearance/description notes on a Party, for
+		// recognizing a walk-in customer later - see DATABASE_VERSION's
+		// comment and Partieseditactivity.
+		addColumnIfMissing(db, TABLE_PARTIES, "appearance_notes", "TEXT");
 
 		dropPurchaseCodeColumnIfPresent(db);
 	}
@@ -1017,12 +1028,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 // UPDATE PARTY
 // =====================
 
-	public boolean updateParty(int id, String name) {
+	public boolean updateParty(int id, String name, String appearanceNotes) {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
 		ContentValues values = new ContentValues();
 		values.put("name", name);
+		values.put("appearance_notes", appearanceNotes);
 
 		int rows = db.update(
             TABLE_PARTIES,
@@ -1033,6 +1045,32 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 
 		return rows > 0;
+	}
+
+	// Optional free-form notes helping recognize a walk-in customer
+	// later (e.g. "Tall, beard, usually wears a blue cap") - set from
+	// Partieseditactivity's full edit form, never from the quick "+Add
+	// New Party" flow, which stays name-only for speed. Empty string
+	// when a party has none, never null, so callers never need a
+	// null-check before displaying it.
+	public String getPartyAppearanceNotes(int partyId) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT appearance_notes FROM " + TABLE_PARTIES + " WHERE id=?",
+			new String[]{String.valueOf(partyId)}
+		);
+
+		String notes = "";
+
+		if (cursor.moveToFirst() && !cursor.isNull(0)) {
+			notes = cursor.getString(0);
+		}
+
+		cursor.close();
+
+		return notes;
 	}
 	// =====================
 // PARTY EXISTS
@@ -9447,6 +9485,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	public int getOrCreatePartyIdBulk(SQLiteDatabase db, String name) {
+		return getOrCreatePartyIdBulk(db, name, null);
+	}
+
+	// appearanceNotes is only ever applied on a freshly-inserted row (e.g.
+	// Vyapar import) - an existing party found by name keeps whatever
+	// appearance_notes it already has, since this method has no way to
+	// tell "blank on purpose" apart from "caller didn't pass one."
+	public int getOrCreatePartyIdBulk(SQLiteDatabase db, String name, String appearanceNotes) {
 
 		if (name == null || name.trim().length() == 0) {
 			name = "Cash Sale";
@@ -9470,6 +9516,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		ContentValues values = new ContentValues();
 		values.put("name", name);
+		values.put("appearance_notes", appearanceNotes);
 
 		long id = db.insertWithOnConflict(
 			TABLE_PARTIES,
@@ -9484,7 +9531,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		// Someone else created the same party name in this transaction
 		// (e.g. an earlier row in the same file) - look it up again.
-		return getOrCreatePartyIdBulk(db, name);
+		return getOrCreatePartyIdBulk(db, name, appearanceNotes);
 	}
 
 	// =====================

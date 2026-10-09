@@ -406,7 +406,13 @@ public class ExportVyaparActivity extends Activity {
 			"CREATE TABLE kb_names (" +
 			"name_id INTEGER PRIMARY KEY, " +
 			"full_name TEXT, " +
-			"name_type INTEGER" +
+			"name_type INTEGER, " +
+			// This app's own extension (party appearance/description notes,
+			// used to help recognize a walk-in customer later) - absent from
+			// a real Vyapar backup or an export made before this field
+			// existed, which ImportVyaparActivity's columnExists check
+			// detects up front so an older backup still restores cleanly.
+			"full_name_appearance TEXT" +
 			")"
 		);
 
@@ -683,7 +689,8 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	private static void exportParties(SQLiteDatabase local, SQLiteDatabase vyb) {
 
-		Cursor c = local.rawQuery("SELECT id, name FROM parties", null);
+		Cursor c = local.rawQuery(
+			"SELECT id, name, appearance_notes FROM parties", null);
 
 		while (c.moveToNext()) {
 
@@ -691,6 +698,7 @@ public class ExportVyaparActivity extends Activity {
 			values.put("name_id", c.getLong(0));
 			values.put("full_name", c.getString(1));
 			values.put("name_type", 1);
+			values.put("full_name_appearance", c.getString(2));
 
 			vyb.insert("kb_names", null, values);
 		}

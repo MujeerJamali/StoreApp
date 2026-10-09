@@ -23,6 +23,8 @@ public class Partyviewactivity extends Activity {
     TextView tv_party_balance;
     TextView tv_party_loyalty_points;
     TextView tv_adjust_loyalty_points;
+    View container_party_appearance;
+    TextView tv_party_appearance;
     TextView tv_transactions_empty;
     Button btn_edit_party, btn_delete_party;
 
@@ -45,6 +47,8 @@ public class Partyviewactivity extends Activity {
         tv_party_balance = findViewById(R.id.tv_party_balance);
         tv_party_loyalty_points = findViewById(R.id.tv_party_loyalty_points);
         tv_adjust_loyalty_points = findViewById(R.id.tv_adjust_loyalty_points);
+        container_party_appearance = findViewById(R.id.container_party_appearance);
+        tv_party_appearance = findViewById(R.id.tv_party_appearance);
         tv_transactions_empty = findViewById(R.id.tv_transactions_empty);
         btn_edit_party = findViewById(R.id.btn_edit_party);
         btn_delete_party = findViewById(R.id.btn_delete_party);
@@ -287,6 +291,15 @@ public class Partyviewactivity extends Activity {
 
                 tv_party_balance.setText("0 (Settled)");
                 tv_party_balance.setTextColor(getResources().getColor(R.color.text_secondary));
+            }
+
+            String appearanceNotes = db.getPartyAppearanceNotes(partyId);
+
+            if (appearanceNotes != null && !appearanceNotes.isEmpty()) {
+                tv_party_appearance.setText(appearanceNotes);
+                container_party_appearance.setVisibility(View.VISIBLE);
+            } else {
+                container_party_appearance.setVisibility(View.GONE);
             }
         }
     }

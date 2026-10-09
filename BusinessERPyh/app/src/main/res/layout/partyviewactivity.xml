@@ -71,6 +71,28 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/container_party_appearance"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp"
+            android:visibility="gone">
+
+            <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Appearance / Description" />
+
+            <TextView
+                android:id="@+id/tv_party_appearance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"

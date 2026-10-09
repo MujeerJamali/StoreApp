@@ -11,6 +11,7 @@ import android.widget.Toast;
 public class Partieseditactivity extends Activity {
 
     EditText et_party_name;
+    EditText et_party_appearance;
     TextView tv_party_balance;
     Button btn_update_party;
 
@@ -25,6 +26,7 @@ public class Partieseditactivity extends Activity {
         setContentView(R.layout.partieseditactivityv);
 
         et_party_name = findViewById(R.id.et_party_name);
+        et_party_appearance = findViewById(R.id.et_party_appearance);
         tv_party_balance = findViewById(R.id.tv_party_balance);
         btn_update_party = findViewById(R.id.btn_update_party);
 
@@ -36,6 +38,7 @@ public class Partieseditactivity extends Activity {
 
             originalName = db.getPartyById(partyId);
             et_party_name.setText(originalName);
+            et_party_appearance.setText(db.getPartyAppearanceNotes(partyId));
 
             double balance = db.getPartyBalance(partyId);
 
@@ -84,7 +87,9 @@ public class Partieseditactivity extends Activity {
 						return;
 					}
 
-					if (db.updateParty(partyId, name)) {
+					String appearanceNotes = et_party_appearance.getText().toString().trim();
+
+					if (db.updateParty(partyId, name, appearanceNotes)) {
 
 						Toast.makeText(
                             Partieseditactivity.this,

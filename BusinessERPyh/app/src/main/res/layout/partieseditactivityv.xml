@@ -24,9 +24,24 @@
             <EditText
                 android:id="@+id/et_party_name"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" 
+                android:layout_height="wrap_content"
         android:inputType="text|textNoSuggestions"
         />
+
+            <TextView style="@style/FieldLabel" android:text="Appearance / Description" />
+            <TextView
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:layout_marginBottom="6dp"
+                android:textStyle="normal"
+                android:text="Optional - helps recognize a walk-in customer later, e.g. &quot;Tall, beard, usually wears a blue cap&quot;." />
+            <EditText
+                android:id="@+id/et_party_appearance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minLines="2"
+                android:gravity="top"
+                android:inputType="textMultiLine|textCapSentences" />
 
             <TextView style="@style/FieldLabel" android:text="Current Balance" />
             <TextView
