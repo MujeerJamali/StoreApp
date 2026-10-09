@@ -169,7 +169,15 @@ BusinessERPyh/                  Gradle project root
   ignored repeatedly, or that led to overstock); that log is
   deliberately **not** part of the Vyapar backup round-trip, same
   reasoning as Recently Deleted above - it's the automation's own
-  operational memory, not a business record.
+  operational memory, not a business record. Since there's no in-app
+  screen that lists this raw log, Reorder Settings has its own
+  **Export History (.csv)** button (`DatabaseHelper.
+  getReorderSuggestionLogForExport()`) that writes every logged
+  suggestion - date, item, variety, quantity, and outcome - to a plain
+  .csv file (openable in Excel/Sheets) via the same system file-picker
+  pattern Export Vyapar Backup uses. Same reasoning as the log itself:
+  this is the automation's own history, not business data, so it's
+  deliberately separate from the Vyapar round-trip too.
 - **Loyalty Points** (Dashboard Tools card, pinnable as a Favorite) —
   every named customer earns 1 point per ₹100 spent on a Sale (floored;
   `DatabaseHelper.LOYALTY_POINTS_PER_RUPEES`), skipped for the "Cash

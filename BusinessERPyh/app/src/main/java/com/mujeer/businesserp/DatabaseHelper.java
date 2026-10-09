@@ -6137,6 +6137,53 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		db.insert(TABLE_REORDER_SUGGESTION_LOG, null, values);
 	}
 
+	// Every reorder_suggestion_log row, newest first, with the item's
+	// code/name and (if any) variety combo label already resolved -
+	// used only by ReorderSettingsActivity's "Export History" button
+	// (see that class) to let the user review/share the raw learning
+	// log outside the app. Not a live report screen, so no filtering/
+	// paging - the log is expected to stay small relative to a small
+	// shop's real transaction volume.
+	public ArrayList<HashMap<String, Object>> getReorderSuggestionLogForExport() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT l.suggested_date, i.code, i.name, l.combo_id, l.suggested_qty, " +
+			"l.outcome, l.outcome_date " +
+			"FROM " + TABLE_REORDER_SUGGESTION_LOG + " l " +
+			"LEFT JOIN " + TABLE_ITEMS + " i ON i.id = l.item_id " +
+			"ORDER BY l.suggested_date DESC, l.id DESC",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+
+			row.put("suggested_date", cursor.getString(0));
+			row.put("item_code", cursor.isNull(1) ? "" : cursor.getString(1));
+			row.put("item_name", cursor.isNull(2) ? "(deleted item)" : cursor.getString(2));
+
+			row.put(
+				"combo_label",
+				cursor.isNull(3) ? "" : getComboLabel(db, cursor.getInt(3))
+			);
+
+			row.put("suggested_qty", cursor.getDouble(4));
+			row.put("outcome", cursor.isNull(5) ? "pending" : cursor.getString(5));
+			row.put("outcome_date", cursor.isNull(6) ? "" : cursor.getString(6));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
 	// =====================
 	// TRENDING FLAGS - compares each item's last 7 days of sales against
 	// the 7 days before that, at the whole-item level (summed across any

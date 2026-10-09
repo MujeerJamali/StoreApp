@@ -131,6 +131,36 @@
 
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:text="Reorder Learning History" />
+
+            <TextView
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:layout_marginBottom="10dp"
+                android:textStyle="normal"
+                android:text="Every past Reorder List suggestion and what happened to it (converted to a draft Purchase, or ignored) - the raw log behind the learning loop. Exports as a .csv file you can open in Excel/Sheets." />
+
+            <Button
+                android:id="@+id/btn_export_reorder_history"
+                style="@style/AppButton.Outline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Export History (.csv)" />
+
+        </LinearLayout>
+
         <Button
             android:id="@+id/btn_save_reorder_settings"
             style="@style/AppButton"
