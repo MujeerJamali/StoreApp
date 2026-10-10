@@ -170,6 +170,11 @@ public class GenerateEntriesActivity extends Activity {
 		allParties = db.getParties();
 		allItems = db.getItems();
 
+		// Recently sold items pinned to top of the item picker below -
+		// see ItemPickerUtils (same behavior as Transactioneditactivity's
+		// Add/Edit Item dialog).
+		ItemPickerUtils.pinRecentlySoldItemsFirst(db, allItems);
+
 		partyNames = new ArrayList<String>();
 		partyIdByName = new HashMap<String, Integer>();
 		partySubtitleByName = new HashMap<String, String>();

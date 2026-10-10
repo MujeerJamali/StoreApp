@@ -28,6 +28,7 @@ public class Itemviewactivity extends Activity {
     TextView tv_extra_cost_per_unit;
     View container_locations;
     TextView tv_item_locations;
+    TextView tv_holiday_seasonal_badge;
 
     LinearLayout cardVarietiesView;
     LinearLayout containerVarietiesView;
@@ -69,6 +70,7 @@ public class Itemviewactivity extends Activity {
         tv_extra_cost_per_unit = findViewById(R.id.tv_extra_cost_per_unit);
         container_locations = findViewById(R.id.container_locations);
         tv_item_locations = findViewById(R.id.tv_item_locations);
+        tv_holiday_seasonal_badge = findViewById(R.id.tv_holiday_seasonal_badge);
 
         cardVarietiesView = findViewById(R.id.card_varieties_view);
         containerVarietiesView = findViewById(R.id.container_varieties_view);
@@ -337,6 +339,10 @@ public class Itemviewactivity extends Activity {
 
                 container_locations.setVisibility(View.GONE);
             }
+
+            tv_holiday_seasonal_badge.setVisibility(
+                Boolean.TRUE.equals(item.get("holiday_seasonal")) ? View.VISIBLE : View.GONE
+            );
 
             double stock = 0;
 

@@ -1099,42 +1099,14 @@ public class Transactioneditactivity extends Activity {
 	}
 
 	// Moves whatever items were sold most recently to the front of the
-	// Add Item dialog's picker, most-recently-sold first, leaving every
-	// other item in its existing (alphabetical) order behind them - on
-	// both the Sale and Purchase screens, since a fast-selling item is
-	// exactly the one worth restocking too. The AutoCompleteTextView's
-	// default filter preserves whatever order it's handed among the
-	// names that match what's typed, so reordering this source list is
-	// enough to pin them at the top of the dropdown too.
+	// Add Item dialog's picker - on both the Sale and Purchase screens,
+	// since a fast-selling item is exactly the one worth restocking
+	// too. See ItemPickerUtils for the shared implementation (also used
+	// by GenerateEntriesActivity) and why reordering the source list is
+	// enough to pin them at the top of an AutoCompleteTextView's
+	// dropdown too.
 	private void pinRecentlySoldItemsFirst(ArrayList<HashMap<String, Object>> items) {
-
-		ArrayList<Integer> recentItemIds = db.getRecentlySoldItemIds(8);
-
-		if (recentItemIds.isEmpty()) {
-			return;
-		}
-
-		ArrayList<HashMap<String, Object>> remaining =
-			new ArrayList<HashMap<String, Object>>(items);
-		ArrayList<HashMap<String, Object>> reordered =
-			new ArrayList<HashMap<String, Object>>();
-
-		for (Integer recentItemId : recentItemIds) {
-
-			for (int i = 0; i < remaining.size(); i++) {
-
-				if (recentItemId.equals(remaining.get(i).get("id"))) {
-
-					reordered.add(remaining.remove(i));
-					break;
-				}
-			}
-		}
-
-		reordered.addAll(remaining);
-
-		items.clear();
-		items.addAll(reordered);
+		ItemPickerUtils.pinRecentlySoldItemsFirst(db, items);
 	}
 
     private void setCurrentDateTime() {

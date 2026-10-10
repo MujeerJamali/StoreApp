@@ -25,6 +25,7 @@ public class Itemseditactivity extends Activity {
     EditText et_reorder_threshold;
     EditText et_item_locations;
     CheckBox cb_active;
+    CheckBox cb_holiday_seasonal;
 
     CheckBox cb_is_shoe;
     TextView tv_item_name_label;
@@ -61,6 +62,7 @@ public class Itemseditactivity extends Activity {
         et_reorder_threshold = findViewById(R.id.et_reorder_threshold);
         et_item_locations = findViewById(R.id.et_item_locations);
         cb_active = findViewById(R.id.cb_active);
+        cb_holiday_seasonal = findViewById(R.id.cb_holiday_seasonal);
 
         cb_is_shoe = findViewById(R.id.cb_is_shoe);
         tv_item_name_label = findViewById(R.id.tv_item_name_label);
@@ -149,6 +151,7 @@ public class Itemseditactivity extends Activity {
             et_item_locations.setText(locations == null ? "" : locations);
 
             cb_active.setChecked(!Boolean.FALSE.equals(item.get("active")));
+            cb_holiday_seasonal.setChecked(Boolean.TRUE.equals(item.get("holiday_seasonal")));
 
             // Varieties only make sense once the item has an id to attach
             // groups to - a brand-new item has to be saved once first.
@@ -222,6 +225,7 @@ public class Itemseditactivity extends Activity {
 						db.setItemActive(itemId, cb_active.isChecked());
 						db.updateItemLocations(
 							itemId, et_item_locations.getText().toString().trim());
+						db.updateItemHolidaySeasonal(itemId, cb_holiday_seasonal.isChecked());
 
 						Toast.makeText(
                             Itemseditactivity.this,

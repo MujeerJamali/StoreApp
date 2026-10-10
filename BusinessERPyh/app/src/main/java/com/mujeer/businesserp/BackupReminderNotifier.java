@@ -55,6 +55,29 @@ class BackupReminderNotifier {
 			.apply();
 	}
 
+	// Backs the visible "Last successful backup: X days ago" readout on
+	// the Export Vyapar screen (approved feature "Backup health check") -
+	// -1 means recordBackupNow() has never actually run on this device.
+	static long getDaysSinceLastBackup(Context appContext) {
+
+		long lastBackup = appContext
+			.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+			.getLong(KEY_LAST_BACKUP_MILLIS, 0);
+
+		if (lastBackup == 0) {
+			return -1;
+		}
+
+		return TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - lastBackup);
+	}
+
+	// Same 7-day threshold the overdue notification already uses, so
+	// the visible readout and the notification always agree on when a
+	// backup counts as "overdue".
+	static int getReminderThresholdDays() {
+		return REMINDER_THRESHOLD_DAYS;
+	}
+
 	static void checkAndNotifyIfNeeded(final Context appContext) {
 
 		final SharedPreferences prefs =

@@ -107,6 +107,24 @@
 
             </LinearLayout>
 
+            <!-- Manual "holiday/gift-driven item" flag - see
+                 DatabaseHelper.getHolidaySeasonalMultiplier(). -->
+            <TextView
+                android:id="@+id/tv_holiday_seasonal_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_chip"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp"
+                android:text="Holiday/Gift Item"
+                android:textColor="@color/primary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
             <TextView
                 style="@style/FieldLabel"
                 android:text="Sale Price" />

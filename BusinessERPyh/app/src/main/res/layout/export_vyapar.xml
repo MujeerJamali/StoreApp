@@ -18,6 +18,22 @@
         android:textColor="@color/text_secondary"
         android:textSize="13sp" />
 
+    <!-- Backup health check (approved feature "last successful backup:
+         X days ago" warning) - a visible, always-there readout rather
+         than only the silent 7-day-overdue notification
+         (BackupReminderNotifier) that already existed. See
+         ExportVyaparActivity#applyBackupHealthStatus(). -->
+    <TextView
+        android:id="@+id/tv_backup_health"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_chip"
+        android:padding="10dp"
+        android:text="Never backed up yet"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
+
     <Button
         android:id="@+id/btn_export_vyb"
         style="@style/AppButton"

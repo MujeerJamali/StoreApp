@@ -143,7 +143,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // over-budget alert. Real standing user data (the shop owner's own
     // spending limit per category), so it's included in the Vyapar
     // round-trip.
-    public static final int DATABASE_VERSION = 34;
+    // Bumped 34 -> 35 to add items.holiday_seasonal (0/1, default 0) -
+    // a manual "this is a holiday/gift-driven item" flag (toys,
+    // decorations, etc.), distinct from the generic per-item
+    // auto-detected seasonal pattern (getSeasonalMultiplier()): a toy
+    // that's only ever been sold for one season has no sales history
+    // to auto-detect a pattern from, so this is a manual override the
+    // owner sets once. Applies an extra boost multiplier to reorder
+    // suggestions during the Oct-Dec holiday-shopping window (see
+    // getHolidaySeasonalMultiplier()). Real standing user data (the
+    // shop owner's own classification of this item), so it's included
+    // in the Vyapar round-trip.
+    public static final int DATABASE_VERSION = 35;
 
     // A party's customer tagging (default REGULAR) - see DATABASE_VERSION's
     // comment, Partieseditactivity's Customer Type spinner, and the
@@ -355,7 +366,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"extra_cost_per_unit REAL NOT NULL DEFAULT 0, " +
 			"active INTEGER NOT NULL DEFAULT 1, " +
 			"reorder_threshold REAL NOT NULL DEFAULT 0, " +
-			"locations TEXT NOT NULL DEFAULT ''" +
+			"locations TEXT NOT NULL DEFAULT '', " +
+			"holiday_seasonal INTEGER NOT NULL DEFAULT 0" +
 			");"
 		);
 
@@ -784,6 +796,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		// Monthly spending limit per expense category (0 = no budget set)
 		// - see DATABASE_VERSION's comment and CostItemEditActivity.
 		addColumnIfMissing(db, TABLE_COST_ITEMS, "monthly_budget", "REAL NOT NULL DEFAULT 0");
+
+		// Manual holiday/gift-driven item flag (0/1) - see
+		// DATABASE_VERSION's comment and Itemseditactivity.
+		addColumnIfMissing(db, TABLE_ITEMS, "holiday_seasonal", "INTEGER NOT NULL DEFAULT 0");
 
 		dropPurchaseCodeColumnIfPresent(db);
 	}
@@ -1636,7 +1652,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		Cursor cursor = db.rawQuery(
 			"SELECT code, name, purchase_price, sale_price, balance, extra_cost_per_unit, active, " +
-			"reorder_threshold, locations FROM " +
+			"reorder_threshold, locations, holiday_seasonal FROM " +
 			TABLE_ITEMS +
 			" WHERE id=?",
 			new String[]{String.valueOf(id)}
@@ -1653,6 +1669,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("active", cursor.getInt(6) != 0);
 			map.put("reorder_threshold", cursor.getDouble(7));
 			map.put("locations", cursor.getString(8));
+			map.put("holiday_seasonal", cursor.getInt(9) != 0);
 		}
 
 		cursor.close();
@@ -1670,6 +1687,25 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		ContentValues values = new ContentValues();
 		values.put("locations", locations == null ? "" : locations);
+
+		db.update(TABLE_ITEMS, values, "id=?", new String[]{String.valueOf(itemId)});
+	}
+
+	// Manual "this is a holiday/gift-driven item" flag (toys,
+	// decorations, etc.) - feeds getHolidaySeasonalMultiplier() inside
+	// the reorder suggestion formula. Set separately from insertItem()/
+	// updateItem(), same pattern as updateItemLocations().
+	public void updateItemHolidaySeasonal(int itemId, boolean holidaySeasonal) {
+		updateItemHolidaySeasonalBulk(this.getWritableDatabase(), itemId, holidaySeasonal);
+	}
+
+	// Vyapar-import variant operating on a passed-in connection, same
+	// pattern as updatePartyCustomerTypeBulk()/updateCostItemBudgetBulk().
+	public void updateItemHolidaySeasonalBulk(
+		SQLiteDatabase db, int itemId, boolean holidaySeasonal) {
+
+		ContentValues values = new ContentValues();
+		values.put("holiday_seasonal", holidaySeasonal ? 1 : 0);
 
 		db.update(TABLE_ITEMS, values, "id=?", new String[]{String.valueOf(itemId)});
 	}
@@ -6265,8 +6301,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			.format(windowStart.getTime());
 
 		Cursor itemCursor = db.rawQuery(
-			"SELECT id, code, name, balance, purchase_price, reorder_threshold FROM " +
-			TABLE_ITEMS + " WHERE active = 1",
+			"SELECT id, code, name, balance, purchase_price, reorder_threshold, " +
+			"holiday_seasonal FROM " + TABLE_ITEMS + " WHERE active = 1",
 			null
 		);
 
@@ -6278,6 +6314,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			double itemBalance = itemCursor.getDouble(3);
 			double purchasePrice = itemCursor.getDouble(4);
 			double manualThreshold = itemCursor.getDouble(5);
+			boolean holidaySeasonal = itemCursor.getInt(6) != 0;
 
 			ArrayList<HashMap<String, Object>> combos = getVarietyCombos(itemId);
 
@@ -6285,8 +6322,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 				HashMap<String, Object> suggestion = buildReorderSuggestion(
 					db, itemId, 0, null, code, name, itemBalance, purchasePrice,
-					manualThreshold, windowStartDate, velocityWindowDays, leadTimeDays,
-					safetyStockPercent, minOrderQty, maxOrderQty
+					manualThreshold, holidaySeasonal, windowStartDate, velocityWindowDays,
+					leadTimeDays, safetyStockPercent, minOrderQty, maxOrderQty
 				);
 
 				if (suggestion != null) {
@@ -6303,7 +6340,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 					HashMap<String, Object> suggestion = buildReorderSuggestion(
 						db, itemId, comboId, comboLabel, code, name, comboBalance,
-						purchasePrice, manualThreshold, windowStartDate,
+						purchasePrice, manualThreshold, holidaySeasonal, windowStartDate,
 						velocityWindowDays, leadTimeDays, safetyStockPercent,
 						minOrderQty, maxOrderQty
 					);
@@ -6331,8 +6368,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	private HashMap<String, Object> buildReorderSuggestion(
 		SQLiteDatabase db, int itemId, int comboId, String comboLabel, String code,
 		String name, double currentStock, double purchasePrice, double manualThreshold,
-		String windowStartDate, int velocityWindowDays, int leadTimeDays,
-		double safetyStockPercent, double minOrderQty, double maxOrderQty) {
+		boolean holidaySeasonal, String windowStartDate, int velocityWindowDays,
+		int leadTimeDays, double safetyStockPercent, double minOrderQty, double maxOrderQty) {
 
 		double unitsSold;
 
@@ -6392,8 +6429,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		int currentMonth = Calendar.getInstance().get(Calendar.MONTH) + 1;
 		double manualSeasonalMultiplier = getManualSeasonalMultiplierForMonth(db, currentMonth);
 
+		double holidaySeasonalMultiplier =
+			getHolidaySeasonalMultiplier(holidaySeasonal, currentMonth);
+
 		suggestedQty = suggestedQty * seasonalMultiplier * learningMultiplier *
-			forecastMultiplier * manualSeasonalMultiplier;
+			forecastMultiplier * manualSeasonalMultiplier * holidaySeasonalMultiplier;
 
 		if (suggestedQty < minOrderQty) {
 			suggestedQty = minOrderQty;
@@ -6423,6 +6463,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		row.put("forecasted_weekly_velocity", forecastedWeeklyVelocity);
 		row.put("forecast_multiplier", forecastMultiplier);
 		row.put("manual_seasonal_multiplier", manualSeasonalMultiplier);
+		row.put("holiday_seasonal_multiplier", holidaySeasonalMultiplier);
 
 		if (velocity > 0) {
 
@@ -6446,7 +6487,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			buildReorderWhyExplanation(
 				belowManualThreshold && !belowVelocityReorderPoint, velocity, velocityWindowDays,
 				leadTimeDays, safetyStockPercent, seasonalMultiplier, learningMultiplier,
-				forecastMultiplier, manualSeasonalMultiplier)
+				forecastMultiplier, manualSeasonalMultiplier, holidaySeasonalMultiplier)
 		);
 
 		return row;
@@ -6462,7 +6503,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	private String buildReorderWhyExplanation(
 		boolean manualThresholdTriggered, double velocity, int velocityWindowDays,
 		int leadTimeDays, double safetyStockPercent, double seasonalMultiplier,
-		double learningMultiplier, double forecastMultiplier, double manualSeasonalMultiplier) {
+		double learningMultiplier, double forecastMultiplier, double manualSeasonalMultiplier,
+		double holidaySeasonalMultiplier) {
 
 		StringBuilder why = new StringBuilder();
 
@@ -6495,6 +6537,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			why.append(" You've marked this month as a busy period, boosting it a further ")
 				.append(AmountFormat.formatPlain((manualSeasonalMultiplier - 1) * 100))
 				.append("% (Seasonal Calendar).");
+		}
+
+		if (holidaySeasonalMultiplier > 1.01) {
+
+			why.append(" Marked as a holiday/gift-driven item, boosting it a further ")
+				.append(AmountFormat.formatPlain((holidaySeasonalMultiplier - 1) * 100))
+				.append("% heading into the holiday season.");
 		}
 
 		if (forecastMultiplier > 1.04) {
@@ -6777,6 +6826,33 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		cursor.close();
 
 		return multiplier;
+	}
+
+	// Fixed 50% boost for an item manually flagged holiday_seasonal
+	// (toys, decorations, etc.) during Oct/Nov/Dec, 1.0 (no adjustment)
+	// every other month or when the flag isn't set. Deliberately a
+	// flat, fixed boost rather than a learned/auto-detected one like
+	// getSeasonalMultiplier() - a toy that's never been sold this shop
+	// has no sales history to detect a pattern from in the first
+	// place, so this is a manual override standing in for that missing
+	// history, not a refinement of it.
+	private static final int[] HOLIDAY_SEASONAL_MONTHS = {10, 11, 12};
+	private static final double HOLIDAY_SEASONAL_BOOST = 1.5;
+
+	private double getHolidaySeasonalMultiplier(boolean holidaySeasonal, int month) {
+
+		if (!holidaySeasonal) {
+			return 1.0;
+		}
+
+		for (int holidayMonth : HOLIDAY_SEASONAL_MONTHS) {
+
+			if (holidayMonth == month) {
+				return HOLIDAY_SEASONAL_BOOST;
+			}
+		}
+
+		return 1.0;
 	}
 
 	// =====================

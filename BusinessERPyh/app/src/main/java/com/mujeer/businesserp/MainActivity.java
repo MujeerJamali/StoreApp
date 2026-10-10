@@ -53,6 +53,7 @@ public class MainActivity extends Activity {
 	Button btn_stock_take;
 	Button btn_quick_sale;
 	Button btn_today_actions;
+	Button btn_customize_dashboard;
 
 	Button btn_quick_add;
 
@@ -81,8 +82,11 @@ public class MainActivity extends Activity {
 
 	EditText et_dashboard_search;
 
+	View block_favorites;
 	View row_favorites_label;
 	LinearLayout card_favorites;
+	View card_cash_summary;
+	View card_sales_trend;
 
 	// Every long-press-pinnable Tool Row on this screen (both the
 	// Modules and Tools cards), keyed by its own button id's resource
@@ -95,7 +99,7 @@ public class MainActivity extends Activity {
 		"btn_recurring_expenses", "btn_drafts", "btn_cost_items",
 		"btn_display_shoes", "btn_sample_shoes", "btn_recently_deleted",
 		"btn_reorder_list", "btn_bulk_item_update", "btn_loyalty_points",
-		"btn_stock_take", "btn_quick_sale", "btn_today_actions"
+		"btn_stock_take", "btn_quick_sale", "btn_today_actions", "btn_customize_dashboard"
 	};
 
 	private static final String[] SHORTCUT_LABELS = {
@@ -105,7 +109,7 @@ public class MainActivity extends Activity {
 		"Recurring Expenses", "Drafts", "Cost Items",
 		"Display Shoes", "Sample Shoes", "Recently Deleted",
 		"Reorder List", "Bulk Item Update", "Loyalty Points",
-		"Stock Take", "Quick Sale", "What To Do Today"
+		"Stock Take", "Quick Sale", "What To Do Today", "Customize Dashboard"
 	};
 
 	DatabaseHelper db;
@@ -144,6 +148,7 @@ public class MainActivity extends Activity {
 		btn_stock_take = findViewById(R.id.btn_stock_take);
 		btn_quick_sale = findViewById(R.id.btn_quick_sale);
 		btn_today_actions = findViewById(R.id.btn_today_actions);
+		btn_customize_dashboard = findViewById(R.id.btn_customize_dashboard);
 
 		btn_quick_add = findViewById(R.id.btn_quick_add);
 
@@ -173,8 +178,11 @@ public class MainActivity extends Activity {
 
 		et_dashboard_search = findViewById(R.id.et_dashboard_search);
 
+		block_favorites = findViewById(R.id.block_favorites);
 		row_favorites_label = findViewById(R.id.row_favorites_label);
 		card_favorites = findViewById(R.id.card_favorites);
+		card_cash_summary = findViewById(R.id.card_cash_summary);
+		card_sales_trend = findViewById(R.id.card_sales_trend);
 
 		InfoBubbleView info_bubble_favorites = findViewById(R.id.info_bubble_favorites);
 		info_bubble_favorites.setInfo(
@@ -215,6 +223,7 @@ public class MainActivity extends Activity {
 		attachFavoriteLongPress(btn_stock_take, "btn_stock_take");
 		attachFavoriteLongPress(btn_quick_sale, "btn_quick_sale");
 		attachFavoriteLongPress(btn_today_actions, "btn_today_actions");
+		attachFavoriteLongPress(btn_customize_dashboard, "btn_customize_dashboard");
 
 		ArrayAdapter<String> trendHorizonAdapter = new ArrayAdapter<String>(
 			this, android.R.layout.simple_spinner_item, TREND_HORIZON_LABELS
@@ -543,6 +552,19 @@ public class MainActivity extends Activity {
 				}
 			});
 
+		btn_customize_dashboard.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						DashboardCustomizeActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
 		btn_quick_add.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
@@ -607,11 +629,60 @@ public class MainActivity extends Activity {
 	@Override
 	protected void onResume() {
 		super.onResume();
+		applyDashboardCardOrder();
 		loadCashSummary();
 		loadSalesTrend();
 		loadTodayVsLastWeek();
 		loadSalesStreak();
 		refreshFavoritesCard();
+	}
+
+	// Customizable dashboard (approved feature "pick which cards show
+	// first") - physically reorders the three top info-card blocks
+	// (Favorites/Cash Summary/Sales Trend) per DashboardCardOrder's
+	// saved order, and hides whichever ones the user turned off. Run
+	// first on every resume (including right after returning from
+	// DashboardCustomizeActivity) so a saved change takes effect
+	// immediately; cheap and idempotent to repeat.
+	private void applyDashboardCardOrder() {
+
+		LinearLayout parent = (LinearLayout) card_cash_summary.getParent();
+
+		View[] blocks = new View[]{block_favorites, card_cash_summary, card_sales_trend};
+		String[] keys = new String[]{
+			DashboardCardOrder.CARD_FAVORITES,
+			DashboardCardOrder.CARD_CASH_SUMMARY,
+			DashboardCardOrder.CARD_SALES_TREND
+		};
+
+		int insertIndex = parent.indexOfChild(block_favorites);
+
+		for (View block : blocks) {
+			insertIndex = Math.min(insertIndex, parent.indexOfChild(block));
+		}
+
+		for (View block : blocks) {
+			parent.removeView(block);
+		}
+
+		ArrayList<String> order = DashboardCardOrder.getOrder(this);
+
+		for (String key : order) {
+
+			for (int i = 0; i < keys.length; i++) {
+
+				if (keys[i].equals(key)) {
+					parent.addView(blocks[i], insertIndex);
+					insertIndex++;
+				}
+			}
+		}
+
+		for (int i = 0; i < keys.length; i++) {
+			blocks[i].setVisibility(
+				DashboardCardOrder.isVisible(this, keys[i]) ? View.VISIBLE : View.GONE
+			);
+		}
 	}
 
 	// Every Tool Row (Modules/Tools card buttons) gets the same
@@ -821,6 +892,10 @@ public class MainActivity extends Activity {
 
 			case "btn_today_actions":
 				intent = new Intent(this, TodayActionsActivity.class);
+				break;
+
+			case "btn_customize_dashboard":
+				intent = new Intent(this, DashboardCustomizeActivity.class);
 				break;
 
 			default:

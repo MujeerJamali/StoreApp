@@ -51,42 +51,54 @@
                  Tools card) to pin/unpin it here - long-pressing a
                  pinned row here unpins it too. Hidden entirely when
                  nothing is pinned (see
-                 MainActivity#refreshFavoritesCard()). -->
+                 MainActivity#refreshFavoritesCard()). Wrapped in one
+                 outer block (with card_cash_summary/card_sales_trend
+                 below) so Customize Dashboard can move the label and
+                 its card together as a single reorderable unit - see
+                 DashboardCardOrder/MainActivity#applyDashboardCardOrder(). -->
             <LinearLayout
-                android:id="@+id/row_favorites_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="10dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:visibility="gone">
-
-                <TextView
-                    android:id="@+id/tv_favorites_label"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="6dp"
-                    android:text="Favorites"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <com.mujeer.businesserp.InfoBubbleView
-                    android:id="@+id/info_bubble_favorites"
-                    android:layout_width="@dimen/info_bubble_size"
-                    android:layout_height="@dimen/info_bubble_size" />
-
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/card_favorites"
+                android:id="@+id/block_favorites"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:background="@drawable/bg_card"
-                android:elevation="@dimen/elevation_card"
-                android:orientation="vertical"
-                android:visibility="gone" />
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/row_favorites_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="10dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tv_favorites_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:text="Favorites"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <com.mujeer.businesserp.InfoBubbleView
+                        android:id="@+id/info_bubble_favorites"
+                        android:layout_width="@dimen/info_bubble_size"
+                        android:layout_height="@dimen/info_bubble_size" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/card_favorites"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:background="@drawable/bg_card"
+                    android:elevation="@dimen/elevation_card"
+                    android:orientation="vertical"
+                    android:visibility="gone" />
+
+            </LinearLayout>
 
             <!-- Cash summary: current cash-in-hand plus today/week/month
                  expense totals, computed live each time this screen is
@@ -603,6 +615,16 @@
                     android:id="@+id/btn_today_actions"
                     style="@style/ToolRow"
                     android:text="What To Do Today" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <Button
+                    android:id="@+id/btn_customize_dashboard"
+                    style="@style/ToolRow"
+                    android:text="Customize Dashboard" />
 
             </LinearLayout>
 

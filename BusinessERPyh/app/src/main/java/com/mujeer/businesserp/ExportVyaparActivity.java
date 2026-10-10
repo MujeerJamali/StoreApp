@@ -87,6 +87,7 @@ public class ExportVyaparActivity extends Activity {
 	private TextView tv_export_result;
 	private Button btn_connect_drive;
 	private TextView tv_drive_status;
+	private TextView tv_backup_health;
 
 	// The zipped .vyb sitting in cache storage, waiting to be copied to
 	// wherever the user picks in writeZipToDestination() - null whenever
@@ -102,6 +103,9 @@ public class ExportVyaparActivity extends Activity {
 		tv_export_result = (TextView) findViewById(R.id.tv_export_result);
 		btn_connect_drive = (Button) findViewById(R.id.btn_connect_drive);
 		tv_drive_status = (TextView) findViewById(R.id.tv_drive_status);
+		tv_backup_health = (TextView) findViewById(R.id.tv_backup_health);
+
+		applyBackupHealthStatus();
 
 		btn_export_vyb.setOnClickListener(new View.OnClickListener() {
 				@Override
@@ -208,6 +212,44 @@ public class ExportVyaparActivity extends Activity {
 					tv_export_result.setText(text);
 				}
 			});
+	}
+
+	// Backup health check (approved feature "last successful backup:
+	// X days ago" warning) - a visible, always-there readout next to
+	// the Export button, on top of BackupReminderNotifier's existing
+	// silent 7-day-overdue notification. Same threshold/wording as
+	// that notification, so the two never disagree.
+	private void applyBackupHealthStatus() {
+
+		long daysSince = BackupReminderNotifier.getDaysSinceLastBackup(this);
+
+		String text;
+
+		if (daysSince < 0) {
+
+			text = "Never backed up yet - export one below.";
+
+		} else if (daysSince == 0) {
+
+			text = "Last successful backup: today.";
+
+		} else if (daysSince == 1) {
+
+			text = "Last successful backup: 1 day ago.";
+
+		} else {
+
+			text = "Last successful backup: " + daysSince + " days ago.";
+		}
+
+		tv_backup_health.setText(text);
+
+		boolean overdue = daysSince < 0
+			|| daysSince >= BackupReminderNotifier.getReminderThresholdDays();
+
+		tv_backup_health.setTextColor(
+			getResources().getColor(overdue ? R.color.danger : R.color.text_secondary)
+		);
 	}
 
 	// =====================
@@ -451,6 +493,13 @@ public class ExportVyaparActivity extends Activity {
 			// actually succeeded, so there's nothing overdue right now.
 			BackupReminderNotifier.recordBackupNow(getApplicationContext());
 
+			runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						applyBackupHealthStatus();
+					}
+				});
+
 			// If a Google Drive folder is connected (see the Cloud Backup
 			// card below), also drop a timestamped copy there - on top
 			// of, not instead of, the file the user just picked above.
@@ -568,7 +617,13 @@ public class ExportVyaparActivity extends Activity {
 			// before it existed, which ImportVyaparActivity's
 			// itemsHaveLocations detects up front so it defaults to ""
 			// instead of failing.
-			"item_locations TEXT" +
+			"item_locations TEXT, " +
+			// Another of this app's own extensions (manual holiday/gift-
+			// driven flag) - absent from a real Vyapar backup or one
+			// exported before it existed, which ImportVyaparActivity's
+			// itemsHaveHolidaySeasonal detects up front so it defaults
+			// to 0 instead of failing.
+			"item_holiday_seasonal INTEGER" +
 			")"
 		);
 
@@ -889,7 +944,7 @@ public class ExportVyaparActivity extends Activity {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, code, name, purchase_price, sale_price, extra_cost_per_unit, active, " +
-			"reorder_threshold, locations FROM items", null);
+			"reorder_threshold, locations, holiday_seasonal FROM items", null);
 
 		while (c.moveToNext()) {
 
@@ -904,6 +959,7 @@ public class ExportVyaparActivity extends Activity {
 			values.put("item_extra_cost_per_unit", c.getDouble(5));
 			values.put("item_reorder_threshold", c.getDouble(7));
 			values.put("item_locations", c.getString(8));
+			values.put("item_holiday_seasonal", c.getInt(9));
 
 			vyb.insert("kb_items", null, values);
 		}

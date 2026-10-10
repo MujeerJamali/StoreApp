@@ -133,10 +133,15 @@ BusinessERPyh/                  Gradle project root
   straight to creating the item and returns with it selected, no need
   to first type something that fails to match. That same dropdown also
   pins whatever items were sold most recently to the very top (see
-  `DatabaseHelper.getRecentlySoldItemIds()`), on both the Sale and
-  Purchase screens, since a fast-selling item is exactly the one worth
-  restocking too - everything else stays in its usual alphabetical
-  order behind them. A Purchase's "+ Select
+  `ItemPickerUtils.pinRecentlySoldItemsFirst()`/`DatabaseHelper.
+  getRecentlySoldItemIds()`), on both the Sale and Purchase screens,
+  since a fast-selling item is exactly the one worth restocking too -
+  everything else stays in its usual alphabetical order behind them.
+  The same pinning applies to every other screen that lets the user
+  browse/pick from the full items list - Generate Entries' own item
+  picker, and Quick Sale's quick-pick grid (which fills from the most
+  recently sold items directly rather than reordering a browsable list,
+  since it has no list to browse in the first place). A Purchase's "+ Select
   Expenses" button links one or more existing **Expenses** to it as
   landed cost (see below) — works even before the purchase itself is
   saved, and either way nothing is written until Save/Update Transaction
@@ -233,7 +238,7 @@ BusinessERPyh/                  Gradle project root
   Discount This Week/Dead Stock Aging share - see those reports below. A unit with no sales history
   still qualifies if its own manual Reorder Threshold (Edit Item
   screen) says it's low, the same signal the Low Stock report uses.
-  Four more signals adjust a suggestion before it's shown: a seasonal
+  Five more signals adjust a suggestion before it's shown: a seasonal
   check (`getSeasonalMultiplier()`) compares this calendar month's
   average sales in past years against what the recent velocity alone
   would project, and scales the suggested quantity up (capped at 2x)
@@ -244,7 +249,13 @@ BusinessERPyh/                  Gradle project root
   a month plus a quantity-boost %, applied app-wide for that month on
   top of the auto-detected per-item pattern above, since the user's own
   calendar knowledge can cover a pattern too new or too irregular for
-  sales history alone to have caught yet. A **Set Reorder Thresholds**
+  sales history alone to have caught yet. A manual **Holiday/Gift Item**
+  checkbox (Edit Item screen) is a separate, item-level version of that
+  same idea for an item with no sales history to auto-detect a pattern
+  from in the first place (a toy that's never been sold here before,
+  say) - checking it applies a flat 50% boost during Oct/Nov/Dec
+  (`getHolidaySeasonalMultiplier()`), shown as a "Holiday/Gift Item"
+  badge on the Item view screen. A **Set Reorder Thresholds**
   onboarding checklist (Reorder Settings) lists every active item still
   at the default threshold of 0 ("not set") so the Reorder List and Low
   Stock report can flag it even before it has enough sales history to
@@ -267,8 +278,8 @@ BusinessERPyh/                  Gradle project root
   built from the exact same inputs the calculation just used so it can
   never drift out of sync - whether it's velocity- or manual-threshold-
   triggered, plus a note for each adjustment above that actually fired
-  (seasonal boost, manual busy-period boost, trend, or learning nudge)
-  and by how much. Nothing on
+  (seasonal boost, manual busy-period boost, holiday-item boost, trend,
+  or learning nudge) and by how much. Nothing on
   this screen is final: each suggestion's quantity is a
   plain editable field, a checkbox excludes it, and "Ignore" dismisses
   it outright - only checked rows get used by **Convert Checked to
@@ -503,7 +514,12 @@ BusinessERPyh/                  Gradle project root
   archive; the manual export is still what moving a backup to another
   device is for. A successful automatic backup resets the reminder's
   countdown too, so in normal use the reminder should rarely ever
-  actually need to nag.
+  actually need to nag. The Export Vyapar Backup screen also shows a
+  visible, always-there **backup health check** status line above the
+  Export button ("Last successful backup: X days ago" / "Never backed
+  up yet"), not just the silent notification - same 7-day threshold,
+  turning red once that overdue (`BackupReminderNotifier.
+  getDaysSinceLastBackup()`).
 - **Cloud Backup (Google Drive)** — a "Cloud Backup" card on the Export
   Vyapar Backup screen with a single **Connect Google Drive** button.
   This app has no Google Sign-In/Drive API Maven dependency - AIDE's
@@ -782,6 +798,17 @@ summary; long-pressing a pinned row there unpins it the same way. Pin
 order is preserved across app opens (`DashboardFavorites`,
 `SharedPreferences`); the Favorites card and its label are hidden
 entirely when nothing is pinned.
+
+**Customize Dashboard** (Dashboard Tools card): reorders and/or hides
+the Dashboard's three glanceable info-card blocks - Favorites, Cash
+Summary, Sales Trend - via `DashboardCardOrder`/`DashboardCustomizeActivity`
+(plain Up/Down buttons per row, no drag-and-drop library). Deliberately
+scoped to just those three; the Modules/Tools navigation cards below
+them are left out, since letting the user hide core navigation could
+lock them out of the rest of the app with no way back in.
+`MainActivity#applyDashboardCardOrder()` physically re-parents the
+three card views into the saved order on every resume, so a change
+takes effect immediately on returning from that settings screen.
 
 **Global Search**: a tappable search box at the top of the Dashboard
 opens a dedicated Search screen rather than searching inline on an

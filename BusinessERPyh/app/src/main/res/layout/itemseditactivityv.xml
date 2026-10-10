@@ -155,6 +155,13 @@
                 android:checked="true"
                 android:text="Active (inactive items are hidden from item pickers)" />
 
+            <CheckBox
+                android:id="@+id/cb_holiday_seasonal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Holiday/gift-driven item (toys, decorations, etc.) - boosts reorder suggestions heading into Oct-Dec" />
+
         </LinearLayout>
 
         <!-- Optional stock-keeping groups (e.g. Size, Color). Hidden until
