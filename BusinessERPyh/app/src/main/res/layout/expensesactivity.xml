@@ -36,13 +36,43 @@
         android:inputType="text|textNoSuggestions"
         />
 
-        <Button
-            android:id="@+id/btn_filter"
-            style="@style/AppButton.Outline.Small"
+        <Spinner
+            android:id="@+id/spinner_filter"
+            style="@style/FilterSpinner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" />
+
+        <LinearLayout
+            android:id="@+id/container_custom_range"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="Filter" />
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <EditText
+                android:id="@+id/et_custom_from"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false"
+                android:hint="From"
+                android:inputType="text|textNoSuggestions" />
+
+            <EditText
+                android:id="@+id/et_custom_to"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false"
+                android:hint="To"
+                android:inputType="text|textNoSuggestions" />
+
+        </LinearLayout>
 
         <TextView
             android:id="@+id/tv_empty"

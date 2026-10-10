@@ -6903,7 +6903,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		if (comboId > 0) {
 
 			cursor = db.rawQuery(
-				"SELECT pi.qty FROM " + TABLE_PURCHASE_ITEMS + " pi " +
+				"SELECT pi.quantity FROM " + TABLE_PURCHASE_ITEMS + " pi " +
 				"INNER JOIN " + TABLE_PURCHASES + " p ON p.id = pi.purchase_id " +
 				"WHERE pi.combo_id = ? ORDER BY p.date DESC, pi.id DESC LIMIT 1",
 				new String[]{String.valueOf(comboId)}
@@ -6912,7 +6912,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		} else {
 
 			cursor = db.rawQuery(
-				"SELECT pi.qty FROM " + TABLE_PURCHASE_ITEMS + " pi " +
+				"SELECT pi.quantity FROM " + TABLE_PURCHASE_ITEMS + " pi " +
 				"INNER JOIN " + TABLE_PURCHASES + " p ON p.id = pi.purchase_id " +
 				"WHERE pi.item_id = ? AND (pi.combo_id IS NULL OR pi.combo_id = 0) " +
 				"ORDER BY p.date DESC, pi.id DESC LIMIT 1",
