@@ -61,6 +61,7 @@ public class ItemMonthlyRankReportActivity extends Activity {
 
 	private TextView tv_empty;
 	private ListView lv_ranking;
+	private SimpleBarChartView chart_monthly_rank;
 
 	private DatabaseHelper db;
 
@@ -100,6 +101,7 @@ public class ItemMonthlyRankReportActivity extends Activity {
 
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_ranking = findViewById(R.id.lv_ranking);
+		chart_monthly_rank = findViewById(R.id.chart_monthly_rank);
 
 		db = new DatabaseHelper(this);
 
@@ -352,13 +354,44 @@ public class ItemMonthlyRankReportActivity extends Activity {
 
 									tv_empty.setVisibility(View.VISIBLE);
 									lv_ranking.setVisibility(View.GONE);
+									chart_monthly_rank.setVisibility(View.GONE);
 
 								} else {
 
 									tv_empty.setVisibility(View.GONE);
 									lv_ranking.setVisibility(View.VISIBLE);
+									chart_monthly_rank.setVisibility(View.VISIBLE);
 
 									setListViewHeightBasedOnChildren(lv_ranking);
+
+									// Top ~10 items in the list's own best-
+									// first order (sorted by rank_sum, the
+									// report's whole point), charting
+									// whichever metric is currently
+									// selected - Sales or Profit - so the
+									// chart always matches what the rows
+									// themselves are built from.
+									ArrayList<SimpleBarChartView.Entry> chartEntries =
+										new ArrayList<SimpleBarChartView.Entry>();
+
+									int chartCount = Math.min(10, rankingList.size());
+
+									for (int i = 0; i < chartCount; i++) {
+
+										HashMap<String, Object> row = rankingList.get(i);
+
+										double value = byProfit_forQuery ?
+											(Double) row.get("total_profit") :
+											(Double) row.get("total_sales");
+
+										chartEntries.add(new SimpleBarChartView.Entry(
+											String.valueOf(row.get("item_name")),
+											value,
+											getResources().getColor(R.color.primary)
+										));
+									}
+
+									chart_monthly_rank.setEntries(chartEntries);
 								}
 							}
 						});

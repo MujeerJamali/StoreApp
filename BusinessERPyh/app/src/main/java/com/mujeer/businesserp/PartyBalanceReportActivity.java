@@ -11,6 +11,8 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 
 // =====================
@@ -28,6 +30,7 @@ public class PartyBalanceReportActivity extends Activity {
 	private Spinner spinner_party_sort;
 
 	private TextView tv_no_parties;
+	private SimpleBarChartView chart_party_balance;
 	private ListView lv_parties;
 
 	private DatabaseHelper db;
@@ -94,6 +97,7 @@ public class PartyBalanceReportActivity extends Activity {
 		spinner_party_sort = findViewById(R.id.spinner_party_sort);
 
 		tv_no_parties = findViewById(R.id.tv_no_parties);
+		chart_party_balance = findViewById(R.id.chart_party_balance);
 		lv_parties = findViewById(R.id.lv_parties);
 
 		db = new DatabaseHelper(this);
@@ -199,15 +203,57 @@ public class PartyBalanceReportActivity extends Activity {
 
 									tv_no_parties.setVisibility(View.VISIBLE);
 									lv_parties.setVisibility(View.GONE);
+									chart_party_balance.setVisibility(View.GONE);
 
 								} else {
 
 									tv_no_parties.setVisibility(View.GONE);
 									lv_parties.setVisibility(View.VISIBLE);
+									chart_party_balance.setVisibility(View.VISIBLE);
+
+									applyBalanceChart(partyList);
 								}
 							}
 						});
 				}
 			}).start();
+	}
+
+	// Top 8 parties by absolute balance (whichever side - debit or
+	// credit - is largest), from the already-loaded partyList - sorts
+	// a copy in memory rather than re-querying the DB. The chart uses
+	// one color regardless of sign; SimpleBarChartView itself draws a
+	// negative balance below the zero baseline, which already shows
+	// the debit/credit direction without needing a second color.
+	private void applyBalanceChart(ArrayList<HashMap<String, Object>> list) {
+
+		ArrayList<HashMap<String, Object>> sortedByAbsBalance =
+			new ArrayList<HashMap<String, Object>>(list);
+
+		Collections.sort(sortedByAbsBalance, new Comparator<HashMap<String, Object>>() {
+				@Override
+				public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+					return Double.compare(
+						Math.abs((Double) b.get("balance")), Math.abs((Double) a.get("balance"))
+					);
+				}
+			});
+
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+
+		int chartCount = Math.min(8, sortedByAbsBalance.size());
+
+		for (int i = 0; i < chartCount; i++) {
+
+			HashMap<String, Object> row = sortedByAbsBalance.get(i);
+
+			chartEntries.add(new SimpleBarChartView.Entry(
+				String.valueOf(row.get("name")),
+				(Double) row.get("balance"),
+				getResources().getColor(R.color.primary)
+			));
+		}
+
+		chart_party_balance.setEntries(chartEntries);
 	}
 }

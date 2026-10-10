@@ -49,6 +49,7 @@ public class CrossSellReportActivity extends Activity {
 
 	private LinearLayout container_cross_sell_results;
 	private TextView tv_frequently_empty;
+	private SimpleBarChartView chart_frequently_together;
 	private LinearLayout container_frequently_together;
 	private TextView tv_rarely_empty;
 	private LinearLayout container_rarely_together;
@@ -88,6 +89,7 @@ public class CrossSellReportActivity extends Activity {
 
 		container_cross_sell_results = findViewById(R.id.container_cross_sell_results);
 		tv_frequently_empty = findViewById(R.id.tv_frequently_empty);
+		chart_frequently_together = findViewById(R.id.chart_frequently_together);
 		container_frequently_together = findViewById(R.id.container_frequently_together);
 		tv_rarely_empty = findViewById(R.id.tv_rarely_empty);
 		container_rarely_together = findViewById(R.id.container_rarely_together);
@@ -395,6 +397,36 @@ public class CrossSellReportActivity extends Activity {
 		fillRows(container_frequently_together, frequentlyTogether, true);
 		tv_frequently_empty.setVisibility(frequentlyTogether.isEmpty() ? View.VISIBLE : View.GONE);
 		container_frequently_together.setVisibility(frequentlyTogether.isEmpty() ? View.GONE : View.VISIBLE);
+
+		// Top 8 cross-sell partners by how often they've co-occurred with
+		// the selected item - frequentlyTogether is already sorted
+		// descending by co_occurrence_count (see getCrossSellInsight()),
+		// so this just takes the first few rather than re-sorting.
+		// "Rarely Bought Together" below is deliberately NOT charted - it's
+		// every other sold item in the shop (often dozens), not a bounded
+		// top-N ranking, so a bar chart of it would be unreadable and
+		// mostly zero-height bars.
+		chart_frequently_together.setVisibility(frequentlyTogether.isEmpty() ? View.GONE : View.VISIBLE);
+
+		if (!frequentlyTogether.isEmpty()) {
+
+			ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+
+			int chartCount = Math.min(8, frequentlyTogether.size());
+
+			for (int i = 0; i < chartCount; i++) {
+
+				HashMap<String, Object> row = frequentlyTogether.get(i);
+
+				chartEntries.add(new SimpleBarChartView.Entry(
+					String.valueOf(row.get("name")),
+					(Integer) row.get("co_occurrence_count"),
+					getResources().getColor(R.color.primary)
+				));
+			}
+
+			chart_frequently_together.setEntries(chartEntries);
+		}
 
 		fillRows(container_rarely_together, rarelyTogether, false);
 		tv_rarely_empty.setVisibility(rarelyTogether.isEmpty() ? View.VISIBLE : View.GONE);

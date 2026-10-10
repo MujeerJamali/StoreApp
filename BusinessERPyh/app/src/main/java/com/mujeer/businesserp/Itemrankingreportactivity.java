@@ -13,6 +13,8 @@ import android.widget.TextView;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Locale;
 
@@ -50,6 +52,7 @@ public class Itemrankingreportactivity extends Activity {
 
 	private TextView tv_empty;
 	private ListView lv_ranking;
+	private SimpleBarChartView chart_item_ranking;
 
 	private DatabaseHelper db;
 
@@ -86,6 +89,7 @@ public class Itemrankingreportactivity extends Activity {
 
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_ranking = findViewById(R.id.lv_ranking);
+		chart_item_ranking = findViewById(R.id.chart_item_ranking);
 
 		db = new DatabaseHelper(this);
 
@@ -248,13 +252,50 @@ public class Itemrankingreportactivity extends Activity {
 
 									tv_empty.setVisibility(View.VISIBLE);
 									lv_ranking.setVisibility(View.GONE);
+									chart_item_ranking.setVisibility(View.GONE);
 
 								} else {
 
 									tv_empty.setVisibility(View.GONE);
 									lv_ranking.setVisibility(View.VISIBLE);
+									chart_item_ranking.setVisibility(View.VISIBLE);
 
 									setListViewHeightBasedOnChildren(lv_ranking);
+
+									// Top ~10 items by all-time sales total,
+									// always re-sorted by that figure
+									// regardless of the combined-index sort
+									// the list itself is showing (that index
+									// is a rank-sum where lower is better,
+									// not a currency amount a bar height
+									// could sensibly represent).
+									ArrayList<HashMap<String, Object>> topByAllTime =
+										new ArrayList<HashMap<String, Object>>(rankingList);
+
+									Collections.sort(topByAllTime, new Comparator<HashMap<String, Object>>() {
+											@Override
+											public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+												return ((Double) b.get("alltime")).compareTo((Double) a.get("alltime"));
+											}
+										});
+
+									ArrayList<SimpleBarChartView.Entry> chartEntries =
+										new ArrayList<SimpleBarChartView.Entry>();
+
+									int chartCount = Math.min(10, topByAllTime.size());
+
+									for (int i = 0; i < chartCount; i++) {
+
+										HashMap<String, Object> row = topByAllTime.get(i);
+
+										chartEntries.add(new SimpleBarChartView.Entry(
+											String.valueOf(row.get("item_name")),
+											(Double) row.get("alltime"),
+											getResources().getColor(R.color.primary)
+										));
+									}
+
+									chart_item_ranking.setEntries(chartEntries);
 								}
 							}
 						});

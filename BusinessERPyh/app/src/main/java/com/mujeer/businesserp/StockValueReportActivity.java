@@ -26,6 +26,8 @@ public class StockValueReportActivity extends Activity {
 	private TextView tv_total_value;
 	private LinearLayout container_by_category;
 	private LinearLayout container_by_age;
+	private SimplePieChartView chart_stock_value_pie;
+	private SimpleBarChartView chart_stock_value;
 
 	private DatabaseHelper db;
 
@@ -47,6 +49,8 @@ public class StockValueReportActivity extends Activity {
 		tv_total_value = findViewById(R.id.tv_total_value);
 		container_by_category = findViewById(R.id.container_by_category);
 		container_by_age = findViewById(R.id.container_by_age);
+		chart_stock_value_pie = findViewById(R.id.chart_stock_value_pie);
+		chart_stock_value = findViewById(R.id.chart_stock_value);
 
 		db = new DatabaseHelper(this);
 
@@ -97,8 +101,61 @@ public class StockValueReportActivity extends Activity {
 
 		LinkedHashMap<String, Double> byAge = (LinkedHashMap<String, Double>) result.get("by_age");
 
-		fillBuckets(container_by_category, sortedByValueDescending(byCategory));
+		ArrayList<Map.Entry<String, Double>> sortedByCategory = sortedByValueDescending(byCategory);
+
+		applyCategoryChart(sortedByCategory);
+
+		fillBuckets(container_by_category, sortedByCategory);
 		fillBuckets(container_by_age, sortedByValueDescending(byAge));
+	}
+
+	// Share of total stock value by category - a Pie whenever at least 2
+	// categories actually hold positive value (a true share-of-a-whole),
+	// falling back to a single-category Bar otherwise (a Pie can't plot
+	// fewer than 2 slices), and nothing at all with no categories. Same
+	// dual-chart fallback pattern as ProfitSplitReportActivity. Colors
+	// cycle through a small set of existing app colors, same as that
+	// worked example, since a category count isn't known ahead of time
+	// and a Pie's slices need to be visually distinguishable from each
+	// other (unlike a same-color "top N" ranking bar chart).
+	private void applyCategoryChart(ArrayList<Map.Entry<String, Double>> sortedByCategory) {
+
+		int[] palette = {
+			getResources().getColor(R.color.primary),
+			getResources().getColor(R.color.accent),
+			getResources().getColor(R.color.mod_sales),
+			getResources().getColor(R.color.danger),
+			getResources().getColor(R.color.mod_items)
+		};
+
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+
+		int positiveCount = 0;
+
+		for (int i = 0; i < sortedByCategory.size(); i++) {
+
+			Map.Entry<String, Double> entry = sortedByCategory.get(i);
+
+			if (entry.getValue() > 0) {
+				positiveCount++;
+			}
+
+			chartEntries.add(new SimpleBarChartView.Entry(
+				entry.getKey(), entry.getValue(), palette[i % palette.length]
+			));
+		}
+
+		boolean usePie = positiveCount >= 2;
+		boolean useBar = !usePie && positiveCount >= 1;
+
+		chart_stock_value_pie.setVisibility(usePie ? View.VISIBLE : View.GONE);
+		chart_stock_value.setVisibility(useBar ? View.VISIBLE : View.GONE);
+
+		if (usePie) {
+			chart_stock_value_pie.setEntries(chartEntries);
+		} else if (useBar) {
+			chart_stock_value.setEntries(chartEntries);
+		}
 	}
 
 	private ArrayList<Map.Entry<String, Double>> sortedByValueDescending(

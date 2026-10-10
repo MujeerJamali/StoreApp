@@ -42,6 +42,7 @@ public class SlowMovingStockReportActivity extends Activity {
 	private Spinner spinner_shoes_filter;
 	private TextView tv_empty;
 	private ListView lv_slow_moving_stock;
+	private SimpleBarChartView chart_slow_moving;
 
 	private DatabaseHelper db;
 
@@ -73,6 +74,7 @@ public class SlowMovingStockReportActivity extends Activity {
 		spinner_shoes_filter = findViewById(R.id.spinner_shoes_filter);
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_slow_moving_stock = findViewById(R.id.lv_slow_moving_stock);
+		chart_slow_moving = findViewById(R.id.chart_slow_moving);
 
 		db = new DatabaseHelper(this);
 
@@ -198,6 +200,38 @@ public class SlowMovingStockReportActivity extends Activity {
 									tv_empty.setVisibility(View.GONE);
 									lv_slow_moving_stock.setVisibility(View.VISIBLE);
 								}
+
+								// Top few items by actual days since last sale -
+								// a never-sold item (days_since_sale == -1) has
+								// no comparable number, so it's skipped here
+								// (it's still shown, as "Never sold", in the
+								// list itself) rather than drawn as a
+								// misleading near-zero/negative bar.
+								ArrayList<SimpleBarChartView.Entry> chartEntries =
+									new ArrayList<SimpleBarChartView.Entry>();
+
+								for (HashMap<String, Object> row : slowMovingList) {
+
+									int daysSinceSale = (Integer) row.get("days_since_sale");
+
+									if (daysSinceSale < 0) {
+										continue;
+									}
+
+									chartEntries.add(new SimpleBarChartView.Entry(
+										String.valueOf(row.get("name")), daysSinceSale,
+										getResources().getColor(R.color.primary)
+									));
+
+									if (chartEntries.size() >= 8) {
+										break;
+									}
+								}
+
+								chart_slow_moving.setEntries(chartEntries);
+								chart_slow_moving.setVisibility(
+									chartEntries.isEmpty() ? View.GONE : View.VISIBLE
+								);
 							}
 						});
 				}

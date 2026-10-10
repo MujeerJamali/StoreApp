@@ -8,6 +8,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 
@@ -25,10 +27,16 @@ import java.util.LinkedHashMap;
 // =====================
 public class BudgetPlannerActivity extends Activity {
 
+	// Only the top N suppliers by planned spend get a bar - a shop with
+	// many suppliers would otherwise overload the chart's own "sparse"
+	// threshold (see SimpleBarChartView).
+	private static final int CHART_TOP_N = 8;
+
 	private TextView tv_available_cash;
 	private TextView tv_total_suggested;
 	private TextView tv_remaining;
 	private TextView tv_no_suggestions;
+	private SimpleBarChartView chart_budget_by_supplier;
 	private LinearLayout container_budget_by_supplier;
 
 	private DatabaseHelper db;
@@ -50,6 +58,7 @@ public class BudgetPlannerActivity extends Activity {
 		tv_total_suggested = findViewById(R.id.tv_total_suggested);
 		tv_remaining = findViewById(R.id.tv_remaining);
 		tv_no_suggestions = findViewById(R.id.tv_no_suggestions);
+		chart_budget_by_supplier = findViewById(R.id.chart_budget_by_supplier);
 		container_budget_by_supplier = findViewById(R.id.container_budget_by_supplier);
 
 		db = new DatabaseHelper(this);
@@ -142,10 +151,40 @@ public class BudgetPlannerActivity extends Activity {
 		if (bySupplier.isEmpty()) {
 
 			tv_no_suggestions.setVisibility(View.VISIBLE);
+			chart_budget_by_supplier.setEntries(null);
 			return;
 		}
 
 		tv_no_suggestions.setVisibility(View.GONE);
+
+		// Planned spend per supplier is never negative (it's a sum of
+		// estimated costs), so a plain ranking bar works fine - built from
+		// the same bySupplier map the rows below use, sorted by amount
+		// (biggest planned spend first) and capped to CHART_TOP_N, same
+		// single color for every bar since suppliers are just a ranking,
+		// not a sign/meaning split.
+		ArrayList<SimpleBarChartView.Entry> allSupplierEntries = new ArrayList<SimpleBarChartView.Entry>();
+		int chartColor = getResources().getColor(R.color.primary);
+
+		for (String supplierName : bySupplier.keySet()) {
+			allSupplierEntries.add(new SimpleBarChartView.Entry(
+				supplierName, bySupplier.get(supplierName), chartColor
+			));
+		}
+
+		Collections.sort(allSupplierEntries, new Comparator<SimpleBarChartView.Entry>() {
+				@Override
+				public int compare(SimpleBarChartView.Entry a, SimpleBarChartView.Entry b) {
+					return Double.compare(b.value, a.value);
+				}
+			}
+		);
+
+		chart_budget_by_supplier.setEntries(
+			new ArrayList<SimpleBarChartView.Entry>(
+				allSupplierEntries.subList(0, Math.min(CHART_TOP_N, allSupplierEntries.size()))
+			)
+		);
 
 		for (String supplierName : bySupplier.keySet()) {
 

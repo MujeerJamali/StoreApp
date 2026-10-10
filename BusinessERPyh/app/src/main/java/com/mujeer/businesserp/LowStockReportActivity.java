@@ -21,6 +21,7 @@ public class LowStockReportActivity extends Activity {
 
 	private TextView tv_empty;
 	private ListView lv_low_stock;
+	private SimpleBarChartView chart_low_stock;
 
 	private DatabaseHelper db;
 
@@ -47,6 +48,7 @@ public class LowStockReportActivity extends Activity {
 
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_low_stock = findViewById(R.id.lv_low_stock);
+		chart_low_stock = findViewById(R.id.chart_low_stock);
 
 		db = new DatabaseHelper(this);
 
@@ -108,6 +110,33 @@ public class LowStockReportActivity extends Activity {
 									tv_empty.setVisibility(View.GONE);
 									lv_low_stock.setVisibility(View.VISIBLE);
 								}
+
+								// Already sorted lowest-stock-first (the most
+								// critical items) by the query itself, so the
+								// chart just takes the first few as-is - no
+								// second sort/query needed.
+								ArrayList<SimpleBarChartView.Entry> chartEntries =
+									new ArrayList<SimpleBarChartView.Entry>();
+
+								int chartCount = Math.min(8, lowStockList.size());
+
+								for (int i = 0; i < chartCount; i++) {
+
+									HashMap<String, Object> row = lowStockList.get(i);
+
+									double balance = row.get("balance") == null ?
+										0 : (Double) row.get("balance");
+
+									chartEntries.add(new SimpleBarChartView.Entry(
+										String.valueOf(row.get("name")), balance,
+										getResources().getColor(R.color.primary)
+									));
+								}
+
+								chart_low_stock.setEntries(chartEntries);
+								chart_low_stock.setVisibility(
+									chartEntries.isEmpty() ? View.GONE : View.VISIBLE
+								);
 							}
 						});
 				}

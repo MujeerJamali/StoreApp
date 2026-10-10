@@ -9,6 +9,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Locale;
@@ -38,6 +39,7 @@ public class DayCloseReportActivity extends Activity {
 	private TextView tv_payments_in_total;
 	private TextView tv_payments_out_total;
 	private TextView tv_net_cash;
+	private SimpleBarChartView chart_day_close;
 
 	private View card_reorder_prep;
 	private TextView tv_reorder_prep;
@@ -72,6 +74,7 @@ public class DayCloseReportActivity extends Activity {
 		tv_payments_in_total = findViewById(R.id.tv_payments_in_total);
 		tv_payments_out_total = findViewById(R.id.tv_payments_out_total);
 		tv_net_cash = findViewById(R.id.tv_net_cash);
+		chart_day_close = findViewById(R.id.chart_day_close);
 
 		card_reorder_prep = findViewById(R.id.card_reorder_prep);
 		tv_reorder_prep = findViewById(R.id.tv_reorder_prep);
@@ -311,5 +314,24 @@ public class DayCloseReportActivity extends Activity {
 				netCashMovement < 0 ? R.color.danger : R.color.mod_sales
 			)
 		);
+
+		// Same distinct per-category colors already used for each total
+		// above, reused on the chart rather than a new palette; Net Cash
+		// keeps the same sign-based color as its own TextView since it can
+		// go negative - the Bar chart's baseline naturally draws that as a
+		// bar below zero instead of hiding it (unlike a Pie, which could
+		// only plot positive shares).
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+		chartEntries.add(new SimpleBarChartView.Entry("Sales", salesTotal, getResources().getColor(R.color.mod_sales)));
+		chartEntries.add(new SimpleBarChartView.Entry("Purchases", purchasesTotal, getResources().getColor(R.color.mod_purchase)));
+		chartEntries.add(new SimpleBarChartView.Entry("Expenses", expensesTotal, getResources().getColor(R.color.mod_expenses)));
+		chartEntries.add(new SimpleBarChartView.Entry("Payments In", paymentsInTotal, getResources().getColor(R.color.mod_payments)));
+		chartEntries.add(new SimpleBarChartView.Entry("Payments Out", paymentsOutTotal, getResources().getColor(R.color.mod_payments)));
+		chartEntries.add(new SimpleBarChartView.Entry(
+			"Net Cash", netCashMovement,
+			getResources().getColor(netCashMovement < 0 ? R.color.danger : R.color.mod_sales)
+		));
+
+		chart_day_close.setEntries(chartEntries);
 	}
 }

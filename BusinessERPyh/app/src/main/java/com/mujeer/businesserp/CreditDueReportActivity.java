@@ -15,6 +15,8 @@ import android.widget.TextView;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Locale;
 
@@ -61,6 +63,7 @@ public class CreditDueReportActivity extends Activity {
 	private EditText et_custom_to;
 
 	private TextView tv_empty;
+	private SimpleBarChartView chart_credit_due;
 	private ListView lv_credit_due;
 
 	private DatabaseHelper db;
@@ -99,6 +102,7 @@ public class CreditDueReportActivity extends Activity {
 		et_custom_to = findViewById(R.id.et_custom_to);
 
 		tv_empty = findViewById(R.id.tv_empty);
+		chart_credit_due = findViewById(R.id.chart_credit_due);
 		lv_credit_due = findViewById(R.id.lv_credit_due);
 
 		db = new DatabaseHelper(this);
@@ -316,15 +320,65 @@ public class CreditDueReportActivity extends Activity {
 
 									tv_empty.setVisibility(View.VISIBLE);
 									lv_credit_due.setVisibility(View.GONE);
+									chart_credit_due.setVisibility(View.GONE);
 
 								} else {
 
 									tv_empty.setVisibility(View.GONE);
 									lv_credit_due.setVisibility(View.VISIBLE);
+									chart_credit_due.setVisibility(View.VISIBLE);
+
+									applyCreditDueChart(creditDueList);
 								}
 							}
 						});
 				}
 			}).start();
+	}
+
+	// getCreditDueSales() returns one row per unpaid Sale, not grouped
+	// by party or by aging bucket, and the same party can appear more
+	// than once (one row per Sale). Aggregates the already-loaded
+	// creditDueList's balances by party here (no second query) and
+	// charts the top 8 parties by total amount due, single color -
+	// not a Pie, since this isn't a bucketed "share of a whole"
+	// breakdown, just a per-party ranking (see this report's own hint).
+	private void applyCreditDueChart(ArrayList<HashMap<String, Object>> list) {
+
+		HashMap<String, Double> totalsByParty = new HashMap<String, Double>();
+
+		for (HashMap<String, Object> row : list) {
+
+			String partyName = row.get("party_name") == null ?
+				"Cash Sale" : String.valueOf(row.get("party_name"));
+
+			double balance = row.get("balance") == null ? 0 : (Double) row.get("balance");
+
+			Double existing = totalsByParty.get(partyName);
+
+			totalsByParty.put(partyName, (existing == null ? 0 : existing) + balance);
+		}
+
+		ArrayList<SimpleBarChartView.Entry> allEntries = new ArrayList<SimpleBarChartView.Entry>();
+
+		for (java.util.Map.Entry<String, Double> partyTotal : totalsByParty.entrySet()) {
+
+			allEntries.add(new SimpleBarChartView.Entry(
+				partyTotal.getKey(), partyTotal.getValue(), getResources().getColor(R.color.primary)
+			));
+		}
+
+		Collections.sort(allEntries, new Comparator<SimpleBarChartView.Entry>() {
+				@Override
+				public int compare(SimpleBarChartView.Entry a, SimpleBarChartView.Entry b) {
+					return Double.compare(b.value, a.value);
+				}
+			});
+
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>(
+			allEntries.subList(0, Math.min(8, allEntries.size()))
+		);
+
+		chart_credit_due.setEntries(chartEntries);
 	}
 }

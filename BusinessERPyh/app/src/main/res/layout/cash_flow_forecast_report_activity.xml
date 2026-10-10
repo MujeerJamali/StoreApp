@@ -39,6 +39,12 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="12dp" />
 
+    <com.mujeer.businesserp.SimpleLineChartView
+        android:id="@+id/chart_cash_flow_forecast"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp" />
+
     <ListView
         android:id="@+id/lv_cash_flow_forecast"
         android:layout_width="match_parent"

@@ -42,7 +42,7 @@ public class ExpenseRatioTrendReportActivity extends Activity {
 
 	private TextView tv_ratio_description;
 	private Spinner spinner_ratio_mode;
-	private SimpleBarChartView chart_expense_ratio;
+	private SimpleLineChartView chart_expense_ratio;
 	private LinearLayout container_expense_ratio;
 
 	private DatabaseHelper db;

@@ -43,6 +43,12 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp" />
 
+        <com.mujeer.businesserp.SimpleBarChartView
+            android:id="@+id/chart_party_ranking"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp" />
+
         <TextView
             android:id="@+id/tv_empty"
             android:layout_width="match_parent"

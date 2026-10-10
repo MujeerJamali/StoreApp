@@ -77,6 +77,12 @@
         android:layout_marginTop="20dp"
         android:text="By Supplier" />
 
+    <com.mujeer.businesserp.SimpleBarChartView
+        android:id="@+id/chart_budget_by_supplier"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" />
+
     <TextView
         android:id="@+id/tv_no_suggestions"
         android:layout_width="match_parent"

@@ -78,6 +78,21 @@
             android:textSize="16sp"
             android:textStyle="bold" />
 
+        <!-- Pie when at least 2 age buckets carry stock (a true share-of-
+             whole); Bar as the fallback for a single non-empty bucket - see
+             applyDeadStockChart()'s own comment. -->
+        <com.mujeer.businesserp.SimplePieChartView
+            android:id="@+id/chart_dead_stock_aging_pie"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" />
+
+        <com.mujeer.businesserp.SimpleBarChartView
+            android:id="@+id/chart_dead_stock_aging"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" />
+
         <TextView
             android:id="@+id/tv_dead_stock_empty"
             android:layout_width="match_parent"

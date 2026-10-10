@@ -45,14 +45,36 @@
   user asked for the whole app to be more minimalist. Apply it to every
   new filter, and convert an existing button-row filter to match
   whenever you're touching that screen anyway.
-- Charts use `SimpleBarChartView` (plain Canvas drawing, no third-party
-  library) - `build.gradle` has no charting dependency, and AIDE's
-  on-device build has no reliable way to resolve a new Maven dependency,
-  so don't add one (e.g. MPAndroidChart). Adding charts to more reports
-  is an ongoing, incremental effort ("current, past, and future" per the
+- Charts use `SimpleBarChartView`/`SimplePieChartView`/`SimpleLineChartView`
+  (plain Canvas drawing, no third-party library, all three sharing the
+  same `SimpleBarChartView.Entry(label, value, color)` data-point class)
+  - `build.gradle` has no charting dependency, and AIDE's on-device
+  build has no reliable way to resolve a new Maven dependency, so don't
+  add one (e.g. MPAndroidChart). Pick the type by the data's own shape,
+  not by habit: **Bar** for comparing distinct categories/rows (it
+  handles a loss via a zero baseline, so it's also the safe fallback);
+  **Pie** only for a true share-of-a-whole where you're confident every
+  value will be positive (it silently drops non-positive entries and
+  renders nothing at all below 2 positive ones - see
+  `ProfitSplitReportActivity`/`ShoesVsNonShoesReportActivity` for the
+  pattern of wiring BOTH a Pie and a Bar and toggling which is visible,
+  for data that's a share-of-a-whole most of the time but can go
+  negative); **Line** for an ordered trend over time/periods (also
+  renders nothing below 2 points). Don't add a chart at all when a
+  report's own default view is a single aggregate number, or has no
+  single clean comparable numeric axis - say so plainly rather than
+  forcing a misleading chart. Adding/upgrading charts across reports is
+  an ongoing, incremental effort ("current, past, and future" per the
   user) - not a one-time checklist item - so pick it up again whenever
-  touching a report that would benefit from one, instead of treating a
-  partial pass as finished.
+  touching a report that would benefit from one or from a better-fitting
+  type, instead of treating a partial pass as finished. The Dashboard's
+  "live mini-chart widget cards" (`DashboardChartWidgetsActivity`/
+  `DashboardChartWidgetLoader`) reuse this same `Entry` class and the
+  same per-report `DatabaseHelper` query a report's own full page
+  already calls (just with a fixed "today"/shortest-default period) -
+  extending that widget picker to a newly-charted report is a small,
+  separate `loadXxx()` addition to `DashboardChartWidgetLoader`, not a
+  new design.
 - Swipe-left-to-reveal Edit/Delete on a list row uses `SwipeRevealLayout`
   (plain View/MotionEvent custom ViewGroup) - not RecyclerView's
   `ItemTouchHelper`. Every list in this app is a ListView/BaseAdapter and

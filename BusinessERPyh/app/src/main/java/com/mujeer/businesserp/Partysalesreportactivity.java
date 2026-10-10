@@ -15,6 +15,8 @@ import android.widget.TextView;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Locale;
 
@@ -59,6 +61,7 @@ public class Partysalesreportactivity extends Activity {
 
 	private TextView tv_empty;
 	private ListView lv_party_sales;
+	private SimpleBarChartView chart_party_sales;
 
 	private DatabaseHelper db;
 
@@ -100,6 +103,7 @@ public class Partysalesreportactivity extends Activity {
 
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_party_sales = findViewById(R.id.lv_party_sales);
+		chart_party_sales = findViewById(R.id.chart_party_sales);
 
 		db = new DatabaseHelper(this);
 
@@ -323,13 +327,49 @@ public class Partysalesreportactivity extends Activity {
 
 									tv_empty.setVisibility(View.VISIBLE);
 									lv_party_sales.setVisibility(View.GONE);
+									chart_party_sales.setVisibility(View.GONE);
 
 								} else {
 
 									tv_empty.setVisibility(View.GONE);
 									lv_party_sales.setVisibility(View.VISIBLE);
+									chart_party_sales.setVisibility(View.VISIBLE);
 
 									setListViewHeightBasedOnChildren(lv_party_sales);
+
+									// Top ~10 parties by sales amount, always
+									// re-sorted by total regardless of
+									// whichever sort the list itself is
+									// showing (Profit/Name/Count), so the
+									// chart answers "who are the biggest
+									// customers by amount" consistently.
+									ArrayList<HashMap<String, Object>> topByTotal =
+										new ArrayList<HashMap<String, Object>>(partySalesList);
+
+									Collections.sort(topByTotal, new Comparator<HashMap<String, Object>>() {
+											@Override
+											public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+												return ((Double) b.get("total")).compareTo((Double) a.get("total"));
+											}
+										});
+
+									ArrayList<SimpleBarChartView.Entry> chartEntries =
+										new ArrayList<SimpleBarChartView.Entry>();
+
+									int chartCount = Math.min(10, topByTotal.size());
+
+									for (int i = 0; i < chartCount; i++) {
+
+										HashMap<String, Object> row = topByTotal.get(i);
+
+										chartEntries.add(new SimpleBarChartView.Entry(
+											String.valueOf(row.get("party_name")),
+											(Double) row.get("total"),
+											getResources().getColor(R.color.primary)
+										));
+									}
+
+									chart_party_sales.setEntries(chartEntries);
 								}
 							}
 						});

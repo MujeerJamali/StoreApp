@@ -12,6 +12,8 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 
 // =====================
@@ -26,6 +28,13 @@ import java.util.HashMap;
 // =====================
 public class DiscountStopRestockReportActivity extends Activity {
 
+	// Each flagged list gets a small "top N" bar chart of its own
+	// comparable numeric field (suggested discount % / margin) rather
+	// than charting every row - a report list this size can run to
+	// dozens of items, which would overload the chart's own "sparse"
+	// threshold (see SimpleBarChartView).
+	private static final int CHART_TOP_N = 8;
+
 	private static final int[] SHOES_FILTER_VALUES = {
 		DatabaseHelper.SHOES_FILTER_ALL,
 		DatabaseHelper.SHOES_FILTER_SHOES_ONLY,
@@ -38,9 +47,11 @@ public class DiscountStopRestockReportActivity extends Activity {
 
 	private Spinner spinner_shoes_filter;
 
+	private SimpleBarChartView chart_discount;
 	private TextView tv_discount_empty;
 	private LinearLayout container_discount;
 
+	private SimpleBarChartView chart_stop_restocking;
 	private TextView tv_stop_restocking_empty;
 	private LinearLayout container_stop_restocking;
 
@@ -65,9 +76,11 @@ public class DiscountStopRestockReportActivity extends Activity {
 
 		spinner_shoes_filter = findViewById(R.id.spinner_shoes_filter);
 
+		chart_discount = findViewById(R.id.chart_discount);
 		tv_discount_empty = findViewById(R.id.tv_discount_empty);
 		container_discount = findViewById(R.id.container_discount);
 
+		chart_stop_restocking = findViewById(R.id.chart_stop_restocking);
 		tv_stop_restocking_empty = findViewById(R.id.tv_stop_restocking_empty);
 		container_stop_restocking = findViewById(R.id.container_stop_restocking);
 
@@ -153,10 +166,18 @@ public class DiscountStopRestockReportActivity extends Activity {
 		if (list.isEmpty()) {
 
 			tv_discount_empty.setVisibility(View.VISIBLE);
+			chart_discount.setEntries(null);
 			return;
 		}
 
 		tv_discount_empty.setVisibility(View.GONE);
+
+		// list already arrives most-urgent-first (see getSlowMovingStock()'s
+		// own sort, reused by getDiscountCandidates()), so the first
+		// CHART_TOP_N rows are already the top N most urgent, not just the
+		// first N alphabetically.
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+		int chartColor = getResources().getColor(R.color.primary);
 
 		for (final HashMap<String, Object> row : list) {
 
@@ -181,6 +202,13 @@ public class DiscountStopRestockReportActivity extends Activity {
 			int discountPercent = (Integer) row.get("suggested_discount_percent");
 			tv_badge.setText(discountPercent + "%");
 
+			if (chartEntries.size() < CHART_TOP_N) {
+
+				chartEntries.add(new SimpleBarChartView.Entry(
+					String.valueOf(row.get("name")), discountPercent, chartColor
+				));
+			}
+
 			view.setOnClickListener(new View.OnClickListener() {
 					@Override
 					public void onClick(View v) {
@@ -197,6 +225,8 @@ public class DiscountStopRestockReportActivity extends Activity {
 
 			container_discount.addView(view);
 		}
+
+		chart_discount.setEntries(chartEntries);
 	}
 
 	private void applyStopRestockingCandidates(ArrayList<HashMap<String, Object>> list) {
@@ -206,10 +236,50 @@ public class DiscountStopRestockReportActivity extends Activity {
 		if (list.isEmpty()) {
 
 			tv_stop_restocking_empty.setVisibility(View.VISIBLE);
+			chart_stop_restocking.setEntries(null);
 			return;
 		}
 
 		tv_stop_restocking_empty.setVisibility(View.GONE);
+
+		// list arrives name-sorted (see getStopRestockingCandidates()), so a
+		// separate, margin-sorted copy is built just for the chart's own
+		// "top N worst margins" ranking - the row list below keeps its own
+		// name order untouched.
+		ArrayList<HashMap<String, Object>> sortedForChart =
+			new ArrayList<HashMap<String, Object>>(list);
+
+		Collections.sort(sortedForChart, new Comparator<HashMap<String, Object>>() {
+				@Override
+				public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+
+					double marginA = (Double) a.get("margin");
+					double marginB = (Double) b.get("margin");
+
+					return Double.compare(marginA, marginB);
+				}
+			}
+		);
+
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+		int chartColor = getResources().getColor(R.color.danger);
+
+		// Every candidate here is, by definition, selling at or below its
+		// own cost (see getStopRestockingCandidates()), so every margin is
+		// <= 0 - a single uniform color is correct, not per-row conditional
+		// coloring, since there is no sign to vary on.
+		for (int i = 0; i < sortedForChart.size() && i < CHART_TOP_N; i++) {
+
+			HashMap<String, Object> row_forChart = sortedForChart.get(i);
+
+			chartEntries.add(new SimpleBarChartView.Entry(
+				String.valueOf(row_forChart.get("name")),
+				(Double) row_forChart.get("margin"),
+				chartColor
+			));
+		}
+
+		chart_stop_restocking.setEntries(chartEntries);
 
 		for (final HashMap<String, Object> row : list) {
 

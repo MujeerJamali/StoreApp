@@ -34,6 +34,7 @@ public class ScenarioCheckActivity extends Activity {
 	private TextView tv_extra_cash_needed;
 	private TextView tv_estimated_extra_profit;
 	private TextView tv_basis;
+	private SimpleBarChartView chart_scenario;
 
 	private DatabaseHelper db;
 	private ArrayList<String> categories;
@@ -59,6 +60,7 @@ public class ScenarioCheckActivity extends Activity {
 		tv_extra_cash_needed = findViewById(R.id.tv_extra_cash_needed);
 		tv_estimated_extra_profit = findViewById(R.id.tv_estimated_extra_profit);
 		tv_basis = findViewById(R.id.tv_basis);
+		chart_scenario = findViewById(R.id.chart_scenario);
 
 		db = new DatabaseHelper(this);
 
@@ -138,6 +140,22 @@ public class ScenarioCheckActivity extends Activity {
 			"window), stock-weighted average purchase price, and current stock of " +
 			AmountFormat.formatPlain(currentStock) + "."
 		);
+
+		// Current vs Scenario stock, in units - the single metric this
+		// whole screen's question ("what if I stock X% more") is actually
+		// about, built from the same currentStock/extraUnits already
+		// computed above (no second query). Plain Bar, not Pie: a
+		// negative percentMore (destocking) can send extraUnits negative,
+		// which a pie can't plot anyway.
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+		int chartColor = getResources().getColor(R.color.primary);
+
+		chartEntries.add(new SimpleBarChartView.Entry("Current Stock", currentStock, chartColor));
+		chartEntries.add(new SimpleBarChartView.Entry(
+			"Scenario Stock", currentStock + extraUnits, chartColor
+		));
+
+		chart_scenario.setEntries(chartEntries);
 
 		container_result.setVisibility(View.VISIBLE);
 	}

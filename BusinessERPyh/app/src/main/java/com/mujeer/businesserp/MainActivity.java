@@ -10,6 +10,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.Spinner;
@@ -54,6 +55,7 @@ public class MainActivity extends Activity {
 	Button btn_quick_sale;
 	Button btn_today_actions;
 	Button btn_customize_dashboard;
+	Button btn_chart_widgets;
 	Button btn_swipe_gesture_settings;
 
 	Button btn_quick_add;
@@ -93,6 +95,7 @@ public class MainActivity extends Activity {
 	private long trendLoadGeneration = 0;
 	private long todayVsLastWeekLoadGeneration = 0;
 	private long salesStreakLoadGeneration = 0;
+	private long chartWidgetsGeneration = 0;
 
 	EditText et_dashboard_search;
 
@@ -101,6 +104,9 @@ public class MainActivity extends Activity {
 	LinearLayout card_favorites;
 	View card_cash_summary;
 	View card_sales_trend;
+
+	View row_chart_widgets_label;
+	LinearLayout container_chart_widgets_dashboard;
 
 	// Every long-press-pinnable Tool Row on this screen (both the
 	// Modules and Tools cards), keyed by its own button id's resource
@@ -114,7 +120,7 @@ public class MainActivity extends Activity {
 		"btn_display_shoes", "btn_sample_shoes", "btn_recently_deleted",
 		"btn_reorder_list", "btn_bulk_item_update", "btn_loyalty_points",
 		"btn_stock_take", "btn_quick_sale", "btn_today_actions", "btn_customize_dashboard",
-		"btn_swipe_gesture_settings"
+		"btn_chart_widgets", "btn_swipe_gesture_settings"
 	};
 
 	private static final String[] SHORTCUT_LABELS = {
@@ -125,7 +131,7 @@ public class MainActivity extends Activity {
 		"Display Shoes", "Sample Shoes", "Recently Deleted",
 		"Reorder List", "Bulk Item Update", "Loyalty Points",
 		"Stock Take", "Quick Sale", "What To Do Today", "Customize Dashboard",
-		"Swipe Gesture Settings"
+		"Dashboard Chart Widgets", "Swipe Gesture Settings"
 	};
 
 	DatabaseHelper db;
@@ -165,6 +171,7 @@ public class MainActivity extends Activity {
 		btn_quick_sale = findViewById(R.id.btn_quick_sale);
 		btn_today_actions = findViewById(R.id.btn_today_actions);
 		btn_customize_dashboard = findViewById(R.id.btn_customize_dashboard);
+		btn_chart_widgets = findViewById(R.id.btn_chart_widgets);
 		btn_swipe_gesture_settings = findViewById(R.id.btn_swipe_gesture_settings);
 
 		btn_quick_add = findViewById(R.id.btn_quick_add);
@@ -201,6 +208,9 @@ public class MainActivity extends Activity {
 		card_favorites = findViewById(R.id.card_favorites);
 		card_cash_summary = findViewById(R.id.card_cash_summary);
 		card_sales_trend = findViewById(R.id.card_sales_trend);
+
+		row_chart_widgets_label = findViewById(R.id.row_chart_widgets_label);
+		container_chart_widgets_dashboard = findViewById(R.id.container_chart_widgets_dashboard);
 
 		InfoBubbleView info_bubble_favorites = findViewById(R.id.info_bubble_favorites);
 		info_bubble_favorites.setInfo(
@@ -242,6 +252,7 @@ public class MainActivity extends Activity {
 		attachFavoriteLongPress(btn_quick_sale, "btn_quick_sale");
 		attachFavoriteLongPress(btn_today_actions, "btn_today_actions");
 		attachFavoriteLongPress(btn_customize_dashboard, "btn_customize_dashboard");
+		attachFavoriteLongPress(btn_chart_widgets, "btn_chart_widgets");
 		attachFavoriteLongPress(btn_swipe_gesture_settings, "btn_swipe_gesture_settings");
 
 		ArrayAdapter<String> trendHorizonAdapter = new ArrayAdapter<String>(
@@ -613,6 +624,19 @@ public class MainActivity extends Activity {
 				}
 			});
 
+		btn_chart_widgets.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						DashboardChartWidgetsActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
 		btn_swipe_gesture_settings.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
@@ -696,6 +720,7 @@ public class MainActivity extends Activity {
 		loadTodayVsLastWeek();
 		loadSalesStreak();
 		refreshFavoritesCard();
+		refreshChartWidgets();
 	}
 
 	// Customizable dashboard (approved feature "pick which cards show
@@ -863,6 +888,128 @@ public class MainActivity extends Activity {
 		}
 	}
 
+	// Live mini-chart widget cards (approved feature - a real chart per
+	// picked report, not just a text shortcut; compare
+	// refreshFavoritesCard() above). Which reports are picked and in
+	// what order comes from DashboardChartWidgetsActivity via
+	// DashboardChartWidgets; the actual chart data for each one comes
+	// from DashboardChartWidgetLoader, which owns the "today" snapshot
+	// query for every report it supports. Runs on a background thread
+	// since it's a handful of DB queries - same generation-guard
+	// pattern as loadCashSummary()/loadSalesTrend() so a slow reply
+	// after a newer refresh already landed never overwrites it.
+	private void refreshChartWidgets() {
+
+		final ArrayList<String> keys = new ArrayList<String>();
+
+		for (String key : DashboardChartWidgets.getOrder(this)) {
+
+			if (DashboardChartWidgets.isVisible(this, key)) {
+				keys.add(key);
+			}
+		}
+
+		if (keys.isEmpty()) {
+
+			row_chart_widgets_label.setVisibility(View.GONE);
+			container_chart_widgets_dashboard.setVisibility(View.GONE);
+			container_chart_widgets_dashboard.removeAllViews();
+
+			return;
+		}
+
+		row_chart_widgets_label.setVisibility(View.VISIBLE);
+		container_chart_widgets_dashboard.setVisibility(View.VISIBLE);
+
+		final long myGeneration = ++chartWidgetsGeneration;
+
+		new Thread(new Runnable() {
+				@Override
+				public void run() {
+
+					final ArrayList<DashboardChartWidgetLoader.WidgetChart> results =
+						new ArrayList<DashboardChartWidgetLoader.WidgetChart>();
+
+					for (String key : keys) {
+
+						DashboardChartWidgetLoader.WidgetChart chart =
+							DashboardChartWidgetLoader.load(MainActivity.this, key);
+
+						if (chart != null) {
+							results.add(chart);
+						}
+					}
+
+					runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
+
+								if (myGeneration != chartWidgetsGeneration || isFinishing()) {
+									return;
+								}
+
+								applyChartWidgets(results);
+							}
+						});
+				}
+			}).start();
+	}
+
+	private void applyChartWidgets(ArrayList<DashboardChartWidgetLoader.WidgetChart> results) {
+
+		container_chart_widgets_dashboard.removeAllViews();
+
+		LayoutInflater inflater = LayoutInflater.from(this);
+
+		for (final DashboardChartWidgetLoader.WidgetChart chart : results) {
+
+			View card = inflater.inflate(
+				R.layout.dashboard_chart_widget_card, container_chart_widgets_dashboard, false
+			);
+
+			TextView tv_title = card.findViewById(R.id.tv_widget_card_title);
+			FrameLayout container_chart = card.findViewById(R.id.container_widget_card_chart);
+
+			tv_title.setText(chart.title);
+
+			View chartView;
+
+			if (chart.chartType == DashboardChartWidgetLoader.TYPE_PIE) {
+
+				SimplePieChartView pieView = new SimplePieChartView(this);
+				pieView.setEntries(chart.entries);
+				chartView = pieView;
+
+			} else if (chart.chartType == DashboardChartWidgetLoader.TYPE_LINE) {
+
+				SimpleLineChartView lineView = new SimpleLineChartView(this);
+				lineView.setEntries(chart.entries);
+				chartView = lineView;
+
+			} else {
+
+				SimpleBarChartView barView = new SimpleBarChartView(this);
+				barView.setEntries(chart.entries);
+				chartView = barView;
+			}
+
+			chartView.setLayoutParams(new FrameLayout.LayoutParams(
+				FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT
+			));
+
+			container_chart.addView(chartView);
+
+			card.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						startActivity(new Intent(MainActivity.this, chart.targetActivity));
+					}
+				});
+
+			container_chart_widgets_dashboard.addView(card);
+		}
+	}
+
 	// A Tool Row key always starts with "btn_" (see SHORTCUT_KEYS); a
 	// report favoriteKey never does, so this is enough to route the
 	// unpin to whichever store actually holds the key.
@@ -985,6 +1132,10 @@ public class MainActivity extends Activity {
 
 			case "btn_customize_dashboard":
 				intent = new Intent(this, DashboardCustomizeActivity.class);
+				break;
+
+			case "btn_chart_widgets":
+				intent = new Intent(this, DashboardChartWidgetsActivity.class);
 				break;
 
 			case "btn_swipe_gesture_settings":

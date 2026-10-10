@@ -13,6 +13,8 @@ import android.widget.TextView;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Locale;
 
@@ -38,6 +40,7 @@ public class Partyrankingreportactivity extends Activity {
 	};
 
 	private TextView tv_empty;
+	private SimpleBarChartView chart_party_ranking;
 	private ListView lv_ranking;
 
 	private DatabaseHelper db;
@@ -72,6 +75,7 @@ public class Partyrankingreportactivity extends Activity {
 		spinner_party_ranking_sort = findViewById(R.id.spinner_party_ranking_sort);
 
 		tv_empty = findViewById(R.id.tv_empty);
+		chart_party_ranking = findViewById(R.id.chart_party_ranking);
 		lv_ranking = findViewById(R.id.lv_ranking);
 
 		db = new DatabaseHelper(this);
@@ -198,18 +202,57 @@ public class Partyrankingreportactivity extends Activity {
 
 									tv_empty.setVisibility(View.VISIBLE);
 									lv_ranking.setVisibility(View.GONE);
+									chart_party_ranking.setVisibility(View.GONE);
 
 								} else {
 
 									tv_empty.setVisibility(View.GONE);
 									lv_ranking.setVisibility(View.VISIBLE);
+									chart_party_ranking.setVisibility(View.VISIBLE);
 
 									setListViewHeightBasedOnChildren(lv_ranking);
+									applyRankingChart(rankingList);
 								}
 							}
 						});
 				}
 			}).start();
+	}
+
+	// Top 8 parties by all-time sales total, independent of whatever
+	// sort the Spinner above is currently set to (the list below can be
+	// sorted by combined index or name, but the chart is always "who
+	// actually sold the most") - sorts a copy of the already-loaded
+	// rankingList in memory rather than re-querying the DB, since every
+	// row already carries its own "alltime" total.
+	private void applyRankingChart(ArrayList<HashMap<String, Object>> list) {
+
+		ArrayList<HashMap<String, Object>> sortedByAllTime =
+			new ArrayList<HashMap<String, Object>>(list);
+
+		Collections.sort(sortedByAllTime, new Comparator<HashMap<String, Object>>() {
+				@Override
+				public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+					return Double.compare((Double) b.get("alltime"), (Double) a.get("alltime"));
+				}
+			});
+
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+
+		int chartCount = Math.min(8, sortedByAllTime.size());
+
+		for (int i = 0; i < chartCount; i++) {
+
+			HashMap<String, Object> row = sortedByAllTime.get(i);
+
+			chartEntries.add(new SimpleBarChartView.Entry(
+				String.valueOf(row.get("party_name")),
+				(Double) row.get("alltime"),
+				getResources().getColor(R.color.primary)
+			));
+		}
+
+		chart_party_ranking.setEntries(chartEntries);
 	}
 
 	// A ListView inside a ScrollView doesn't scroll on its own, so it

@@ -203,6 +203,16 @@
 
         </LinearLayout>
 
+        <!-- Pie when both sides are a profit (a true share-of-whole,
+             always the case for Sales); Bar as the fallback whenever
+             Profit mode has a loss on either side - see
+             applyReport()'s own comment. -->
+        <com.mujeer.businesserp.SimplePieChartView
+            android:id="@+id/chart_shoes_split_pie"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" />
+
         <com.mujeer.businesserp.SimpleBarChartView
             android:id="@+id/chart_shoes_split"
             android:layout_width="match_parent"

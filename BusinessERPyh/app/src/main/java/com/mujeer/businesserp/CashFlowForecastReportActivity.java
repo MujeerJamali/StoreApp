@@ -8,8 +8,10 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Spinner;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Locale;
 
 // =====================
 // Today's real cash balance (DatabaseHelper.getCashBalance()) projected
@@ -31,6 +33,7 @@ public class CashFlowForecastReportActivity extends Activity {
 	private static final int DEFAULT_HORIZON_INDEX = 2;
 
 	private Spinner spinner_horizon;
+	private SimpleLineChartView chart_cash_flow_forecast;
 	private ListView lv_cash_flow_forecast;
 
 	private DatabaseHelper db;
@@ -59,6 +62,7 @@ public class CashFlowForecastReportActivity extends Activity {
 		);
 
 		spinner_horizon = findViewById(R.id.spinner_horizon);
+		chart_cash_flow_forecast = findViewById(R.id.chart_cash_flow_forecast);
 		lv_cash_flow_forecast = findViewById(R.id.lv_cash_flow_forecast);
 
 		db = new DatabaseHelper(this);
@@ -120,6 +124,43 @@ public class CashFlowForecastReportActivity extends Activity {
 								forecastList.addAll(result);
 
 								adapter.notifyDataSetChanged();
+
+								// Projected running cash balance, day by day - the
+								// exact ordered trend SimpleLineChartView exists
+								// for, built from the same result rows the list
+								// above already shows (no second query). Day-of-
+								// month-only labels, same short convention
+								// MainActivity's own daily sales chart uses - a
+								// 60-day horizon would otherwise overflow the
+								// chart's label area.
+								SimpleDateFormat isoFormat =
+									new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+								SimpleDateFormat dayFormat =
+									new SimpleDateFormat("d", Locale.getDefault());
+
+								ArrayList<SimpleBarChartView.Entry> chartEntries =
+									new ArrayList<SimpleBarChartView.Entry>();
+
+								int chartColor = getResources().getColor(R.color.primary);
+
+								for (HashMap<String, Object> row : result) {
+
+									String date = String.valueOf(row.get("date"));
+									String label = date;
+
+									try {
+										label = dayFormat.format(isoFormat.parse(date));
+									} catch (Exception e) {
+									}
+
+									double runningBalance = (Double) row.get("running_balance");
+
+									chartEntries.add(new SimpleBarChartView.Entry(
+										label, runningBalance, chartColor
+									));
+								}
+
+								chart_cash_flow_forecast.setEntries(chartEntries);
 							}
 						});
 				}

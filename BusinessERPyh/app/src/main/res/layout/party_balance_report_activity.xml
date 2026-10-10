@@ -53,6 +53,12 @@
 
     </LinearLayout>
 
+    <com.mujeer.businesserp.SimpleBarChartView
+        android:id="@+id/chart_party_balance"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp" />
+
     <TextView
         android:id="@+id/tv_no_parties"
         android:layout_width="match_parent"

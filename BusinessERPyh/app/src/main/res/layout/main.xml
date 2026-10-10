@@ -366,6 +366,27 @@
 
             </LinearLayout>
 
+            <!-- Live mini-chart widget cards - whichever reports the user
+                 picked in DashboardChartWidgetsActivity, each rendered
+                 with its own real chart (not a text shortcut; compare
+                 block_favorites above) via DashboardChartWidgetLoader -
+                 see MainActivity#refreshChartWidgets(). Collapsed
+                 entirely (both the label and this container) when
+                 nothing's been picked yet, same as block_favorites. -->
+            <TextView
+                android:id="@+id/row_chart_widgets_label"
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:layout_marginBottom="8dp"
+                android:text="Chart Widgets" />
+
+            <LinearLayout
+                android:id="@+id/container_chart_widgets_dashboard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:orientation="vertical" />
+
             <!-- Modules: plain one-line text rows, no icons - matches the
                  Tools list below instead of the old icon-grid cards. -->
             <LinearLayout
@@ -626,6 +647,16 @@
                     android:id="@+id/btn_customize_dashboard"
                     style="@style/ToolRow"
                     android:text="Customize Dashboard" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <Button
+                    android:id="@+id/btn_chart_widgets"
+                    style="@style/ToolRow"
+                    android:text="Dashboard Chart Widgets" />
 
                 <View
                     android:layout_width="match_parent"

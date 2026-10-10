@@ -63,6 +63,7 @@ public class ShoesVsNonShoesReportActivity extends Activity {
 	private TextView tv_total_label;
 	private TextView tv_total_amount;
 	private SimpleBarChartView chart_shoes_split;
+	private SimplePieChartView chart_shoes_split_pie;
 
 	private DatabaseHelper db;
 
@@ -102,6 +103,7 @@ public class ShoesVsNonShoesReportActivity extends Activity {
 		tv_total_label = findViewById(R.id.tv_total_label);
 		tv_total_amount = findViewById(R.id.tv_total_amount);
 		chart_shoes_split = findViewById(R.id.chart_shoes_split);
+		chart_shoes_split_pie = findViewById(R.id.chart_shoes_split_pie);
 
 		db = new DatabaseHelper(this);
 
@@ -385,6 +387,22 @@ public class ShoesVsNonShoesReportActivity extends Activity {
 		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
 		chartEntries.add(new SimpleBarChartView.Entry("Shoes", shoesAmount, getResources().getColor(R.color.mod_sales)));
 		chartEntries.add(new SimpleBarChartView.Entry("Non-Shoes", nonShoesAmount, getResources().getColor(R.color.primary)));
-		chart_shoes_split.setEntries(chartEntries);
+
+		// Sales amounts are never negative, so the Sales toggle always
+		// reads as a real share-of-whole pie. The Profit toggle can go
+		// negative on either side (a loss), which a pie can only hide
+		// by dropping that slice - so the bar chart (negative bars
+		// below baseline) takes over whenever either side isn't a
+		// profit, same reasoning as ProfitSplitReportActivity.
+		boolean bothPositive = shoesAmount > 0 && nonShoesAmount > 0;
+
+		chart_shoes_split_pie.setVisibility(bothPositive ? View.VISIBLE : View.GONE);
+		chart_shoes_split.setVisibility(bothPositive ? View.GONE : View.VISIBLE);
+
+		if (bothPositive) {
+			chart_shoes_split_pie.setEntries(chartEntries);
+		} else {
+			chart_shoes_split.setEntries(chartEntries);
+		}
 	}
 }

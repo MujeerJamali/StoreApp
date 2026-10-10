@@ -818,12 +818,46 @@ the Party Balances report.
 All period-based reports share the same range selector: Today, Yesterday,
 Week, Month, Quarter, Year, Custom Range.
 
-**Charts**: Net Profit, Stock Worth, Shoes vs Non-Shoes, Profit: Cash
-Sale vs Party, and Month-over-Month each show a small bar chart
-alongside their summary figures, drawn by a dependency-free custom view
-(`SimpleBarChartView` - no charting library is wired into the project).
-This is an ongoing pass, not a finished one - more reports get charts
-over time.
+**Charts**: 26 of the app's 30 report screens show a small chart
+alongside their summary figures, drawn by dependency-free custom views
+(`SimpleBarChartView`/`SimplePieChartView`/`SimpleLineChartView` - no
+charting library is wired into the project). Which type depends on the
+data's own shape, not a fixed per-report choice:
+- **Bar** (comparing distinct categories/rows, handles a loss via a
+  zero baseline) - Net Profit, Stock Worth, Size-Curve Analysis, Margin
+  & Profit Alerts, Sales by Party, Item Monthly Rank, Item Ranking, Low
+  Stock, Slow-Moving Stock, Combo/Variety Stock, Budget Planner,
+  Scenario Check, Cross-Sell Insight, Party Ranking, Party Balances,
+  Credit Due, Win-Back List, and Day Close (top 8-10 rows where the
+  report is a ranking; Discount & Stop-Restocking gets two independent
+  bar charts, one per flagged list).
+- **Pie** (true share-of-a-whole, needs 2+ positive values) - Dead
+  Stock Aging (by age bucket) and Stock Value (by category). Profit:
+  Cash Sale vs Party and Shoes vs Non-Shoes wire up BOTH a Pie and a
+  Bar chart and toggle which is visible at render time: Pie when both
+  sides are positive, Bar as the fallback the moment either side is a
+  loss (a pie can only plot positive slices, so it would otherwise just
+  hide a real loss instead of showing it) - see either Activity's
+  `applyReport()` for the toggle.
+- **Line** (an ordered trend, needs 2+ points) - Expense Ratio Trend
+  (6 months) and Cash Flow Forecast (projected daily cash balance).
+
+`SimplePieChartView`/`SimpleLineChartView` collapse to zero height
+(nothing drawn at all) when their data doesn't fit - fewer than 2
+positive entries for Pie, fewer than 2 points for Line - rather than
+render a misleading single-slice pie or a pointless one-point line;
+`SimpleBarChartView` always draws whatever it's given, same as before.
+
+Four reports were deliberately left without a chart because their data
+doesn't fit any of the three types: **Total Sales by Period** and
+**Average Cart Size/Amount** only ever show a single aggregate number
+(or two different-unit numbers) for the whole selected period, with no
+day-by-day or category breakdown to plot; **Min Order Quantities** is a
+one-item-at-a-time flashcard editor with no aggregate results list; and
+**Cash Projection** returns one aggregate total for its whole period,
+not a sub-period breakdown. This is an ongoing pass, not a finished one
+- more reports (or a Pie/Line upgrade for an existing Bar one) can be
+added any time a report's own default view turns out to fit one.
 
 The Dashboard also has a Sales Trend sparkline (daily sales total for
 the last 7/30 days, including a day with zero sales - a quick "is the
@@ -876,6 +910,31 @@ lock them out of the rest of the app with no way back in.
 `MainActivity#applyDashboardCardOrder()` physically re-parents the
 three card views into the saved order on every resume, so a change
 takes effect immediately on returning from that settings screen.
+
+**Dashboard Chart Widgets** (Dashboard Tools card): live mini-chart
+cards on the Dashboard, not just a text shortcut like Dashboard
+Favorites above - each turned-on report renders its own real chart
+(small, read-only) directly on the Dashboard; tapping a card opens that
+report's full page. Picked and reordered from
+`DashboardChartWidgetsActivity` (same checkbox + Up/Down-button screen
+shape as Customize Dashboard, driven by `DashboardChartWidgets`,
+`SharedPreferences`-backed and opt-in - unlike Customize Dashboard's
+three always-on cards, a report widget defaults to OFF so adding a
+chart to a report's own page never also silently adds it to the
+Dashboard). `MainActivity#refreshChartWidgets()` renders the picked
+reports' charts on every resume via `DashboardChartWidgetLoader`, which
+owns one small "today" (or that report's own shortest default period)
+snapshot query per supported report, reusing the exact same
+`DatabaseHelper` methods that report's own full page calls so the
+widget and the full report can never disagree about what a number
+means - never a second, divergent query. Currently supports 6 reports
+(`DashboardChartWidgetLoader.SUPPORTED_KEYS`): Net Profit (Today), Stock
+Worth, Month-over-Month, Profit: Cash Sale vs Party (Today), Shoes vs
+Non-Shoes Sales (Today), and Expense Ratio Trend - the ones with a
+cheap, parameterless-or-"today" default view and an always-unambiguous
+chart type. Same "ongoing, pick it up again" spirit as the Charts
+rollout above: a report newly added to that list just needs one more
+small `loadXxx()` case in `DashboardChartWidgetLoader`, not a redesign.
 
 **Global Search**: a tappable search box at the top of the Dashboard
 opens a dedicated Search screen rather than searching inline on an

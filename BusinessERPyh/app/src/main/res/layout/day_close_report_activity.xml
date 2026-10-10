@@ -227,6 +227,20 @@
 
             </LinearLayout>
 
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/stroke" />
+
+            <com.mujeer.businesserp.SimpleBarChartView
+                android:id="@+id/chart_day_close"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="14dp" />
+
         </LinearLayout>
 
         <!-- Only shown when the selected date is today - reorder prep is

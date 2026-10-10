@@ -19,6 +19,7 @@ import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 
 // =====================
 // Dead Stock Aging: every active item with stock that hasn't sold in 60+
@@ -47,6 +48,8 @@ public class DeadStockAgingReportActivity extends Activity {
 
 	private TextView tv_dead_stock_empty;
 	private LinearLayout container_dead_stock;
+	private SimplePieChartView chart_dead_stock_aging_pie;
+	private SimpleBarChartView chart_dead_stock_aging;
 
 	private DatabaseHelper db;
 
@@ -74,6 +77,8 @@ public class DeadStockAgingReportActivity extends Activity {
 
 		tv_dead_stock_empty = findViewById(R.id.tv_dead_stock_empty);
 		container_dead_stock = findViewById(R.id.container_dead_stock);
+		chart_dead_stock_aging_pie = findViewById(R.id.chart_dead_stock_aging_pie);
+		chart_dead_stock_aging = findViewById(R.id.chart_dead_stock_aging);
 
 		db = new DatabaseHelper(this);
 
@@ -219,9 +224,20 @@ public class DeadStockAgingReportActivity extends Activity {
 
 		container_dead_stock.removeAllViews();
 
+		// Stock quantity tied up per age bucket, for the chart below - same
+		// four buckets getDeadStockAging() assigns, summed only over the
+		// rows this method actually renders (an item already in clearance
+		// is excluded, same as the list below).
+		LinkedHashMap<String, Double> bucketTotals = new LinkedHashMap<String, Double>();
+		bucketTotals.put("60-89 Days", 0.0);
+		bucketTotals.put("90-119 Days", 0.0);
+		bucketTotals.put("120+ Days", 0.0);
+		bucketTotals.put("Never Sold", 0.0);
+
 		if (list.isEmpty()) {
 
 			tv_dead_stock_empty.setVisibility(View.VISIBLE);
+			applyDeadStockChart(bucketTotals);
 			return;
 		}
 
@@ -233,6 +249,17 @@ public class DeadStockAgingReportActivity extends Activity {
 			if (row.get("clearance") != null) {
 				continue;
 			}
+
+			String ageBucket_forChart = String.valueOf(row.get("age_bucket"));
+			double balance_forChart =
+				row.get("balance") == null ? 0 : (Double) row.get("balance");
+
+			Double existingBucketTotal = bucketTotals.get(ageBucket_forChart);
+
+			bucketTotals.put(
+				ageBucket_forChart,
+				(existingBucketTotal == null ? 0.0 : existingBucketTotal) + balance_forChart
+			);
 
 			View view = LayoutInflater.from(this).inflate(
 				R.layout.dead_stock_row, container_dead_stock, false
@@ -292,6 +319,55 @@ public class DeadStockAgingReportActivity extends Activity {
 			);
 
 			container_dead_stock.addView(view);
+		}
+
+		applyDeadStockChart(bucketTotals);
+	}
+
+	// Share of dead-stock quantity by age bucket - a Pie whenever at least
+	// two buckets actually carry stock (a true share-of-a-whole), falling
+	// back to a single-bucket Bar otherwise (a Pie can't plot fewer than 2
+	// slices), and showing nothing at all when every bucket is empty. Same
+	// dual-chart fallback pattern as ProfitSplitReportActivity.
+	private void applyDeadStockChart(LinkedHashMap<String, Double> bucketTotals) {
+
+		int[] bucketColors = {
+			getResources().getColor(R.color.accent),
+			getResources().getColor(R.color.primary),
+			getResources().getColor(R.color.danger),
+			getResources().getColor(R.color.text_secondary)
+		};
+
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+
+		int positiveCount = 0;
+		int colorIndex = 0;
+
+		for (String bucketLabel : bucketTotals.keySet()) {
+
+			double value = bucketTotals.get(bucketLabel);
+
+			if (value > 0) {
+				positiveCount++;
+			}
+
+			chartEntries.add(new SimpleBarChartView.Entry(
+				bucketLabel, value, bucketColors[colorIndex % bucketColors.length]
+			));
+
+			colorIndex++;
+		}
+
+		boolean usePie = positiveCount >= 2;
+		boolean useBar = !usePie && positiveCount >= 1;
+
+		chart_dead_stock_aging_pie.setVisibility(usePie ? View.VISIBLE : View.GONE);
+		chart_dead_stock_aging.setVisibility(useBar ? View.VISIBLE : View.GONE);
+
+		if (usePie) {
+			chart_dead_stock_aging_pie.setEntries(chartEntries);
+		} else if (useBar) {
+			chart_dead_stock_aging.setEntries(chartEntries);
 		}
 	}
 

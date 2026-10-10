@@ -32,6 +32,7 @@ public class WinBackListActivity extends Activity {
 	Spinner spinner_win_back_sort;
 	TextView tv_win_back_empty;
 	LinearLayout container_win_back_list;
+	SimpleBarChartView chart_win_back;
 
 	DatabaseHelper db;
 
@@ -79,6 +80,7 @@ public class WinBackListActivity extends Activity {
 		spinner_win_back_sort = findViewById(R.id.spinner_win_back_sort);
 		tv_win_back_empty = findViewById(R.id.tv_win_back_empty);
 		container_win_back_list = findViewById(R.id.container_win_back_list);
+		chart_win_back = findViewById(R.id.chart_win_back);
 
 		db = new DatabaseHelper(this);
 
@@ -174,10 +176,43 @@ public class WinBackListActivity extends Activity {
 		if (parties.isEmpty()) {
 
 			tv_win_back_empty.setVisibility(View.VISIBLE);
+			chart_win_back.setEntries(null);
 			return;
 		}
 
 		tv_win_back_empty.setVisibility(View.GONE);
+
+		// Top-10 ranking off the front of the already-sorted list (it's
+		// never re-queried just for the chart) - whichever metric the
+		// selected sort is currently ranking by, so the chart always
+		// matches what the rows below it are sorted on: longest-quiet-
+		// first shows days quiet, highest-profit-first shows lifetime
+		// profit. Every bar gets the same color since this is a ranking
+		// across many same-kind rows, not a set of distinct categories.
+		boolean chartByProfit = selectedSort == DatabaseHelper.WINBACK_SORT_PROFIT_DESC;
+		int chartColor = getResources().getColor(R.color.primary);
+		int chartCount = Math.min(10, parties.size());
+
+		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
+
+		for (int i = 0; i < chartCount; i++) {
+
+			HashMap<String, Object> party = parties.get(i);
+
+			String name = (String) party.get("name");
+
+			double chartValue;
+
+			if (chartByProfit) {
+				chartValue = party.get("lifetime_profit") != null ? (Double) party.get("lifetime_profit") : 0;
+			} else {
+				chartValue = (Integer) party.get("days_since");
+			}
+
+			chartEntries.add(new SimpleBarChartView.Entry(name, chartValue, chartColor));
+		}
+
+		chart_win_back.setEntries(chartEntries);
 
 		for (final HashMap<String, Object> party : parties) {
 

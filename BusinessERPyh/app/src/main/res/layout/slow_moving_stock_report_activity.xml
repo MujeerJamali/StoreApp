@@ -53,6 +53,12 @@
 
     </LinearLayout>
 
+    <com.mujeer.businesserp.SimpleBarChartView
+        android:id="@+id/chart_slow_moving"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp" />
+
     <TextView
         android:id="@+id/tv_empty"
         android:layout_width="match_parent"

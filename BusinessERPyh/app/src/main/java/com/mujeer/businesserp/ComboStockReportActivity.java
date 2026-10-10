@@ -54,6 +54,7 @@ public class ComboStockReportActivity extends Activity {
 	private TextView tv_total_stock;
 	private TextView tv_empty;
 	private ListView lv_combo_stock;
+	private SimpleBarChartView chart_combo_stock;
 
 	private DatabaseHelper db;
 
@@ -85,6 +86,7 @@ public class ComboStockReportActivity extends Activity {
 		tv_total_stock = findViewById(R.id.tv_total_stock);
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_combo_stock = findViewById(R.id.lv_combo_stock);
+		chart_combo_stock = findViewById(R.id.chart_combo_stock);
 
 		db = new DatabaseHelper(this);
 
@@ -342,6 +344,53 @@ public class ComboStockReportActivity extends Activity {
 					}
 				});
 		}
+
+		// Top few combo items by their own stock quantity (the matched
+		// combo's stock when a specific size is selected, else every
+		// combo's stock summed for that item) - a single color since this
+		// is a top-N ranking of many similar rows, not a signed or
+		// categorical breakdown.
+		ArrayList<SimpleBarChartView.Entry> chartSource = new ArrayList<SimpleBarChartView.Entry>();
+
+		for (HashMap<String, Object> item : filteredList) {
+
+			ArrayList<HashMap<String, Object>> itemCombos =
+				(ArrayList<HashMap<String, Object>>) item.get("combos");
+
+			double itemStock;
+
+			if (selected == null || selected.gender == null) {
+
+				itemStock = 0;
+
+				for (HashMap<String, Object> combo : itemCombos) {
+					itemStock += balanceOf(combo);
+				}
+
+			} else {
+
+				itemStock = balanceOf(findComboByLabel(itemCombos, selectedLabel));
+			}
+
+			chartSource.add(new SimpleBarChartView.Entry(
+				String.valueOf(item.get("name")), itemStock, getResources().getColor(R.color.primary)
+			));
+		}
+
+		Collections.sort(chartSource, new Comparator<SimpleBarChartView.Entry>() {
+				@Override
+				public int compare(SimpleBarChartView.Entry a, SimpleBarChartView.Entry b) {
+					return Double.compare(b.value, a.value);
+				}
+			});
+
+		int chartCount = Math.min(8, chartSource.size());
+
+		ArrayList<SimpleBarChartView.Entry> chartEntries =
+			new ArrayList<SimpleBarChartView.Entry>(chartSource.subList(0, chartCount));
+
+		chart_combo_stock.setEntries(chartEntries);
+		chart_combo_stock.setVisibility(chartEntries.isEmpty() ? View.GONE : View.VISIBLE);
 
 		adapter.setSelectedFilter(selectedLabel);
 		adapter.notifyDataSetChanged();

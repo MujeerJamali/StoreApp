@@ -51,6 +51,7 @@ public class ProfitSplitReportActivity extends Activity {
 	private TextView tv_party_profit;
 	private TextView tv_total_profit;
 	private SimpleBarChartView chart_profit_split;
+	private SimplePieChartView chart_profit_split_pie;
 
 	private DatabaseHelper db;
 
@@ -87,6 +88,7 @@ public class ProfitSplitReportActivity extends Activity {
 		tv_party_profit = findViewById(R.id.tv_party_profit);
 		tv_total_profit = findViewById(R.id.tv_total_profit);
 		chart_profit_split = findViewById(R.id.chart_profit_split);
+		chart_profit_split_pie = findViewById(R.id.chart_profit_split_pie);
 
 		db = new DatabaseHelper(this);
 
@@ -318,6 +320,22 @@ public class ProfitSplitReportActivity extends Activity {
 		ArrayList<SimpleBarChartView.Entry> chartEntries = new ArrayList<SimpleBarChartView.Entry>();
 		chartEntries.add(new SimpleBarChartView.Entry("Cash Sale", cashProfit, getResources().getColor(R.color.mod_sales)));
 		chartEntries.add(new SimpleBarChartView.Entry("Named Party", partyProfit, getResources().getColor(R.color.primary)));
-		chart_profit_split.setEntries(chartEntries);
+
+		// A pie reads much more naturally as "share of profit" than a
+		// bar pair, but a pie can only plot positive slices - so it's
+		// only used when both sides actually turned a profit. The
+		// moment either side is a loss, that bar chart below is what
+		// still shows it (negative bars below baseline) instead of a
+		// pie silently hiding it.
+		boolean bothPositive = cashProfit > 0 && partyProfit > 0;
+
+		chart_profit_split_pie.setVisibility(bothPositive ? View.VISIBLE : View.GONE);
+		chart_profit_split.setVisibility(bothPositive ? View.GONE : View.VISIBLE);
+
+		if (bothPositive) {
+			chart_profit_split_pie.setEntries(chartEntries);
+		} else {
+			chart_profit_split.setEntries(chartEntries);
+		}
 	}
 }

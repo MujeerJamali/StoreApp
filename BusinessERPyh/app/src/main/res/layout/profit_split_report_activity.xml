@@ -179,6 +179,17 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 
+        <!-- Pie when both sides turned a profit (a true share-of-whole);
+             Bar as the fallback whenever either side is a loss, since a
+             pie can only plot positive slices and would otherwise just
+             hide a real loss instead of showing it - see
+             applyReport()'s own comment. -->
+        <com.mujeer.businesserp.SimplePieChartView
+            android:id="@+id/chart_profit_split_pie"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" />
+
         <com.mujeer.businesserp.SimpleBarChartView
             android:id="@+id/chart_profit_split"
             android:layout_width="match_parent"
