@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/PageTitle"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_marginBottom="0dp"
+                android:text="Scenario Check" />
+
+            <com.mujeer.businesserp.InfoBubbleView
+                android:id="@+id/info_bubble"
+                android:layout_width="@dimen/info_bubble_size"
+                android:layout_height="@dimen/info_bubble_size" />
+
+        </LinearLayout>
+
+        <TextView
+            style="@style/FieldLabel"
+            android:layout_marginTop="0dp"
+            android:layout_marginBottom="12dp"
+            android:text="A rough profit estimate for &quot;what if I stocked X% more of category Y&quot; - a straight-line projection from that category's own recent sales, not a prediction." />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Category" />
+            <Spinner
+                android:id="@+id/spinner_category"
+                style="@style/FilterSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <TextView style="@style/FieldLabel" android:text="Stock more by (%)" />
+            <EditText
+                android:id="@+id/et_percent_more"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. 20"
+                android:inputType="numberDecimal"
+                android:text="20" />
+
+            <Button
+                android:id="@+id/btn_calculate"
+                style="@style/AppButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="Calculate" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/container_result"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp"
+            android:visibility="gone">
+
+            <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Current Stock" />
+            <TextView
+                android:id="@+id/tv_current_stock"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView style="@style/FieldLabel" android:text="Extra Units" />
+            <TextView
+                android:id="@+id/tv_extra_units"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView style="@style/FieldLabel" android:text="Extra Cash Needed" />
+            <TextView
+                android:id="@+id/tv_extra_cash_needed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView style="@style/FieldLabel" android:text="Estimated Extra Profit (if it all sells)" />
+            <TextView
+                android:id="@+id/tv_estimated_extra_profit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_basis"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Based on..."
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

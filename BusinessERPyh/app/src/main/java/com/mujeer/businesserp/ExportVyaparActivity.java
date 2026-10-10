@@ -308,6 +308,8 @@ public class ExportVyaparActivity extends Activity {
 			exportSampleShoes(local, vyb);
 			exportItemClearance(local, vyb);
 			exportLoyaltyPoints(local, vyb);
+			exportSeasonalCalendar(local, vyb);
+			exportStockTake(local, vyb);
 
 			// Deliberately NOT exported: TABLE_RECENTLY_DELETED. Unlike
 			// every table above, it holds already-deleted data's
@@ -527,7 +529,11 @@ public class ExportVyaparActivity extends Activity {
 			// a real Vyapar backup or an export made before this field
 			// existed, which ImportVyaparActivity's columnExists check
 			// detects up front so an older backup still restores cleanly.
-			"full_name_appearance TEXT" +
+			"full_name_appearance TEXT, " +
+			// Another of this app's own extensions (customer tagging:
+			// Regular/One-Time/Wholesale) - same columnExists gating as
+			// full_name_appearance above.
+			"full_name_customer_type TEXT" +
 			")"
 		);
 
@@ -556,7 +562,13 @@ public class ExportVyaparActivity extends Activity {
 			// exported before it existed, which ImportVyaparActivity's
 			// itemsHaveReorderThreshold detects up front so it defaults
 			// to 0 (no alert) instead of failing.
-			"item_reorder_threshold REAL" +
+			"item_reorder_threshold REAL, " +
+			// Another of this app's own extensions (free-form bin/shelf
+			// tag) - absent from a real Vyapar backup or one exported
+			// before it existed, which ImportVyaparActivity's
+			// itemsHaveLocations detects up front so it defaults to ""
+			// instead of failing.
+			"item_locations TEXT" +
 			")"
 		);
 
@@ -669,10 +681,16 @@ public class ExportVyaparActivity extends Activity {
 		// another of this app's own extensions. Nothing else references a
 		// cost item by id (Expenses.item is plain text), so id is not even
 		// preserved on the way back in - see importCostItems().
+		// cost_item_monthly_budget is itself a further extension on top
+		// of that (expense category budgets) - absent from a backup made
+		// before it existed, which ImportVyaparActivity's columnExists
+		// check detects up front so it defaults to 0 (no budget/alert)
+		// instead of failing.
 		vyb.execSQL(
 			"CREATE TABLE businesserp_cost_items (" +
 			"id INTEGER PRIMARY KEY, " +
-			"name TEXT" +
+			"name TEXT, " +
+			"cost_item_monthly_budget REAL" +
 			")"
 		);
 
@@ -797,6 +815,47 @@ public class ExportVyaparActivity extends Activity {
 			"reason TEXT" +
 			")"
 		);
+
+		// The user's own manually marked busy-period months (see
+		// DatabaseHelper.TABLE_SEASONAL_CALENDAR) - another of this
+		// app's own extensions. Nothing else references an entry by id,
+		// so id is not even preserved on the way back in (same reasoning
+		// as businesserp_cost_items above) - see importSeasonalCalendar().
+		vyb.execSQL(
+			"CREATE TABLE businesserp_seasonal_calendar (" +
+			"id INTEGER PRIMARY KEY, " +
+			"label TEXT, " +
+			"month INTEGER, " +
+			"multiplier REAL" +
+			")"
+		);
+
+		// Only completed Stock Take sessions ever reach here (see
+		// exportStockTake() below) - a session's own id is preserved so
+		// its lines can reference it back, same convention as a
+		// purchase/sale and its own line items.
+		vyb.execSQL(
+			"CREATE TABLE businesserp_stock_take_sessions (" +
+			"id INTEGER PRIMARY KEY, " +
+			"started_date TEXT, " +
+			"started_time TEXT, " +
+			"completed_date TEXT, " +
+			"completed_time TEXT, " +
+			"item_count INTEGER, " +
+			"discrepancy_count INTEGER" +
+			")"
+		);
+
+		vyb.execSQL(
+			"CREATE TABLE businesserp_stock_take_lines (" +
+			"id INTEGER PRIMARY KEY, " +
+			"session_id INTEGER, " +
+			"item_id INTEGER, " +
+			"combo_id INTEGER, " +
+			"expected_qty REAL, " +
+			"counted_qty REAL" +
+			")"
+		);
 	}
 
 	// =====================
@@ -805,7 +864,7 @@ public class ExportVyaparActivity extends Activity {
 	private static void exportParties(SQLiteDatabase local, SQLiteDatabase vyb) {
 
 		Cursor c = local.rawQuery(
-			"SELECT id, name, appearance_notes FROM parties", null);
+			"SELECT id, name, appearance_notes, customer_type FROM parties", null);
 
 		while (c.moveToNext()) {
 
@@ -814,6 +873,7 @@ public class ExportVyaparActivity extends Activity {
 			values.put("full_name", c.getString(1));
 			values.put("name_type", 1);
 			values.put("full_name_appearance", c.getString(2));
+			values.put("full_name_customer_type", c.getString(3));
 
 			vyb.insert("kb_names", null, values);
 		}
@@ -829,7 +889,7 @@ public class ExportVyaparActivity extends Activity {
 
 		Cursor c = local.rawQuery(
 			"SELECT id, code, name, purchase_price, sale_price, extra_cost_per_unit, active, " +
-			"reorder_threshold FROM items", null);
+			"reorder_threshold, locations FROM items", null);
 
 		while (c.moveToNext()) {
 
@@ -843,6 +903,7 @@ public class ExportVyaparActivity extends Activity {
 			values.put("item_active", c.getInt(6));
 			values.put("item_extra_cost_per_unit", c.getDouble(5));
 			values.put("item_reorder_threshold", c.getDouble(7));
+			values.put("item_locations", c.getString(8));
 
 			vyb.insert("kb_items", null, values);
 		}
@@ -1265,13 +1326,15 @@ public class ExportVyaparActivity extends Activity {
 	// =====================
 	private static void exportCostItems(SQLiteDatabase local, SQLiteDatabase vyb) {
 
-		Cursor c = local.rawQuery("SELECT id, name FROM cost_items", null);
+		Cursor c = local.rawQuery(
+			"SELECT id, name, monthly_budget FROM cost_items", null);
 
 		while (c.moveToNext()) {
 
 			ContentValues values = new ContentValues();
 			values.put("id", c.getLong(0));
 			values.put("name", c.getString(1));
+			values.put("cost_item_monthly_budget", c.getDouble(2));
 
 			vyb.insert("businesserp_cost_items", null, values);
 		}
@@ -1507,6 +1570,87 @@ public class ExportVyaparActivity extends Activity {
 		}
 
 		c.close();
+	}
+
+	// =====================
+	// SEASONAL CALENDAR -> businesserp_seasonal_calendar (1:1 copy).
+	// Nothing else references an entry by id, so id is not even
+	// preserved on the way back in - see importSeasonalCalendar().
+	// =====================
+	private static void exportSeasonalCalendar(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor c = local.rawQuery(
+			"SELECT id, label, month, multiplier FROM seasonal_calendar", null);
+
+		while (c.moveToNext()) {
+
+			ContentValues values = new ContentValues();
+			values.put("id", c.getLong(0));
+			values.put("label", c.getString(1));
+			values.put("month", c.getInt(2));
+			values.put("multiplier", c.getDouble(3));
+
+			vyb.insert("businesserp_seasonal_calendar", null, values);
+		}
+
+		c.close();
+	}
+
+	// =====================
+	// STOCK TAKE -> businesserp_stock_take_sessions/lines. Only
+	// completed sessions - an open (in-progress) one is mid-workflow
+	// device state, not a finished record, same reasoning as a drafts
+	// autosave row never being a real Draft. Only counted lines are
+	// carried over too; an uncounted line contributed nothing (no
+	// counted_qty to even write) and would just be noise on restore.
+	// =====================
+	private static void exportStockTake(SQLiteDatabase local, SQLiteDatabase vyb) {
+
+		Cursor sessionCursor = local.rawQuery(
+			"SELECT id, started_date, started_time, completed_date, completed_time, " +
+			"item_count, discrepancy_count FROM stock_take_sessions WHERE status='completed'",
+			null
+		);
+
+		while (sessionCursor.moveToNext()) {
+
+			long sessionId = sessionCursor.getLong(0);
+
+			ContentValues sessionValues = new ContentValues();
+			sessionValues.put("id", sessionId);
+			sessionValues.put("started_date", sessionCursor.getString(1));
+			sessionValues.put("started_time", sessionCursor.getString(2));
+			sessionValues.put("completed_date", sessionCursor.getString(3));
+			sessionValues.put("completed_time", sessionCursor.getString(4));
+			sessionValues.put("item_count", sessionCursor.getInt(5));
+			sessionValues.put("discrepancy_count", sessionCursor.getInt(6));
+
+			vyb.insert("businesserp_stock_take_sessions", null, sessionValues);
+
+			Cursor lineCursor = local.rawQuery(
+				"SELECT id, item_id, combo_id, expected_qty, counted_qty FROM " +
+				"stock_take_lines WHERE session_id=? AND counted=1",
+				new String[]{String.valueOf(sessionId)}
+			);
+
+			while (lineCursor.moveToNext()) {
+
+				ContentValues lineValues = new ContentValues();
+				lineValues.put("id", lineCursor.getLong(0));
+				lineValues.put("session_id", sessionId);
+				lineValues.put("item_id", lineCursor.getLong(1));
+				lineValues.put(
+					"combo_id", lineCursor.isNull(2) ? null : lineCursor.getLong(2));
+				lineValues.put("expected_qty", lineCursor.getDouble(3));
+				lineValues.put("counted_qty", lineCursor.getDouble(4));
+
+				vyb.insert("businesserp_stock_take_lines", null, lineValues);
+			}
+
+			lineCursor.close();
+		}
+
+		sessionCursor.close();
 	}
 
 	// =====================

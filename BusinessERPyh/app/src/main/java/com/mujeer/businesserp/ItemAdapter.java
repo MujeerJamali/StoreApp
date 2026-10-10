@@ -70,10 +70,18 @@ public class ItemAdapter extends BaseAdapter implements Filterable {
             stock = (Double) item.get("balance");
         }
 
+        double reorderThreshold = 0;
+
+        if (item.get("reorder_threshold") != null) {
+            reorderThreshold = (Double) item.get("reorder_threshold");
+        }
+
         tvStock.setText("Stock: " + formatQty(stock));
 
         if (stock <= 0) {
             tvStock.setTextColor(activity.getResources().getColor(R.color.danger));
+        } else if (reorderThreshold > 0 && stock <= reorderThreshold) {
+            tvStock.setTextColor(activity.getResources().getColor(R.color.warning));
         } else {
             tvStock.setTextColor(activity.getResources().getColor(R.color.mod_items));
         }

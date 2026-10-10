@@ -34,7 +34,11 @@ BusinessERPyh/                  Gradle project root
   stays fully visible/editable on the Items list itself and in past
   transactions. Each item also has a **Reorder Threshold** (Edit Item
   screen, 0 = no alert) - its total stock at or below that number is
-  what the Low Stock report/notification flags. Add/Edit Item has a
+  what the Low Stock report/notification flags, and what the Items
+  list's stock figure itself now colors amber for (red still means
+  actually at/below zero; amber means "at or below its own reorder
+  threshold but still in stock"; an item with no threshold set just
+  never shows amber - see `ItemAdapter.getView()`). Add/Edit Item has a
   **"This is a shoe"** checkbox that swaps the plain Name field for 7
   structured fields - Gender, Type, Sole, Upper, Design, Color, Size -
   matching this shop's `"Shoes {Gender} {Type} {Sole} {Upper} {Design}
@@ -51,6 +55,17 @@ BusinessERPyh/                  Gradle project root
   groups are deliberately not copied, since those are specific to
   whatever the new item turns out to be) and a quick **Mark Active/
   Inactive** toggle, without opening the Edit Item screen for either.
+  Edit Item also has a plain free-form **Locations** field (e.g.
+  "Shelf A, Bin 12") for tagging where an item physically sits -
+  deliberately one comma-separated text field rather than a separate
+  bin/shelf table, so "multi-bin" just means multiple comma-separated
+  words in it; shown read-only on the Item view screen when set, hidden
+  entirely when it isn't. That screen's own Transactions list is capped
+  to the 30 most-recent (date+time desc) at a time rather than ever
+  loading an item's entire lifetime history at once - a "Load More"
+  button reveals 30 more per tap, hidden once nothing's left
+  (`DatabaseHelper.getTransactionsByItem(itemId, limit, offset)`/
+  `getTransactionCountByItem()`).
 - **Swipe navigation** — on the plain Add Sale / Add Purchase / Add
   Expense screens (never while editing an existing one, so a swipe
   can't be mistaken for navigating away from in-progress edits), a
@@ -71,6 +86,43 @@ BusinessERPyh/                  Gradle project root
   both actions - a ± percent price change (Purchase Price and/or Sale
   Price, floored at 0) and setting a new Reorder Threshold - confirm
   with that exact count before touching anything.
+- **Stock Take** (Dashboard Tools card, pinnable as a Favorite) — a
+  physical count reconciliation mode. Starting a session snapshots
+  every active item's (and, for a varied item, every one of its
+  variety combos') current stock as its "expected" quantity; you then
+  walk the shop tapping each row to enter what you actually counted -
+  a plain number entry, same pattern as the reorder-threshold
+  checklist above. Finishing the session applies every counted line's
+  difference from expected as a real stock adjustment, through the
+  exact same mechanism a Purchase/Sale line already uses
+  (`adjustItemBalance()`/`adjustComboBalance()`), so items.balance
+  stays correct either way; an item you never got to counting is left
+  untouched entirely rather than being treated as zero. At most one
+  session is open at a time, and it can be cancelled with no stock
+  effect if started by mistake. **Past Stock Takes** lists every
+  finished session with its date and discrepancy count, tapping one
+  shows exactly what differed from expected that time (see
+  `DatabaseHelper`'s Stock Take section:
+  `startStockTake()`/`setStockTakeLineCount()`/`finishStockTake()`).
+- **Quick Sale** (Dashboard Tools card, pinnable as a Favorite) — one
+  screen, the biggest buttons, the least navigation, for a fast
+  walk-up cash sale. Deliberately skips everything the full Sale
+  screen asks for that a quick sale never needs: no party picker
+  (always the existing "Cash Sale" placeholder party, same one the
+  full Sale screen already falls back to), no partial payment or due
+  date (always paid in full), no discount/other-charges fields, and no
+  variety/size picker - only plain, size-less items show up here at
+  all, since picking a specific size is inherently not "quick" (a
+  varied item still sells normally through the full Sale screen).
+  **Quick Picks** are large buttons for whichever items sold most
+  recently (falling back to the first few items alphabetically if
+  nothing has sold yet) - tapping one adds a unit straight to the cart;
+  an **"+ Add Any Item"** search covers anything not already a Quick
+  Pick. Tapping a cart row offers +1/-1/Remove. **Complete Sale** saves
+  it exactly like the full Sale screen would
+  (`insertSale()`/`insertSaleItem()`) and then clears the cart, ready
+  for the next customer without ever leaving this screen (see
+  `QuickSaleActivity`, `DatabaseHelper.getSimpleItemsForQuickSale()`).
 - **Purchases / Sales** — line-item transactions, size dropdowns on sale
   items only show sizes with stock, bulk Excel import for purchases. The
   Add/Edit Item dialog's Quantity, Price and Total fields are linked live:
@@ -79,7 +131,12 @@ BusinessERPyh/                  Gradle project root
   item dropdown always carries a "+ Add New Item" row at the bottom,
   even when what's typed already has (wrong) matches — tapping it jumps
   straight to creating the item and returns with it selected, no need
-  to first type something that fails to match. A Purchase's "+ Select
+  to first type something that fails to match. That same dropdown also
+  pins whatever items were sold most recently to the very top (see
+  `DatabaseHelper.getRecentlySoldItemIds()`), on both the Sale and
+  Purchase screens, since a fast-selling item is exactly the one worth
+  restocking too - everything else stays in its usual alphabetical
+  order behind them. A Purchase's "+ Select
   Expenses" button links one or more existing **Expenses** to it as
   landed cost (see below) — works even before the purchase itself is
   saved, and either way nothing is written until Save/Update Transaction
@@ -91,6 +148,24 @@ BusinessERPyh/                  Gradle project root
   (defaults to the transaction date + 3 days the moment it becomes a
   credit transaction, editable from there) - see the Credit Due report
   below (Sales only - Purchases don't have an equivalent report yet).
+  A Sale (not Purchase - there's no discount concept on that side)
+  also has a **Discount** card with 5%/10% quick-preset buttons plus
+  a plain editable percent field for any other value ("Custom" just
+  focuses it) - the Grand Total, the live Estimated Profit preview,
+  and the default Amount Paid all update immediately as the percent
+  changes, and editing an already-saved Sale back-computes the
+  percent from its stored absolute discount amount to prefill the
+  field (the sales table itself still only stores one absolute
+  amount, same as before).
+  A Sale also shows a **Loyalty Points** chip live while it's being
+  entered, whenever a real (non-"Cash Sale") party is selected - that
+  party's current points balance plus a "(+N)" preview of how many
+  this exact sale would add, using the same formula
+  (`DatabaseHelper.getLoyaltyPointsPreview()`) the actual award on save
+  uses, so the two numbers never disagree. Updates immediately as
+  items, the discount, or the party itself change. The milestone-
+  reached toast after saving is still separate - a one-time
+  celebration, not the only place a balance ever shows.
   The Purchases/Sales list also supports **bulk select**: long-pressing
   any row enters selection mode (every row gets a checkbox, replacing
   that row's own single-delete confirmation) and a bar appears with a
@@ -103,6 +178,20 @@ BusinessERPyh/                  Gradle project root
   (Payments, Expenses, Wanted Items, Drafts, ...) is a candidate to
   pick up the same pattern later, the same way charts and info bubbles
   are being rolled out incrementally rather than everywhere at once.
+  Separately, the Purchases/Sales list, Payments list, and Expenses
+  list now also support **swipe-left-to-reveal Edit/Delete** on a
+  single row (`SwipeRevealLayout` - a plain View/MotionEvent custom
+  ViewGroup, not RecyclerView's `ItemTouchHelper`, since every list in
+  this app is a ListView/BaseAdapter and no RecyclerView dependency is
+  wired into `build.gradle`) - a faster one-swipe path for "just this
+  one" than long-press-into-bulk-select. Delete still shows the usual
+  confirmation dialog; on the Purchases/Sales list it reuses the exact
+  same Recently-Deleted-restorable snapshot delete the bulk-select bar
+  uses, swipe is disabled while bulk-select is active on that same
+  screen, and it stays a no-op everywhere else `TransactionAdapter` is
+  reused read-only (Partyviewactivity's/Itemviewactivity's transaction
+  history). This is the first pass, not the last - every other
+  delete-capable list is a candidate to pick up the same gesture later.
 - **Recently Deleted / Undo** — deleting a Purchase or Sale (single or
   bulk) no longer just deletes it: `DatabaseHelper.
   snapshotAndDeletePurchase()`/`snapshotAndDeleteSale()` first dump
@@ -144,15 +233,42 @@ BusinessERPyh/                  Gradle project root
   Discount This Week/Dead Stock Aging share - see those reports below. A unit with no sales history
   still qualifies if its own manual Reorder Threshold (Edit Item
   screen) says it's low, the same signal the Low Stock report uses.
-  Two more signals adjust a suggestion before it's shown: a seasonal
+  Four more signals adjust a suggestion before it's shown: a seasonal
   check (`getSeasonalMultiplier()`) compares this calendar month's
   average sales in past years against what the recent velocity alone
   would project, and scales the suggested quantity up (capped at 2x)
   when a past-years pattern says this month typically sells faster -
   a shop with no history yet simply gets no adjustment rather than a
-  guess; and each row shows a plain-language "runs out around
-  [date]" estimate from dividing current stock by recent velocity, so
-  the urgency doesn't require doing that math yourself. Nothing on
+  guess; a **Seasonal Calendar** (Reorder Settings) lets the user
+  manually mark their own busy periods too (e.g. a festival season) -
+  a month plus a quantity-boost %, applied app-wide for that month on
+  top of the auto-detected per-item pattern above, since the user's own
+  calendar knowledge can cover a pattern too new or too irregular for
+  sales history alone to have caught yet. A **Set Reorder Thresholds**
+  onboarding checklist (Reorder Settings) lists every active item still
+  at the default threshold of 0 ("not set") so the Reorder List and Low
+  Stock report can flag it even before it has enough sales history to
+  judge speed from - tapping a row prompts for a number right there and
+  it drops off the list once set, with a running "N of M items have a
+  threshold set" progress line; an item deliberately left at 0 simply
+  stays on the list, which is expected (`getItemsMissingReorderThreshold()`,
+  `getActiveItemCount()`, `setItemReorderThreshold()`). A simple per-item sales
+  forecast (`getForecastedWeeklyVelocity()`)
+  weighs the last 4 individual weeks of sales most-recent-heaviest
+  (4/3/2/1) rather than one flat average, so a genuine recent trend
+  shows up as its own number - shown on the row as "Forecast: ~N over
+  the next 2 weeks" - and as a further adjustment
+  (`getForecastMultiplier()`, the ratio of that trend-weighted rate to
+  the flat average, clamped 0.6x-1.6x) on top of the seasonal one; and
+  each row shows a plain-language "runs out around [date]" estimate
+  from dividing current stock by recent velocity, so the urgency
+  doesn't require doing that math yourself. Every row also shows a
+  plain-language **"why this suggestion"** line (`buildReorderWhyExplanation()`),
+  built from the exact same inputs the calculation just used so it can
+  never drift out of sync - whether it's velocity- or manual-threshold-
+  triggered, plus a note for each adjustment above that actually fired
+  (seasonal boost, manual busy-period boost, trend, or learning nudge)
+  and by how much. Nothing on
   this screen is final: each suggestion's quantity is a
   plain editable field, a checkbox excludes it, and "Ignore" dismisses
   it outright - only checked rows get used by **Convert Checked to
@@ -223,6 +339,21 @@ BusinessERPyh/                  Gradle project root
   (`kb_names.full_name_appearance` — gated by `columnExists()` on
   import so a backup made before this field existed still restores
   cleanly, with imported parties simply getting no notes).
+- **Customer Tagging** — a plain Spinner on the full Party edit screen
+  classifies a party as Regular (the default), One-Time, or Wholesale.
+  Same "+Add New Party stays name-only" reasoning as Appearance /
+  Description above, so it's not offered on quick-add either - every
+  new party starts Regular until someone tags it from the edit screen.
+  A tagged (non-Regular) party shows its tag as a small label on the
+  Parties list row and on its own Party view screen; a Regular party
+  shows neither, so the common case stays visually quiet. The Parties
+  list also gets a second filter dropdown (All Types/Regular/One-
+  Time/Wholesale) alongside its existing sort dropdown, both plain
+  `@style/FilterSpinner` controls. Real standing user data, so it's
+  included in the Vyapar backup round-trip
+  (`kb_names.full_name_customer_type` — gated by `columnExists()` on
+  import exactly like `full_name_appearance`, so an older backup still
+  restores cleanly with every imported party defaulting to Regular).
 - **Cost Items / Linking Expenses to Purchases** — Expenses double as the
   source of a purchase's landed costs (petrol, shipping, packaging, ...);
   there's no separate "Purchase Cost" record to create. Cost Items is
@@ -249,6 +380,23 @@ BusinessERPyh/                  Gradle project root
   version seeds a Cost Item for every distinct item text already used
   by an existing Expense or Recurring Expense rule, one-time, so the
   Item autocomplete starts already populated instead of empty.
+- **Expense Category Budgets** — each Cost Item's own edit screen has a
+  Monthly Budget field (0 = no budget/alert, the default). Actual spend
+  against it is this calendar month's `expenses.item` rows matching
+  that category's name (plain text, same join the Expense screen's own
+  autocomplete already relies on - a category renamed here just starts
+  fresh under the new name). The Cost Items list shows a "% of budget"
+  status badge next to any category that has one set, red once spend
+  passes 100%; a category with no budget shows nothing extra. A daily
+  check (`ExpenseBudgetNotifier`, same once-per-calendar-day pattern as
+  Margin Erosion's own alert) posts one notification listing every
+  category currently over its budget, spent vs budget - never posted
+  for a category with no budget set at all. Real standing user data, so
+  it's included in the Vyapar backup round-trip
+  (`businesserp_cost_items.cost_item_monthly_budget` — gated by
+  `columnExists()` on import exactly like the other Cost Items fields,
+  so a backup made before this existed still restores cleanly with
+  every imported category defaulting to no budget).
 - **Payments** — payment in/out against a party.
 - **Expenses** — one-off and **recurring** (weekly/monthly/specific
   dates); the Item field is a Cost Item autocomplete rather than free
@@ -483,6 +631,24 @@ Cash Flow Forecast
 Sales/Purchases already due on a future date - never a prediction from
 history, so a day with nothing due just carries the balance forward
 unchanged; a Next 7/14/30/60 Days horizon spinner, default 30 Days) ·
+Budget Planner (approved feature list row #77 - a dedicated planning
+screen, distinct from Cash Projection's one-line "What If" below: the
+same idea - what buying everything on the current Reorder List would
+cost - but broken down by supplier, each with its own subtotal and
+item count, against the effective cash limit Reorder Settings already
+uses for its own convert-to-draft warning, so the two screens never
+disagree about what's affordable; purely a planning view, nothing here
+commits anything) ·
+Scenario Check (approved feature list row #78 - "what if I stocked X%
+more of category Y" one-shot calculator: pick a category and a
+percentage, get a straight-line estimate - extra units (current
+category stock x that %), extra cash needed (at the category's stock-
+weighted average purchase price), and estimated extra profit, from
+that category's own recent sales speed and margin over Reorder
+Settings' sales-speed window; shows "not enough sales history to
+estimate" rather than a false zero when the category hasn't sold
+anything in that window - see `DatabaseHelper.getCategoryScenarioEstimate()`)
+·
 Cash Projection (today's cash balance projected across a from/to
 period you pick, defaulting to today through +30 days - adds Sales/
 Purchases due in that exact window, plus recurring expenses expected
@@ -551,7 +717,22 @@ of Sales for each of the last 6 calendar months, oldest first - a
 rising ratio means expenses are growing faster than sales, worth
 watching even when both totals are individually growing; each month's
 badge is colored by whether its ratio improved or worsened vs the
-month before it)
+month before it) · Win-Back List (every party whose last Sale/
+Purchase/Payment/Expense/Party Transfer was at least a chosen
+threshold ago - 30/60/90/180+ days quiet, longest-gone first, reusing
+the exact same activity-tracking query the Parties list's own "Oldest
+Activity" sort already computes; a party that's never transacted at
+all is deliberately left off, since there's no relationship yet to
+win back)
+
+**What To Do Today** (Dashboard Tools card) is a single screen combining
+three of the reports above - Reorder Needed, Payments Due, and
+Slow-Moving Stock - via `DatabaseHelper.getTodayActionSummary()`, which
+just calls each report's own existing method rather than recomputing
+anything. Each section shows up to 5 rows and a "View All" link to that
+report's full screen for the rest; a section with nothing to show is
+hidden entirely, and an "All caught up" message shows once all three
+are empty.
 
 Every report list row that represents an item or a party is tappable
 and opens that item's or party's own screen (Net Profit, Item Ranking,
@@ -578,7 +759,20 @@ shop busy lately" glance, not a profit report) using the same
 `SimpleBarChartView`. Past 10 entries it switches to a sparser
 rendering (no per-bar value text, only every few bars labeled) so a
 30-point chart doesn't turn into overlapping text - every other chart
-above has far fewer entries and renders exactly as before.
+above has far fewer entries and renders exactly as before. Below the
+chart, the card also shows today's sales so far against the same
+calendar weekday one week ago (`DatabaseHelper.getTodayVsLastWeekSales()`)
+- a Monday is naturally busier or quieter than a Sunday, so comparing
+to a week ago rather than yesterday isolates a real trend instead of
+just that day-of-week mismatch. The percent change is hidden (shown as
+"No sales last week to compare") when last week's matching day had no
+sales at all, since "0% change from zero" would be misleading. Below
+that, a streak badge (`DatabaseHelper.getSalesStreak()`) counts how
+many days in a row have had at least one sale, plus the best streak
+ever reached - a small motivational nudge, not a report. Today doesn't
+break the current streak just because no sale has been made yet this
+minute; it only actually breaks once a full day passes with nothing
+sold.
 
 **Dashboard Favorites**: long-press any Tool Row on the Dashboard
 (either the Modules card - Parties/Items/Purchases/Sales/Payments/
@@ -623,7 +817,7 @@ decorative icons everywhere else; this is a functional tap
 affordance, exempt the same way a Spinner's dropdown arrow would be)
 that shows an explanation dialog on tap. One call wires it:
 `infoBubble.setInfo(title, description)`. First-pass coverage: every
-report under Reports (all 18, plus the Reports list itself) now has
+report under Reports (all 19, plus the Reports list itself) now has
 one next to its title, and the Dashboard has three (Cash in Hand,
 Sales Trend, Favorites). This is a first pass, not a finished one -
 every other screen in the app is a candidate to pick up the same

@@ -23,6 +23,7 @@ public class Itemseditactivity extends Activity {
     EditText et_sale_price;
     TextView tv_item_stock;
     EditText et_reorder_threshold;
+    EditText et_item_locations;
     CheckBox cb_active;
 
     CheckBox cb_is_shoe;
@@ -58,6 +59,7 @@ public class Itemseditactivity extends Activity {
         et_sale_price = findViewById(R.id.et_sale_price);
         tv_item_stock = findViewById(R.id.tv_item_stock);
         et_reorder_threshold = findViewById(R.id.et_reorder_threshold);
+        et_item_locations = findViewById(R.id.et_item_locations);
         cb_active = findViewById(R.id.cb_active);
 
         cb_is_shoe = findViewById(R.id.cb_is_shoe);
@@ -143,6 +145,9 @@ public class Itemseditactivity extends Activity {
 
             et_reorder_threshold.setText(AmountFormat.formatPlain(reorderThreshold));
 
+            String locations = (String) item.get("locations");
+            et_item_locations.setText(locations == null ? "" : locations);
+
             cb_active.setChecked(!Boolean.FALSE.equals(item.get("active")));
 
             // Varieties only make sense once the item has an id to attach
@@ -215,6 +220,8 @@ public class Itemseditactivity extends Activity {
 						)) {
 
 						db.setItemActive(itemId, cb_active.isChecked());
+						db.updateItemLocations(
+							itemId, et_item_locations.getText().toString().trim());
 
 						Toast.makeText(
                             Itemseditactivity.this,

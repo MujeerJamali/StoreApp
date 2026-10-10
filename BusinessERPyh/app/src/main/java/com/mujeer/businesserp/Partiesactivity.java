@@ -28,8 +28,24 @@ import java.util.HashMap;
     Button btn_add_party;
 
     Spinner spinner_party_sort;
+    Spinner spinner_party_customer_type_filter;
 
     ListView lv_parties;
+
+    // index 0 ("All") maps to a null filter (every customer type) - see
+    // DatabaseHelper.getPartiesWithActivity()'s customerTypeFilter param.
+    private static final String[] CUSTOMER_TYPE_FILTER_VALUES = {
+        null,
+        DatabaseHelper.CUSTOMER_TYPE_REGULAR,
+        DatabaseHelper.CUSTOMER_TYPE_ONE_TIME,
+        DatabaseHelper.CUSTOMER_TYPE_WHOLESALE
+    };
+
+    private static final String[] CUSTOMER_TYPE_FILTER_LABELS = {
+        "All Types", "Regular", "One-Time", "Wholesale"
+    };
+
+    private String selectedCustomerTypeFilter = null;
 
     // Each entry pairs a DatabaseHelper.PARTY_SORT_* with the ascending
     // flag that gives it the label at the same index in
@@ -70,6 +86,7 @@ import java.util.HashMap;
         btn_add_party = findViewById(R.id.btn_add_party);
 
         spinner_party_sort = findViewById(R.id.spinner_party_sort);
+        spinner_party_customer_type_filter = findViewById(R.id.spinner_party_customer_type_filter);
 
         lv_parties = findViewById(R.id.lv_parties);
 
@@ -88,6 +105,28 @@ import java.util.HashMap;
 						@Override
 						public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
 							selectPartySort(PARTY_SORT_VALUES[position], PARTY_SORT_ASCENDING[position]);
+						}
+
+						@Override
+						public void onNothingSelected(AdapterView<?> parent) {
+						}
+					});
+
+				ArrayAdapter<String> customerTypeFilterAdapter = new ArrayAdapter<String>(
+					this, android.R.layout.simple_spinner_item, CUSTOMER_TYPE_FILTER_LABELS
+				);
+
+				customerTypeFilterAdapter.setDropDownViewResource(
+					android.R.layout.simple_spinner_dropdown_item);
+				spinner_party_customer_type_filter.setAdapter(customerTypeFilterAdapter);
+
+				spinner_party_customer_type_filter.setOnItemSelectedListener(
+					new AdapterView.OnItemSelectedListener() {
+						@Override
+						public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+
+							selectedCustomerTypeFilter = CUSTOMER_TYPE_FILTER_VALUES[position];
+							loadParties();
 						}
 
 						@Override
@@ -165,7 +204,8 @@ Partiesactivity.this,
     private void loadParties() {
 
         partyList = db.getPartiesWithActivity(
-            selectedPartySort, selectedPartySortAscending, DatabaseHelper.PARTY_BALANCE_FILTER_ALL
+            selectedPartySort, selectedPartySortAscending, DatabaseHelper.PARTY_BALANCE_FILTER_ALL,
+            selectedCustomerTypeFilter
         );
 
         adapter = new PartyAdapter(

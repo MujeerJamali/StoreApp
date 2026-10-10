@@ -16,6 +16,7 @@ import java.util.HashMap;
 public class CostItemEditActivity extends Activity {
 
 	private EditText et_cost_item_name;
+	private EditText et_cost_item_budget;
 	private Button btn_save_cost_item;
 	private Button btn_delete_cost_item;
 
@@ -33,6 +34,7 @@ public class CostItemEditActivity extends Activity {
 		setTitle("Cost Item");
 
 		et_cost_item_name = findViewById(R.id.et_cost_item_name);
+		et_cost_item_budget = findViewById(R.id.et_cost_item_budget);
 		btn_save_cost_item = findViewById(R.id.btn_save_cost_item);
 		btn_delete_cost_item = findViewById(R.id.btn_delete_cost_item);
 
@@ -47,6 +49,16 @@ public class CostItemEditActivity extends Activity {
 			if (costItem.get("name") != null) {
 				originalName = String.valueOf(costItem.get("name"));
 				et_cost_item_name.setText(originalName);
+			}
+
+			double existingBudget = 0;
+
+			if (costItem.get("monthly_budget") != null) {
+				existingBudget = (Double) costItem.get("monthly_budget");
+			}
+
+			if (existingBudget > 0) {
+				et_cost_item_budget.setText(AmountFormat.formatPlain(existingBudget));
 			}
 
 			btn_delete_cost_item.setVisibility(View.VISIBLE);
@@ -96,6 +108,17 @@ public class CostItemEditActivity extends Activity {
 			return;
 		}
 
+		double budget = 0;
+
+		try {
+			budget = Double.parseDouble(et_cost_item_budget.getText().toString().trim());
+		} catch (Exception e) {
+		}
+
+		if (budget < 0) {
+			budget = 0;
+		}
+
 		int savedId;
 
 		if (costItemId == 0) {
@@ -107,6 +130,8 @@ public class CostItemEditActivity extends Activity {
 			db.updateCostItem(costItemId, name);
 			savedId = costItemId;
 		}
+
+		db.updateCostItemBudget(savedId, budget);
 
 		Toast.makeText(this, "Cost item saved", Toast.LENGTH_SHORT).show();
 

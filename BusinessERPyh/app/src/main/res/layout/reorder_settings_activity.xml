@@ -143,6 +143,66 @@
             <TextView
                 style="@style/FieldLabel"
                 android:layout_marginTop="0dp"
+                android:text="Seasonal Calendar" />
+
+            <TextView
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:layout_marginBottom="10dp"
+                android:textStyle="normal"
+                android:text="Mark known busy periods yourself (e.g. a festival season) to boost Reorder List quantities app-wide for that month - on top of the per-item pattern already detected automatically from past sales." />
+
+            <Button
+                android:id="@+id/btn_seasonal_calendar"
+                style="@style/AppButton.Outline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Seasonal Calendar" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:text="Set Reorder Thresholds" />
+
+            <TextView
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
+                android:layout_marginBottom="10dp"
+                android:textStyle="normal"
+                android:text="A one-time checklist to set a reorder threshold on every item that doesn't have one yet, so the Reorder List and Low Stock report can flag it even before there's enough sales history to judge speed from." />
+
+            <Button
+                android:id="@+id/btn_reorder_threshold_checklist"
+                style="@style/AppButton.Outline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Set Reorder Thresholds" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                style="@style/FieldLabel"
+                android:layout_marginTop="0dp"
                 android:text="Reorder Learning History" />
 
             <TextView

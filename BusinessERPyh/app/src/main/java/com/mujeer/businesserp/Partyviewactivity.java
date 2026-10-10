@@ -20,6 +20,7 @@ import java.util.HashMap;
 public class Partyviewactivity extends Activity {
 
     TextView tv_party_name;
+    TextView tv_party_customer_type;
     TextView tv_party_balance;
     TextView tv_party_loyalty_points;
     TextView tv_adjust_loyalty_points;
@@ -44,6 +45,7 @@ public class Partyviewactivity extends Activity {
         setContentView(R.layout.partyviewactivity);
 
         tv_party_name = findViewById(R.id.tv_party_name);
+        tv_party_customer_type = findViewById(R.id.tv_party_customer_type);
         tv_party_balance = findViewById(R.id.tv_party_balance);
         tv_party_loyalty_points = findViewById(R.id.tv_party_loyalty_points);
         tv_adjust_loyalty_points = findViewById(R.id.tv_adjust_loyalty_points);
@@ -266,6 +268,23 @@ public class Partyviewactivity extends Activity {
         if (partyId != -1) {
 
             tv_party_name.setText(db.getPartyById(partyId));
+
+            String customerType = db.getPartyCustomerType(partyId);
+
+            if (DatabaseHelper.CUSTOMER_TYPE_WHOLESALE.equals(customerType)) {
+
+                tv_party_customer_type.setText("Wholesale");
+                tv_party_customer_type.setVisibility(View.VISIBLE);
+
+            } else if (DatabaseHelper.CUSTOMER_TYPE_ONE_TIME.equals(customerType)) {
+
+                tv_party_customer_type.setText("One-Time");
+                tv_party_customer_type.setVisibility(View.VISIBLE);
+
+            } else {
+
+                tv_party_customer_type.setVisibility(View.GONE);
+            }
 
             tv_party_loyalty_points.setText(
                 String.valueOf(db.getLoyaltyPointsBalance(partyId)) + " points"

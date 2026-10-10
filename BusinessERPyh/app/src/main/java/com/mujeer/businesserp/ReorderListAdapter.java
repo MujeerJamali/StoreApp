@@ -71,6 +71,7 @@ public class ReorderListAdapter extends BaseAdapter {
 		TextView tv_name = view.findViewById(R.id.tv_reorder_name);
 		TextView tv_code_supplier = view.findViewById(R.id.tv_reorder_code_supplier);
 		TextView tv_stock = view.findViewById(R.id.tv_reorder_stock);
+		TextView tv_why = view.findViewById(R.id.tv_reorder_why);
 		TextView tv_cost = view.findViewById(R.id.tv_reorder_cost);
 		TextView tv_ignore = view.findViewById(R.id.tv_reorder_ignore);
 		final CheckBox cb_include = view.findViewById(R.id.cb_include);
@@ -100,13 +101,19 @@ public class ReorderListAdapter extends BaseAdapter {
 			stockLine += "\nRuns out around " + runsOutDate;
 		}
 
-		Double seasonalMultiplier = (Double) row.get("seasonal_multiplier");
+		Double forecastedWeeklyVelocity = (Double) row.get("forecasted_weekly_velocity");
 
-		if (seasonalMultiplier != null && seasonalMultiplier > 1.0) {
-			stockLine += "  • seasonal boost applied";
+		if (forecastedWeeklyVelocity != null && forecastedWeeklyVelocity > 0) {
+
+			stockLine += "\nForecast: ~" + AmountFormat.format(forecastedWeeklyVelocity * 2) +
+				" over the next 2 weeks";
 		}
 
 		tv_stock.setText(stockLine);
+
+		String whyText = row.get("why_text") == null ? "" : row.get("why_text").toString();
+		tv_why.setText(whyText);
+		tv_why.setVisibility(whyText.isEmpty() ? View.GONE : View.VISIBLE);
 
 		double suggestedQty = row.get("suggested_qty") == null ? 0 : (Double) row.get("suggested_qty");
 

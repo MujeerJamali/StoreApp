@@ -50,6 +50,9 @@ public class MainActivity extends Activity {
 	Button btn_reorder_list;
 	Button btn_bulk_item_update;
 	Button btn_loyalty_points;
+	Button btn_stock_take;
+	Button btn_quick_sale;
+	Button btn_today_actions;
 
 	Button btn_quick_add;
 
@@ -60,6 +63,10 @@ public class MainActivity extends Activity {
 
 	Spinner spinner_sales_trend_horizon;
 	SimpleBarChartView chart_sales_trend;
+	TextView tv_today_vs_last_week;
+	TextView tv_today_vs_last_week_change;
+	TextView tv_sales_streak;
+	TextView tv_sales_streak_best;
 
 	private static final int[] TREND_HORIZON_DAYS = {7, 30};
 	private static final String[] TREND_HORIZON_LABELS = {"7 Days", "30 Days"};
@@ -69,6 +76,8 @@ public class MainActivity extends Activity {
 	// A background result is only applied if it's still the most
 	// recent request by the time it comes back.
 	private long trendLoadGeneration = 0;
+	private long todayVsLastWeekLoadGeneration = 0;
+	private long salesStreakLoadGeneration = 0;
 
 	EditText et_dashboard_search;
 
@@ -85,7 +94,8 @@ public class MainActivity extends Activity {
 		"btn_import", "btn_generate_entries", "btn_cash", "btn_wanted_items",
 		"btn_recurring_expenses", "btn_drafts", "btn_cost_items",
 		"btn_display_shoes", "btn_sample_shoes", "btn_recently_deleted",
-		"btn_reorder_list", "btn_bulk_item_update", "btn_loyalty_points"
+		"btn_reorder_list", "btn_bulk_item_update", "btn_loyalty_points",
+		"btn_stock_take", "btn_quick_sale", "btn_today_actions"
 	};
 
 	private static final String[] SHORTCUT_LABELS = {
@@ -94,7 +104,8 @@ public class MainActivity extends Activity {
 		"Import", "Generate Entries", "Cash", "Wanted Items",
 		"Recurring Expenses", "Drafts", "Cost Items",
 		"Display Shoes", "Sample Shoes", "Recently Deleted",
-		"Reorder List", "Bulk Item Update", "Loyalty Points"
+		"Reorder List", "Bulk Item Update", "Loyalty Points",
+		"Stock Take", "Quick Sale", "What To Do Today"
 	};
 
 	DatabaseHelper db;
@@ -130,6 +141,9 @@ public class MainActivity extends Activity {
 		btn_reorder_list = findViewById(R.id.btn_reorder_list);
 		btn_bulk_item_update = findViewById(R.id.btn_bulk_item_update);
 		btn_loyalty_points = findViewById(R.id.btn_loyalty_points);
+		btn_stock_take = findViewById(R.id.btn_stock_take);
+		btn_quick_sale = findViewById(R.id.btn_quick_sale);
+		btn_today_actions = findViewById(R.id.btn_today_actions);
 
 		btn_quick_add = findViewById(R.id.btn_quick_add);
 
@@ -146,11 +160,15 @@ public class MainActivity extends Activity {
 
 		spinner_sales_trend_horizon = findViewById(R.id.spinner_sales_trend_horizon);
 		chart_sales_trend = findViewById(R.id.chart_sales_trend);
+		tv_today_vs_last_week = findViewById(R.id.tv_today_vs_last_week);
+		tv_today_vs_last_week_change = findViewById(R.id.tv_today_vs_last_week_change);
+		tv_sales_streak = findViewById(R.id.tv_sales_streak);
+		tv_sales_streak_best = findViewById(R.id.tv_sales_streak_best);
 
 		InfoBubbleView info_bubble_sales_trend = findViewById(R.id.info_bubble_sales_trend);
 		info_bubble_sales_trend.setInfo(
 			"Sales Trend",
-			"Daily sales total for the last 7/30 days, including a day with zero sales - a quick \"is the shop busy lately\" glance, not a profit report."
+			"Daily sales total for the last 7/30 days, including a day with zero sales - a quick \"is the shop busy lately\" glance, not a profit report. Below it, today's sales so far are compared against the same calendar weekday one week ago (not yesterday) - a Monday is naturally busier or quieter than a Sunday, so this isolates a real trend instead of just that mismatch. At the bottom, a streak counter shows how many days in a row have had at least one sale, plus the best streak ever - a small motivational nudge, not a report."
 		);
 
 		et_dashboard_search = findViewById(R.id.et_dashboard_search);
@@ -194,6 +212,9 @@ public class MainActivity extends Activity {
 		attachFavoriteLongPress(btn_reorder_list, "btn_reorder_list");
 		attachFavoriteLongPress(btn_bulk_item_update, "btn_bulk_item_update");
 		attachFavoriteLongPress(btn_loyalty_points, "btn_loyalty_points");
+		attachFavoriteLongPress(btn_stock_take, "btn_stock_take");
+		attachFavoriteLongPress(btn_quick_sale, "btn_quick_sale");
+		attachFavoriteLongPress(btn_today_actions, "btn_today_actions");
 
 		ArrayAdapter<String> trendHorizonAdapter = new ArrayAdapter<String>(
 			this, android.R.layout.simple_spinner_item, TREND_HORIZON_LABELS
@@ -483,6 +504,45 @@ public class MainActivity extends Activity {
 				}
 			});
 
+		btn_stock_take.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						StockTakeActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_quick_sale.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						QuickSaleActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_today_actions.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						TodayActionsActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
 		btn_quick_add.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
@@ -549,6 +609,8 @@ public class MainActivity extends Activity {
 		super.onResume();
 		loadCashSummary();
 		loadSalesTrend();
+		loadTodayVsLastWeek();
+		loadSalesStreak();
 		refreshFavoritesCard();
 	}
 
@@ -749,6 +811,18 @@ public class MainActivity extends Activity {
 				intent = new Intent(this, LoyaltyPointsActivity.class);
 				break;
 
+			case "btn_stock_take":
+				intent = new Intent(this, StockTakeActivity.class);
+				break;
+
+			case "btn_quick_sale":
+				intent = new Intent(this, QuickSaleActivity.class);
+				break;
+
+			case "btn_today_actions":
+				intent = new Intent(this, TodayActionsActivity.class);
+				break;
+
 			default:
 				return;
 		}
@@ -888,5 +962,109 @@ public class MainActivity extends Activity {
 		}
 
 		chart_sales_trend.setEntries(chartEntries);
+	}
+
+	// Today's sales so far vs the same calendar weekday one week ago,
+	// shown inside the Sales Trend card (see DatabaseHelper.getTodayVsLastWeekSales()
+	// for why a week-ago weekday, not yesterday, is the fairer comparison).
+	private void loadTodayVsLastWeek() {
+
+		final long myGeneration = ++todayVsLastWeekLoadGeneration;
+
+		new Thread(new Runnable() {
+				@Override
+				public void run() {
+
+					final HashMap<String, Object> result = db.getTodayVsLastWeekSales();
+
+					runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
+
+								if (myGeneration != todayVsLastWeekLoadGeneration || isFinishing()) {
+									return;
+								}
+
+								applyTodayVsLastWeek(result);
+							}
+						});
+				}
+			}).start();
+	}
+
+	private void applyTodayVsLastWeek(HashMap<String, Object> result) {
+
+		double todayTotal = (Double) result.get("today_total");
+		double lastWeekTotal = (Double) result.get("last_week_total");
+		Double percentChange = (Double) result.get("percent_change");
+
+		tv_today_vs_last_week.setText(
+			"Today: " + AmountFormat.format(todayTotal) + "  ·  Last week: " + AmountFormat.format(lastWeekTotal)
+		);
+
+		if (percentChange == null) {
+
+			tv_today_vs_last_week_change.setText("No sales last week to compare");
+			tv_today_vs_last_week_change.setTextColor(getResources().getColor(R.color.text_secondary));
+
+		} else {
+
+			String arrow = percentChange >= 0 ? "▲" : "▼";
+			String sign = percentChange >= 0 ? "+" : "";
+
+			tv_today_vs_last_week_change.setText(arrow + " " + sign + AmountFormat.formatPlain(percentChange) + "%");
+			tv_today_vs_last_week_change.setTextColor(
+				getResources().getColor(percentChange >= 0 ? R.color.success : R.color.danger)
+			);
+		}
+	}
+
+	// Current/best consecutive-day sales streak badge at the bottom of
+	// the Sales Trend card (see DatabaseHelper.getSalesStreak()).
+	private void loadSalesStreak() {
+
+		final long myGeneration = ++salesStreakLoadGeneration;
+
+		new Thread(new Runnable() {
+				@Override
+				public void run() {
+
+					final HashMap<String, Object> result = db.getSalesStreak();
+
+					runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
+
+								if (myGeneration != salesStreakLoadGeneration || isFinishing()) {
+									return;
+								}
+
+								applySalesStreak(result);
+							}
+						});
+				}
+			}).start();
+	}
+
+	private void applySalesStreak(HashMap<String, Object> result) {
+
+		int currentStreak = (Integer) result.get("current_streak");
+		int bestStreak = (Integer) result.get("best_streak");
+
+		if (currentStreak <= 0) {
+
+			tv_sales_streak.setText("No sales streak yet");
+			tv_sales_streak_best.setText("");
+
+		} else {
+
+			tv_sales_streak.setText(
+				currentStreak + (currentStreak == 1 ? " day" : " days") + " sales streak"
+			);
+
+			tv_sales_streak_best.setText(
+				bestStreak > currentStreak ? ("Best: " + bestStreak + " days") : "Personal best!"
+			);
+		}
 	}
 }

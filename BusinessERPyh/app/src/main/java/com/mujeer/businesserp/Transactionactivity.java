@@ -14,6 +14,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -58,6 +59,77 @@ public class Transactionactivity extends Activity {
 	private ArrayList<HashMap<String, Object>> transactionList;
 
 	private TransactionAdapter adapter;
+
+	// Swipe-left-to-reveal Edit/Delete on a single row - a faster path
+	// than long-press-into-bulk-select for the common "just this one"
+	// case. Delete reuses the same snapshot-based (Recently Deleted-
+	// restorable) calls the bulk-delete bar already uses, for one id.
+	private final TransactionAdapter.RowActionListener rowActionListener =
+		new TransactionAdapter.RowActionListener() {
+
+			@Override
+			public void onRowEdit(HashMap<String, Object> transaction) {
+
+				Intent intent = new Intent(
+					Transactionactivity.this,
+					Transactioneditactivity.class
+				);
+
+				intent.putExtra("transaction_type", transactionType);
+				intent.putExtra("is_edit", true);
+				intent.putExtra("transaction_id", (Integer) transaction.get("id"));
+
+				startActivity(intent);
+			}
+
+			@Override
+			public void onRowDelete(final HashMap<String, Object> transaction) {
+
+				final int transactionId = (Integer) transaction.get("id");
+				final String noun = transactionType == TYPE_PURCHASE ? "purchase" : "sale";
+
+				new AlertDialog.Builder(Transactionactivity.this)
+					.setTitle("Delete " + noun.substring(0, 1).toUpperCase() + noun.substring(1) + "?")
+					.setMessage("Moves to Recently Deleted - restorable from there afterward.")
+					.setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+
+							@Override
+							public void onClick(DialogInterface dialog, int which) {
+
+								String nowDate = new java.text.SimpleDateFormat(
+									"yyyy-MM-dd", java.util.Locale.getDefault()
+								).format(new java.util.Date());
+
+								String nowTime = new java.text.SimpleDateFormat(
+									"HH:mm:ss", java.util.Locale.getDefault()
+								).format(new java.util.Date());
+
+								String label = labelForTransaction(transactionId);
+
+								if (transactionType == TYPE_PURCHASE) {
+
+									db.snapshotAndDeletePurchase(transactionId, label, nowDate, nowTime);
+
+								} else {
+
+									db.snapshotAndDeleteSale(
+										String.valueOf(transactionId), label, nowDate, nowTime
+									);
+								}
+
+								Toast.makeText(
+									Transactionactivity.this,
+									"Deleted - restorable from Recently Deleted",
+									Toast.LENGTH_SHORT
+								).show();
+
+								loadTransactions();
+							}
+						})
+					.setNegativeButton("Cancel", null)
+					.show();
+			}
+		};
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -412,6 +484,8 @@ public class Transactionactivity extends Activity {
 		);
 
 		adapter.setSelectionMode(selectionMode, selectedIds);
+		adapter.setSwipeEnabled(true);
+		adapter.setRowActionListener(rowActionListener);
 
 		lv_transactions.setAdapter(adapter);
 		lv_transactions.setEmptyView(tv_empty);
@@ -743,6 +817,8 @@ public class Transactionactivity extends Activity {
 		);
 
 		adapter.setSelectionMode(selectionMode, selectedIds);
+		adapter.setSwipeEnabled(true);
+		adapter.setRowActionListener(rowActionListener);
 
 		lv_transactions.setAdapter(adapter);
 		lv_transactions.setEmptyView(tv_empty);

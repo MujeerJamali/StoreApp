@@ -32,6 +32,69 @@ public class Paymentactivity extends Activity {
 
 	private PaymentAdapter adapter;
 
+	// Shared across every PaymentAdapter instance this activity creates
+	// (initial load, type filter, date filter) so swipe actions keep
+	// working no matter which one is currently attached.
+	private final PaymentAdapter.RowActionListener rowActionListener =
+		new PaymentAdapter.RowActionListener() {
+
+			@Override
+			public void onRowEdit(HashMap<String, Object> payment) {
+
+				Intent intent = new Intent(
+					Paymentactivity.this,
+					Paymenteditactivity.class
+				);
+
+				intent.putExtra(
+					"payment_id",
+					(Integer) payment.get("id")
+				);
+
+				startActivity(intent);
+			}
+
+			@Override
+			public void onRowDelete(final HashMap<String, Object> payment) {
+
+				final int paymentId = (Integer) payment.get("id");
+
+				new android.app.AlertDialog.Builder(Paymentactivity.this)
+					.setTitle("Delete Payment")
+					.setMessage("Are you sure you want to delete this payment?")
+					.setPositiveButton(
+						"Delete",
+						new android.content.DialogInterface.OnClickListener() {
+
+							@Override
+							public void onClick(android.content.DialogInterface dialog, int which) {
+
+								if (db.deletePayment(paymentId)) {
+
+									Toast.makeText(
+										Paymentactivity.this,
+										"Payment deleted successfully.",
+										Toast.LENGTH_SHORT
+									).show();
+
+									loadPayments();
+
+								} else {
+
+									Toast.makeText(
+										Paymentactivity.this,
+										"Failed to delete payment.",
+										Toast.LENGTH_SHORT
+									).show();
+								}
+							}
+						}
+					)
+					.setNegativeButton("Cancel", null)
+					.show();
+			}
+		};
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -147,6 +210,8 @@ public class Paymentactivity extends Activity {
 
 								if (adapter != null) {
 
+									adapter.setRowActionListener(rowActionListener);
+
 									adapter.filter(
 										et_search.getText().toString()
 									);
@@ -190,26 +255,8 @@ public class Paymentactivity extends Activity {
 			}
 		);
 
-		lv_payments.setOnItemLongClickListener(
-			new AdapterView.OnItemLongClickListener() {
-
-				@Override
-				public boolean onItemLongClick(
-					AdapterView<?> parent,
-					View view,
-					int position,
-					long id) {
-
-					Toast.makeText(
-						Paymentactivity.this,
-						"Long press actions will be added later.",
-						Toast.LENGTH_SHORT
-					).show();
-
-					return true;
-				}
-			}
-		);
+		// Edit/Delete are now a swipe-left gesture on the row itself
+		// (see SwipeRevealLayout/PaymentAdapter) rather than long-press.
 
 		et_search.addTextChangedListener(
 			new TextWatcher() {
@@ -293,6 +340,8 @@ public class Paymentactivity extends Activity {
 
 		lv_payments.setAdapter(adapter);
 		lv_payments.setEmptyView(tv_empty);
+
+		adapter.setRowActionListener(rowActionListener);
 
 		adapter.filter(
 			et_search.getText().toString()

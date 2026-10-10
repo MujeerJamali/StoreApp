@@ -53,3 +53,15 @@
   user) - not a one-time checklist item - so pick it up again whenever
   touching a report that would benefit from one, instead of treating a
   partial pass as finished.
+- Swipe-left-to-reveal Edit/Delete on a list row uses `SwipeRevealLayout`
+  (plain View/MotionEvent custom ViewGroup) - not RecyclerView's
+  `ItemTouchHelper`. Every list in this app is a ListView/BaseAdapter and
+  `build.gradle` has no RecyclerView dependency wired in (same AIDE-
+  on-device-build constraint as the no-new-charting-library rule above),
+  so don't add one. Currently wired into the Purchases/Sales list
+  (`TransactionAdapter`, gated behind `setSwipeEnabled()` so the same
+  adapter stays inert where it's reused read-only in Partyviewactivity/
+  Itemviewactivity), the Payments list (`PaymentAdapter`), and the
+  Expenses list (`ExpenseAdapter`). Like charts and info bubbles, this is
+  an incremental rollout, not a one-time checklist item - pick it up again
+  for another delete-capable list whenever touching that screen anyway.

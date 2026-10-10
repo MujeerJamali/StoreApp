@@ -66,6 +66,16 @@
             android:textColor="@color/text_secondary"
             android:textSize="13sp" />
 
+        <TextView
+            android:id="@+id/tv_reorder_why"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Why this suggestion"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textStyle="italic" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

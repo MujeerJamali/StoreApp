@@ -83,6 +83,30 @@
 
             </LinearLayout>
 
+            <!-- Only shown when this item has one - see
+                 Itemseditactivity's Locations field. Free-form,
+                 comma-separated bin/shelf tag(s). -->
+            <LinearLayout
+                android:id="@+id/container_locations"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    style="@style/FieldLabel"
+                    android:text="Locations" />
+
+                <TextView
+                    android:id="@+id/tv_item_locations"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="@color/text_secondary"
+                    android:textSize="17sp" />
+
+            </LinearLayout>
+
             <TextView
                 style="@style/FieldLabel"
                 android:text="Sale Price" />
@@ -168,6 +192,15 @@
             android:divider="@android:color/transparent"
             android:dividerHeight="10dp"
             android:scrollbars="none" />
+
+        <Button
+            android:id="@+id/btn_load_more_transactions"
+            style="@style/AppButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Load More"
+            android:visibility="gone" />
 
         <LinearLayout
             android:layout_width="match_parent"

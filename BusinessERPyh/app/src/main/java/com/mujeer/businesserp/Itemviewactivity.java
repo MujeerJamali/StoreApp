@@ -26,6 +26,8 @@ public class Itemviewactivity extends Activity {
     TextView tv_transactions_empty;
     View container_extra_cost;
     TextView tv_extra_cost_per_unit;
+    View container_locations;
+    TextView tv_item_locations;
 
     LinearLayout cardVarietiesView;
     LinearLayout containerVarietiesView;
@@ -34,10 +36,19 @@ public class Itemviewactivity extends Activity {
     Button btn_delete_item;
 
     ListView lv_transactions;
+    Button btn_load_more_transactions;
 
     ArrayList<HashMap<String, Object>> transactionList;
 
     TransactionAdapter transactionAdapter;
+
+    // Caps the history to 30 most-recent transactions at a time rather
+    // than ever loading an item's entire lifetime history in one go -
+    // "Load More" reveals 30 more per tap (see
+    // DatabaseHelper.getTransactionsByItem()/getTransactionCountByItem()).
+    private static final int TRANSACTIONS_PAGE_SIZE = 30;
+    private int transactionsLoadedCount = 0;
+    private int transactionsTotalCount = 0;
 
     DatabaseHelper db;
 
@@ -56,6 +67,8 @@ public class Itemviewactivity extends Activity {
         tv_transactions_empty = findViewById(R.id.tv_transactions_empty);
         container_extra_cost = findViewById(R.id.container_extra_cost);
         tv_extra_cost_per_unit = findViewById(R.id.tv_extra_cost_per_unit);
+        container_locations = findViewById(R.id.container_locations);
+        tv_item_locations = findViewById(R.id.tv_item_locations);
 
         cardVarietiesView = findViewById(R.id.card_varieties_view);
         containerVarietiesView = findViewById(R.id.container_varieties_view);
@@ -64,8 +77,16 @@ public class Itemviewactivity extends Activity {
         btn_delete_item = findViewById(R.id.btn_delete_item);
 
         lv_transactions = findViewById(R.id.lv_transactions);
+        btn_load_more_transactions = findViewById(R.id.btn_load_more_transactions);
 
         db = new DatabaseHelper(this);
+
+        btn_load_more_transactions.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					loadMoreTransactions();
+				}
+			});
 
         transactionList = new ArrayList<HashMap<String, Object>>();
 
@@ -178,9 +199,13 @@ public class Itemviewactivity extends Activity {
 
         transactionList.clear();
 
+        transactionsTotalCount = db.getTransactionCountByItem(itemId);
+
         transactionList.addAll(
-            db.getTransactionsByItem(itemId)
+            db.getTransactionsByItem(itemId, TRANSACTIONS_PAGE_SIZE, 0)
         );
+
+        transactionsLoadedCount = transactionList.size();
 
         transactionAdapter = new TransactionAdapter(
             this,
@@ -190,7 +215,36 @@ public class Itemviewactivity extends Activity {
         lv_transactions.setAdapter(transactionAdapter);
         lv_transactions.setEmptyView(tv_transactions_empty);
 
+        updateLoadMoreButtonVisibility();
+
         setListViewHeightBasedOnChildren(lv_transactions);
+    }
+
+    private void loadMoreTransactions() {
+
+        transactionList.addAll(
+            db.getTransactionsByItem(itemId, TRANSACTIONS_PAGE_SIZE, transactionsLoadedCount)
+        );
+
+        transactionsLoadedCount = transactionList.size();
+
+        // TransactionAdapter.filteredList is its own copy taken at
+        // construction time (for its filter() feature, unused on this
+        // screen) - notifyDataSetChanged() alone wouldn't pick up what
+        // was just appended to transactionList/originalList, so re-apply
+        // the (no-op) filter to refresh it from the now-longer list.
+        transactionAdapter.filter(null);
+
+        updateLoadMoreButtonVisibility();
+
+        setListViewHeightBasedOnChildren(lv_transactions);
+    }
+
+    private void updateLoadMoreButtonVisibility() {
+
+        btn_load_more_transactions.setVisibility(
+            transactionsLoadedCount < transactionsTotalCount ? View.VISIBLE : View.GONE
+        );
     }
 
     // Mirrors the sizing fix used in Transactionviewactivity: a ListView
@@ -270,6 +324,18 @@ public class Itemviewactivity extends Activity {
             } else {
 
                 container_extra_cost.setVisibility(View.GONE);
+            }
+
+            String locations = (String) item.get("locations");
+
+            if (locations != null && locations.trim().length() > 0) {
+
+                container_locations.setVisibility(View.VISIBLE);
+                tv_item_locations.setText(locations.trim());
+
+            } else {
+
+                container_locations.setVisibility(View.GONE);
             }
 
             double stock = 0;

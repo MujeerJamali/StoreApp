@@ -107,6 +107,25 @@ public class CostItemsActivity extends Activity {
 
 		costItemList = db.getCostItems();
 
+		// Merges in this month's spend for every category that has a
+		// budget set, so the list can show a status badge without
+		// CostItemAdapter needing its own DB access.
+		ArrayList<HashMap<String, Object>> budgetStatus = db.getCategoryBudgetStatus();
+
+		for (HashMap<String, Object> costItem : costItemList) {
+
+			for (HashMap<String, Object> status : budgetStatus) {
+
+				if (costItem.get("id").equals(status.get("id"))) {
+
+					costItem.put("spent", status.get("spent"));
+					costItem.put("percent_used", status.get("percent_used"));
+					costItem.put("over_budget", status.get("over_budget"));
+					break;
+				}
+			}
+		}
+
 		adapter = new CostItemAdapter(this, costItemList);
 
 		lv_cost_items.setAdapter(adapter);

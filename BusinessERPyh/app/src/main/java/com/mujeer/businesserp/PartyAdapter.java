@@ -58,6 +58,17 @@ public class PartyAdapter extends BaseAdapter implements Filterable {
 
         tv.setText((String) party.get("name"));
 
+        // Only shown for a tagged (non-Regular) customer - see
+        // Partieseditactivity's Customer Type spinner. Prefixed onto the
+        // meta line below rather than its own badge view, to avoid a
+        // layout change for something most rows never show.
+        String customerType = (String) party.get("customer_type");
+
+        String customerTypeTag =
+            DatabaseHelper.CUSTOMER_TYPE_WHOLESALE.equals(customerType) ? "Wholesale" :
+            DatabaseHelper.CUSTOMER_TYPE_ONE_TIME.equals(customerType) ? "One-Time" :
+            null;
+
         // Only present when this list came from
         // DatabaseHelper.getPartiesWithActivity() (the sorted view) -
         // the plain getParties() list has no last_date/days_since, so
@@ -74,7 +85,16 @@ public class PartyAdapter extends BaseAdapter implements Filterable {
                         "Last activity yesterday" :
                         "Last activity " + daysSince + "d ago";
 
+            if (customerTypeTag != null) {
+                meta = customerTypeTag + " · " + meta;
+            }
+
             tvMeta.setText(meta);
+            tvMeta.setVisibility(View.VISIBLE);
+
+        } else if (customerTypeTag != null) {
+
+            tvMeta.setText(customerTypeTag);
             tvMeta.setVisibility(View.VISIBLE);
 
         } else {

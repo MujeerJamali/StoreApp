@@ -79,6 +79,12 @@ public class Transactioneditactivity extends Activity {
     TextView tv_grand_total;
     View container_sale_profit;
     TextView tv_sale_profit;
+    View container_sale_discount;
+    Button btn_discount_5, btn_discount_10, btn_discount_custom;
+    EditText et_sale_discount_percent;
+    TextView tv_discount_amount;
+    View container_loyalty_preview;
+    TextView tv_loyalty_preview;
     TextView tv_cash_before, tv_cash_after;
     TextView tv_page_title;
     Button btn_add_item, btn_save_transaction, btn_go_dashboard;
@@ -331,6 +337,14 @@ public class Transactioneditactivity extends Activity {
         tv_grand_total = findViewById(R.id.tv_grand_total);
         container_sale_profit = findViewById(R.id.container_sale_profit);
         tv_sale_profit = findViewById(R.id.tv_sale_profit);
+        container_sale_discount = findViewById(R.id.container_sale_discount);
+        btn_discount_5 = findViewById(R.id.btn_discount_5);
+        btn_discount_10 = findViewById(R.id.btn_discount_10);
+        btn_discount_custom = findViewById(R.id.btn_discount_custom);
+        et_sale_discount_percent = findViewById(R.id.et_sale_discount_percent);
+        tv_discount_amount = findViewById(R.id.tv_discount_amount);
+        container_loyalty_preview = findViewById(R.id.container_loyalty_preview);
+        tv_loyalty_preview = findViewById(R.id.tv_loyalty_preview);
         tv_cash_before = findViewById(R.id.tv_cash_before);
         tv_cash_after = findViewById(R.id.tv_cash_after);
         tv_page_title = findViewById(R.id.tv_page_title);
@@ -597,12 +611,77 @@ public class Transactioneditactivity extends Activity {
 				isEditMode ? "Update Sale" : "Save Sale"
 			);
 
+			container_sale_discount.setVisibility(View.VISIBLE);
+
 		} else {
 
 			btn_save_transaction.setText(
 				isEditMode ? "Update Purchase" : "Save Purchase"
 			);
+
+			container_sale_discount.setVisibility(View.GONE);
 		}
+
+		btn_discount_5.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					et_sale_discount_percent.setText("5");
+				}
+			}
+		);
+
+		btn_discount_10.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					et_sale_discount_percent.setText("10");
+				}
+			}
+		);
+
+		btn_discount_custom.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					et_sale_discount_percent.requestFocus();
+					et_sale_discount_percent.selectAll();
+
+					et_sale_discount_percent.post(new Runnable() {
+							@Override
+							public void run() {
+
+								android.view.inputmethod.InputMethodManager imm =
+									(android.view.inputmethod.InputMethodManager)
+									getSystemService(INPUT_METHOD_SERVICE);
+
+								if (imm != null) {
+
+									imm.showSoftInput(
+										et_sale_discount_percent,
+										android.view.inputmethod.InputMethodManager.SHOW_FORCED
+									);
+								}
+							}
+						}
+					);
+				}
+			}
+		);
+
+		et_sale_discount_percent.addTextChangedListener(new android.text.TextWatcher() {
+
+				@Override
+				public void beforeTextChanged(
+					CharSequence s, int start, int count, int after) {}
+
+				@Override
+				public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+				@Override
+				public void afterTextChanged(android.text.Editable s) {
+					updateGrandTotal();
+				}
+			}
+		);
 		
 		
 		btn_save_transaction.setText(
@@ -926,6 +1005,24 @@ public class Transactioneditactivity extends Activity {
 		final PreSelectionTextWatcher partyTextTracker = new PreSelectionTextWatcher();
 		actv_party.addTextChangedListener(partyTextTracker);
 
+		// Refreshes the loyalty points preview (see updateLoyaltyPreview())
+		// the moment the party changes, not just when items/discount do.
+		actv_party.addTextChangedListener(new android.text.TextWatcher() {
+
+				@Override
+				public void beforeTextChanged(
+					CharSequence s, int start, int count, int after) {}
+
+				@Override
+				public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+				@Override
+				public void afterTextChanged(android.text.Editable s) {
+					updateGrandTotal();
+				}
+			}
+		);
+
 		actv_party.setOnItemClickListener(
 			new AdapterView.OnItemClickListener() {
 
@@ -999,6 +1096,45 @@ public class Transactioneditactivity extends Activity {
 	private String formatStockAmount(double stock) {
 
 		return AmountFormat.formatPlain(stock);
+	}
+
+	// Moves whatever items were sold most recently to the front of the
+	// Add Item dialog's picker, most-recently-sold first, leaving every
+	// other item in its existing (alphabetical) order behind them - on
+	// both the Sale and Purchase screens, since a fast-selling item is
+	// exactly the one worth restocking too. The AutoCompleteTextView's
+	// default filter preserves whatever order it's handed among the
+	// names that match what's typed, so reordering this source list is
+	// enough to pin them at the top of the dropdown too.
+	private void pinRecentlySoldItemsFirst(ArrayList<HashMap<String, Object>> items) {
+
+		ArrayList<Integer> recentItemIds = db.getRecentlySoldItemIds(8);
+
+		if (recentItemIds.isEmpty()) {
+			return;
+		}
+
+		ArrayList<HashMap<String, Object>> remaining =
+			new ArrayList<HashMap<String, Object>>(items);
+		ArrayList<HashMap<String, Object>> reordered =
+			new ArrayList<HashMap<String, Object>>();
+
+		for (Integer recentItemId : recentItemIds) {
+
+			for (int i = 0; i < remaining.size(); i++) {
+
+				if (recentItemId.equals(remaining.get(i).get("id"))) {
+
+					reordered.add(remaining.remove(i));
+					break;
+				}
+			}
+		}
+
+		reordered.addAll(remaining);
+
+		items.clear();
+		items.addAll(reordered);
 	}
 
     private void setCurrentDateTime() {
@@ -1098,6 +1234,8 @@ public class Transactioneditactivity extends Activity {
 
 		final ArrayList<HashMap<String, Object>> items =
 			db.getItemsForSpinner();
+
+		pinRecentlySoldItemsFirst(items);
 
 		final ArrayList<String> itemNames =
 			new ArrayList<String>();
@@ -1741,6 +1879,10 @@ public class Transactioneditactivity extends Activity {
 			et_amount_paid.setText((String) data.get("amount_paid"));
 		}
 
+		if (transactionType == TYPE_SALE && data.get("discount_percent") != null) {
+			et_sale_discount_percent.setText((String) data.get("discount_percent"));
+		}
+
 		// Sale or Purchase - see saveDraft()/updateDueDateVisibility().
 		// Read back before updateGrandTotal() runs below (triggered once
 		// the items list is restored a few lines down) so the default-
@@ -1808,6 +1950,10 @@ public class Transactioneditactivity extends Activity {
 		data.put("notes", et_notes.getText().toString());
 		data.put("amount_paid", et_amount_paid.getText().toString());
 		data.put("items", new ArrayList<HashMap<String, Object>>(transactionItemList));
+
+		if (transactionType == TYPE_SALE) {
+			data.put("discount_percent", et_sale_discount_percent.getText().toString());
+		}
 
 		if (
 			(transactionType == TYPE_SALE || transactionType == TYPE_PURCHASE) &&
@@ -2965,6 +3111,37 @@ public class Transactioneditactivity extends Activity {
 			total += (legacyOtherChargesToParty ? legacyOtherCharges : 0);
 		}
 
+		// Sale only - see container_sale_discount's own comment. Clamped
+		// to 0-100% so a stray typed value (negative, or over 100) can
+		// never push the Grand Total the wrong way.
+		double discountAmount = 0;
+
+		if (transactionType == TYPE_SALE && container_sale_discount != null) {
+
+			double discountPercent = 0;
+
+			try {
+
+				discountPercent = Double.parseDouble(
+					et_sale_discount_percent.getText().toString().trim()
+				);
+
+			} catch (Exception e) {
+			}
+
+			if (discountPercent < 0) {
+				discountPercent = 0;
+			} else if (discountPercent > 100) {
+				discountPercent = 100;
+			}
+
+			discountAmount = total * discountPercent / 100.0;
+
+			tv_discount_amount.setText("- " + AmountFormat.format(discountAmount));
+		}
+
+		total -= discountAmount;
+
 		tv_grand_total.setText(
 			AmountFormat.format(total)
 		);
@@ -2996,6 +3173,8 @@ public class Transactioneditactivity extends Activity {
 					profit += lineTotal - (qty * costBasis);
 				}
 
+				profit -= discountAmount;
+
 				tv_sale_profit.setText(AmountFormat.format(profit));
 				container_sale_profit.setVisibility(View.VISIBLE);
 
@@ -3004,6 +3183,54 @@ public class Transactioneditactivity extends Activity {
 				container_sale_profit.setVisibility(View.GONE);
 			}
 		}
+
+		updateLoyaltyPreview(total);
+	}
+
+	// Sale only, and only once a real (non-"Cash Sale") party is
+	// selected - a live preview of this party's current loyalty points
+	// balance plus how many this sale itself would add, computed with
+	// the exact same formula earnLoyaltyPointsForSale() uses on save
+	// (see DatabaseHelper.getLoyaltyPointsPreview()) so the two numbers
+	// never disagree. Not the only place a balance shows - the toast
+	// after saving is a separate, one-time milestone celebration.
+	private void updateLoyaltyPreview(double grandTotal) {
+
+		if (container_loyalty_preview == null) {
+			return;
+		}
+
+		if (transactionType != TYPE_SALE) {
+
+			container_loyalty_preview.setVisibility(View.GONE);
+			return;
+		}
+
+		int partyPosition = getSelectedPartyPosition();
+
+		if (partyPosition == -1) {
+
+			container_loyalty_preview.setVisibility(View.GONE);
+			return;
+		}
+
+		String partyName = (String) parties.get(partyPosition).get("name");
+
+		if (isCashPlaceholderParty(partyName)) {
+
+			container_loyalty_preview.setVisibility(View.GONE);
+			return;
+		}
+
+		int partyId = (Integer) parties.get(partyPosition).get("id");
+		int currentBalance = db.getLoyaltyPointsBalance(partyId);
+		int pointsToEarn = db.getLoyaltyPointsPreview(grandTotal);
+
+		tv_loyalty_preview.setText(
+			currentBalance + (pointsToEarn > 0 ? " (+" + pointsToEarn + ")" : "")
+		);
+
+		container_loyalty_preview.setVisibility(View.VISIBLE);
 	}
 
 	// =====================
@@ -3907,6 +4134,10 @@ public class Transactioneditactivity extends Activity {
 		tv_grand_total.setText("0.00");
 		updateDefaultAmountPaid(0);
 
+		if (transactionType == TYPE_SALE) {
+			et_sale_discount_percent.setText("");
+		}
+
 		String title =
 			transactionType == TYPE_PURCHASE ? "Add Purchase" : "Add Sale";
 
@@ -4113,6 +4344,24 @@ public class Transactioneditactivity extends Activity {
 			}
 		}
 
+		// Back-computed from the saved absolute discount amount, since
+		// that's all the sales table stores - read before
+		// updateGrandTotal() runs below, same reasoning as due_date above.
+		try {
+
+			double savedSubtotal = Double.parseDouble(sale.get("subtotal").toString());
+			double savedDiscount = Double.parseDouble(sale.get("discount").toString());
+
+			if (savedSubtotal > 0 && savedDiscount > 0) {
+
+				et_sale_discount_percent.setText(
+					AmountFormat.formatPlain(savedDiscount / savedSubtotal * 100.0)
+				);
+			}
+
+		} catch (Exception e) {
+		}
+
 		transactionItemList.clear();
 
 		transactionItemList.addAll(
@@ -4183,6 +4432,29 @@ public class Transactioneditactivity extends Activity {
 		}
 
 		double discount = 0;
+
+		if (transactionType == TYPE_SALE) {
+
+			double discountPercent = 0;
+
+			try {
+
+				discountPercent = Double.parseDouble(
+					et_sale_discount_percent.getText().toString().trim()
+				);
+
+			} catch (Exception e) {
+			}
+
+			if (discountPercent < 0) {
+				discountPercent = 0;
+			} else if (discountPercent > 100) {
+				discountPercent = 100;
+			}
+
+			discount = subtotal * discountPercent / 100.0;
+		}
+
 		double otherCharges = 0;
 
 		double grandTotal = subtotal - discount + otherCharges;
@@ -4506,6 +4778,27 @@ public class Transactioneditactivity extends Activity {
 			subtotal += (Double) item.get("total");
 		}
 
+		double discount = 0;
+
+		try {
+
+			double discountPercent = Double.parseDouble(
+				et_sale_discount_percent.getText().toString().trim()
+			);
+
+			if (discountPercent < 0) {
+				discountPercent = 0;
+			} else if (discountPercent > 100) {
+				discountPercent = 100;
+			}
+
+			discount = subtotal * discountPercent / 100.0;
+
+		} catch (Exception e) {
+		}
+
+		double grandTotal = subtotal - discount;
+
 		double paidAmount = 0;
 
 		try {
@@ -4528,7 +4821,7 @@ public class Transactioneditactivity extends Activity {
 			return;
 		}
 
-		if (paidAmount > subtotal) {
+		if (paidAmount > grandTotal) {
 
 			android.widget.Toast.makeText(
 				this,
@@ -4539,7 +4832,7 @@ public class Transactioneditactivity extends Activity {
 			return;
 		}
 
-		if (isCashPlaceholderParty((String) parties.get(partyPosition).get("name")) && paidAmount < subtotal) {
+		if (isCashPlaceholderParty((String) parties.get(partyPosition).get("name")) && paidAmount < grandTotal) {
 
 			android.widget.Toast.makeText(
 				this,
@@ -4554,16 +4847,16 @@ public class Transactioneditactivity extends Activity {
 		saleMap.put("date", et_date.getText().toString());
 		saleMap.put("time", et_time.getText().toString());
 		saleMap.put("subtotal", subtotal);
-		saleMap.put("discount", 0);
+		saleMap.put("discount", discount);
 		saleMap.put("other_charges", 0);
-		saleMap.put("grand_total", subtotal);
+		saleMap.put("grand_total", grandTotal);
 		saleMap.put("paid_amount", paidAmount);
-		saleMap.put("balance", subtotal - paidAmount);
+		saleMap.put("balance", grandTotal - paidAmount);
 		saleMap.put("notes", et_notes.getText().toString());
 
 		saleMap.put(
 			"due_date",
-			(subtotal - paidAmount) > 0.01 ? et_due_date.getText().toString().trim() : null
+			(grandTotal - paidAmount) > 0.01 ? et_due_date.getText().toString().trim() : null
 		);
 
 		// Snapshot the pre-edit row/items so this update can be undone

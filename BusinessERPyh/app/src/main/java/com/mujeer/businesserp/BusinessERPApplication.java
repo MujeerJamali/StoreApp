@@ -19,6 +19,7 @@ public class BusinessERPApplication extends Application {
 		BackupReminderNotifier.checkAndNotifyIfNeeded(getApplicationContext());
 		ReorderDigestNotifier.checkAndNotifyIfNeeded(getApplicationContext());
 		MarginErosionNotifier.checkAndNotifyIfNeeded(getApplicationContext());
+		ExpenseBudgetNotifier.checkAndNotifyIfNeeded(getApplicationContext());
 
 		// Idempotent - re-registering the same alarm on every app open
 		// just replaces its schedule, never stacks duplicates.

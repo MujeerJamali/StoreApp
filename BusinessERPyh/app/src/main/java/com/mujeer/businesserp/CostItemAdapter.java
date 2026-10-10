@@ -52,6 +52,26 @@ public class CostItemAdapter extends BaseAdapter implements Filterable {
 		TextView tvName = convertView.findViewById(R.id.tv_cost_item_name);
 		tvName.setText(String.valueOf(row.get("name")));
 
+		TextView tvBudgetStatus = convertView.findViewById(R.id.tv_cost_item_budget_status);
+
+		if (row.get("percent_used") != null) {
+
+			double percentUsed = (Double) row.get("percent_used");
+			boolean overBudget = Boolean.TRUE.equals(row.get("over_budget"));
+
+			tvBudgetStatus.setText(AmountFormat.formatPlain(percentUsed) + "% of budget");
+
+			tvBudgetStatus.setTextColor(activity.getResources().getColor(
+				overBudget ? R.color.danger : R.color.text_secondary
+			));
+
+			tvBudgetStatus.setVisibility(View.VISIBLE);
+
+		} else {
+
+			tvBudgetStatus.setVisibility(View.GONE);
+		}
+
 		return convertView;
 	}
 

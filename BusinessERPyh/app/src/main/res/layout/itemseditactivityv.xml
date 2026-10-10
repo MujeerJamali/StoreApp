@@ -139,6 +139,14 @@
                 android:hint="0 = no Low Stock alert"
                 android:inputType="numberDecimal" />
 
+            <TextView style="@style/FieldLabel" android:text="Locations" />
+            <EditText
+                android:id="@+id/et_item_locations"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. Shelf A, Bin 12"
+                android:inputType="text" />
+
             <CheckBox
                 android:id="@+id/cb_active"
                 android:layout_width="match_parent"

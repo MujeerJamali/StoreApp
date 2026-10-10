@@ -43,6 +43,13 @@
                 android:gravity="top"
                 android:inputType="textMultiLine|textCapSentences" />
 
+            <TextView style="@style/FieldLabel" android:text="Customer Type" />
+            <Spinner
+                android:id="@+id/spinner_customer_type"
+                style="@style/FilterSpinner"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
             <TextView style="@style/FieldLabel" android:text="Current Balance" />
             <TextView
                 android:id="@+id/tv_party_balance"

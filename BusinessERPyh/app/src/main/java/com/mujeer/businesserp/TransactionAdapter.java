@@ -14,6 +14,16 @@ import java.util.Set;
 
 public class TransactionAdapter extends BaseAdapter {
 
+	// Swipe-left-to-reveal Edit/Delete row actions (see SwipeRevealLayout) -
+	// only Transactionactivity opts in (via setSwipeEnabled/
+	// setRowActionListener); every other screen that reuses this adapter
+	// (Partyviewactivity, Itemviewactivity read-only history) leaves the
+	// actions panel hidden, so swiping there is a no-op.
+	public interface RowActionListener {
+		void onRowEdit(HashMap<String, Object> transaction);
+		void onRowDelete(HashMap<String, Object> transaction);
+	}
+
 	private Activity activity;
 
 	private ArrayList<HashMap<String, Object>> originalList;
@@ -25,6 +35,9 @@ public class TransactionAdapter extends BaseAdapter {
 	// checkbox column at all.
 	private boolean selectionMode = false;
 	private Set<Integer> selectedIds = null;
+
+	private boolean swipeEnabled = false;
+	private RowActionListener rowActionListener;
 
 	private TextView tv_type;
 	private TextView tv_code;
@@ -47,6 +60,14 @@ public class TransactionAdapter extends BaseAdapter {
 	public void setSelectionMode(boolean selectionMode, Set<Integer> selectedIds) {
 		this.selectionMode = selectionMode;
 		this.selectedIds = selectedIds;
+	}
+
+	public void setSwipeEnabled(boolean swipeEnabled) {
+		this.swipeEnabled = swipeEnabled;
+	}
+
+	public void setRowActionListener(RowActionListener listener) {
+		this.rowActionListener = listener;
 	}
 
 	@Override
@@ -87,7 +108,7 @@ public class TransactionAdapter extends BaseAdapter {
 
 		CheckBox cb_select = convertView.findViewById(R.id.cb_select);
 
-		HashMap<String, Object> transaction =
+		final HashMap<String, Object> transaction =
 			filteredList.get(position);
 
 		if (selectionMode) {
@@ -101,6 +122,35 @@ public class TransactionAdapter extends BaseAdapter {
 
 			cb_select.setVisibility(View.GONE);
 		}
+
+		SwipeRevealLayout swipeLayout = (SwipeRevealLayout) convertView;
+		swipeLayout.close(false);
+
+		View swipeActions = convertView.findViewById(R.id.swipe_actions);
+		swipeActions.setVisibility(
+			(swipeEnabled && !selectionMode) ? View.VISIBLE : View.GONE
+		);
+
+		swipeLayout.wireActionButtons(
+			convertView.findViewById(R.id.btn_swipe_edit),
+			convertView.findViewById(R.id.btn_swipe_delete)
+		);
+
+		swipeLayout.setOnSwipeActionListener(new SwipeRevealLayout.OnSwipeActionListener() {
+				@Override
+				public void onEditAction() {
+					if (rowActionListener != null) {
+						rowActionListener.onRowEdit(transaction);
+					}
+				}
+
+				@Override
+				public void onDeleteAction() {
+					if (rowActionListener != null) {
+						rowActionListener.onRowDelete(transaction);
+					}
+				}
+			});
 
 		if (tv_type != null) {
 

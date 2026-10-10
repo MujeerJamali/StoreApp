@@ -127,6 +127,8 @@ public class ImportVyaparActivity extends Activity {
         int sampleShoesImported, sampleShoesDuplicate;
         int itemClearanceImported, itemClearanceDuplicate;
         int loyaltyPointsImported, loyaltyPointsDuplicate;
+        int seasonalCalendarImported, seasonalCalendarDuplicate;
+        int stockTakeImported, stockTakeDuplicate;
     }
 
     @Override
@@ -305,6 +307,7 @@ public class ImportVyaparActivity extends Activity {
             boolean itemsHaveActive = columnExists(vyaparDb, "kb_items", "item_active");
             boolean itemsHaveReorderThreshold =
                 columnExists(vyaparDb, "kb_items", "item_reorder_threshold");
+            boolean itemsHaveLocations = columnExists(vyaparDb, "kb_items", "item_locations");
             boolean salesHaveDueDate = columnExists(vyaparDb, "kb_transactions", "txn_due_date");
             boolean hasCostItemsTable = tableExists(vyaparDb, "businesserp_cost_items");
             boolean hasPurchaseExpenseLinksTable = tableExists(vyaparDb, "businesserp_purchase_expense_links");
@@ -315,6 +318,8 @@ public class ImportVyaparActivity extends Activity {
             boolean hasDraftsTable = tableExists(vyaparDb, "businesserp_drafts");
             boolean hasItemClearanceTable = tableExists(vyaparDb, "businesserp_item_clearance");
             boolean hasLoyaltyPointsTable = tableExists(vyaparDb, "businesserp_loyalty_points");
+            boolean hasSeasonalCalendarTable = tableExists(vyaparDb, "businesserp_seasonal_calendar");
+            boolean hasStockTakeSessionsTable = tableExists(vyaparDb, "businesserp_stock_take_sessions");
 
             helper = new DatabaseHelper(this);
             helper.beginTransaction();
@@ -343,7 +348,7 @@ public class ImportVyaparActivity extends Activity {
             setStatus("Importing items...");
             importItems(
                 vyaparDb, helper, db, itemIdMap, itemsHaveExtraCost, itemsHaveActive,
-                itemsHaveReorderThreshold, skipped, counts);
+                itemsHaveReorderThreshold, itemsHaveLocations, skipped, counts);
 
             if (hasVarietyTables) {
 
@@ -453,6 +458,19 @@ public class ImportVyaparActivity extends Activity {
 
                 setStatus("Importing loyalty points...");
                 importLoyaltyPoints(vyaparDb, helper, db, partyIdMap, skipped, counts);
+            }
+
+            if (hasSeasonalCalendarTable) {
+
+                setStatus("Importing seasonal calendar...");
+                importSeasonalCalendar(vyaparDb, helper, db, counts);
+            }
+
+            if (hasStockTakeSessionsTable) {
+
+                setStatus("Importing stock take history...");
+                importStockTake(
+                    vyaparDb, helper, db, itemIdMap, varietyComboIdMap, skipped, counts);
             }
 
             setStatus("Logging unsupported transaction types...");
@@ -576,6 +594,14 @@ public class ImportVyaparActivity extends Activity {
                     if (finalCounts.loyaltyPointsImported > 0 || finalCounts.loyaltyPointsDuplicate > 0) {
                         summary.append("Loyalty points: " + finalCounts.loyaltyPointsImported
 									   + " imported, " + finalCounts.loyaltyPointsDuplicate + " already imported\n");
+                    }
+                    if (finalCounts.seasonalCalendarImported > 0 || finalCounts.seasonalCalendarDuplicate > 0) {
+                        summary.append("Seasonal calendar entries: " + finalCounts.seasonalCalendarImported
+									   + " imported, " + finalCounts.seasonalCalendarDuplicate + " already imported\n");
+                    }
+                    if (finalCounts.stockTakeImported > 0 || finalCounts.stockTakeDuplicate > 0) {
+                        summary.append("Stock take sessions: " + finalCounts.stockTakeImported
+									   + " imported, " + finalCounts.stockTakeDuplicate + " already imported\n");
                     }
 
                     summary.append("\nRows not imported: " + finalSkippedCount);
@@ -758,16 +784,30 @@ public class ImportVyaparActivity extends Activity {
         // failing the whole restore.
         boolean hasAppearanceColumn = columnExists(vyaparDb, "kb_names", "full_name_appearance");
 
+        // full_name_customer_type is this app's own extension too - same
+        // "absent means every imported party just gets the default
+        // (Regular)" fallback as appearance notes above.
+        boolean hasCustomerTypeColumn =
+            columnExists(vyaparDb, "kb_names", "full_name_customer_type");
+
         Cursor c = vyaparDb.rawQuery(
             "SELECT name_id, full_name" +
-            (hasAppearanceColumn ? ", full_name_appearance" : "") + " " +
+            (hasAppearanceColumn ? ", full_name_appearance" : "") +
+            (hasCustomerTypeColumn ? ", full_name_customer_type" : "") + " " +
             "FROM kb_names WHERE name_type=1", null);
+
+        int customerTypeColumn = hasAppearanceColumn ? 3 : 2;
 
         while (c.moveToNext()) {
 
             long nameId = c.getLong(0);
             String fullName = c.getString(1);
             String appearanceNotes = (hasAppearanceColumn && !c.isNull(2)) ? c.getString(2) : null;
+
+            String customerType =
+                (hasCustomerTypeColumn && !c.isNull(customerTypeColumn)) ?
+                c.getString(customerTypeColumn) : DatabaseHelper.CUSTOMER_TYPE_REGULAR;
+
             String importKey = "vyb_party_" + nameId;
 
             if (helper.isImportKeyUsedBulk(db, importKey)) {
@@ -788,6 +828,7 @@ public class ImportVyaparActivity extends Activity {
             }
 
             int localId = helper.getOrCreatePartyIdBulk(db, fullName.trim(), appearanceNotes);
+            helper.updatePartyCustomerTypeBulk(db, localId, customerType);
 
             helper.markImportKeyUsedBulk(db, importKey);
             helper.saveVybLocalId(db, "party", nameId, localId);
@@ -833,21 +874,24 @@ public class ImportVyaparActivity extends Activity {
         boolean itemsHaveExtraCost,
         boolean itemsHaveActive,
         boolean itemsHaveReorderThreshold,
+        boolean itemsHaveLocations,
         ArrayList<SkippedRow> skipped,
         Counts counts) {
 
-        // item_extra_cost_per_unit/item_active/item_reorder_threshold are
-        // this app's own extensions (see itemsHaveExtraCost/itemsHaveActive/
-        // itemsHaveReorderThreshold in runImport()) - only selected when
-        // the backup's kb_items actually has that column, since a real
-        // Vyapar backup or an export made before any of them existed
-        // won't; item_active defaults to active and item_reorder_threshold
-        // to 0 (no alert) rather than failing in that case.
+        // item_extra_cost_per_unit/item_active/item_reorder_threshold/
+        // item_locations are this app's own extensions (see
+        // itemsHaveExtraCost/itemsHaveActive/itemsHaveReorderThreshold/
+        // itemsHaveLocations in runImport()) - only selected when the
+        // backup's kb_items actually has that column, since a real
+        // Vyapar backup or an export made before each one existed won't;
+        // item_active defaults to active, item_reorder_threshold to 0 (no
+        // alert), and item_locations to "" rather than failing in that case.
         Cursor c = vyaparDb.rawQuery(
             "SELECT item_id, item_code, item_name, item_purchase_unit_price, item_sale_unit_price" +
             (itemsHaveExtraCost ? ", item_extra_cost_per_unit" : "") +
             (itemsHaveActive ? ", item_active" : "") +
-            (itemsHaveReorderThreshold ? ", item_reorder_threshold" : "") + " " +
+            (itemsHaveReorderThreshold ? ", item_reorder_threshold" : "") +
+            (itemsHaveLocations ? ", item_locations" : "") + " " +
             "FROM kb_items " +
             "WHERE item_type != 2 " +
             "   OR item_id IN (" +
@@ -860,6 +904,7 @@ public class ImportVyaparActivity extends Activity {
         int extraCostColumn = 5;
         int activeColumn = itemsHaveExtraCost ? 6 : 5;
         int reorderThresholdColumn = activeColumn + (itemsHaveActive ? 1 : 0);
+        int locationsColumn = reorderThresholdColumn + (itemsHaveReorderThreshold ? 1 : 0);
 
         while (c.moveToNext()) {
 
@@ -879,6 +924,9 @@ public class ImportVyaparActivity extends Activity {
                 (itemsHaveReorderThreshold && !c.isNull(reorderThresholdColumn)) ?
                 c.getDouble(reorderThresholdColumn) : 0.0;
 
+            String locations = (itemsHaveLocations && !c.isNull(locationsColumn)) ?
+                c.getString(locationsColumn) : "";
+
             String importKey = "vyb_item_" + itemId;
 
             if (helper.isImportKeyUsedBulk(db, importKey)) {
@@ -894,7 +942,8 @@ public class ImportVyaparActivity extends Activity {
             }
 
             long localId = helper.insertItemBulk(
-                db, code, name, purchasePrice, salePrice, extraCostPerUnit, active, reorderThreshold);
+                db, code, name, purchasePrice, salePrice, extraCostPerUnit, active,
+                reorderThreshold, locations);
 
             helper.markImportKeyUsedBulk(db, importKey);
             helper.saveVybLocalId(db, "item", itemId, localId);
@@ -2007,12 +2056,25 @@ public class ImportVyaparActivity extends Activity {
         ArrayList<SkippedRow> skipped,
         Counts counts) {
 
-        Cursor c = vyaparDb.rawQuery("SELECT id, name FROM businesserp_cost_items", null);
+        // cost_item_monthly_budget is this app's own extension on top of
+        // businesserp_cost_items itself - absent from a backup made
+        // before expense category budgets existed, in which case every
+        // imported category simply gets no budget (0) rather than
+        // failing the whole restore.
+        boolean hasBudgetColumn =
+            columnExists(vyaparDb, "businesserp_cost_items", "cost_item_monthly_budget");
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT id, name" + (hasBudgetColumn ? ", cost_item_monthly_budget" : "") +
+            " FROM businesserp_cost_items", null);
 
         while (c.moveToNext()) {
 
             long id = c.getLong(0);
             String name = c.getString(1);
+
+            double monthlyBudget =
+                (hasBudgetColumn && !c.isNull(2)) ? c.getDouble(2) : 0;
 
             String importKey = "vyb_cost_item_" + id;
 
@@ -2025,7 +2087,8 @@ public class ImportVyaparActivity extends Activity {
                 continue;
             }
 
-            helper.insertCostItemBulk(db, name);
+            long localId = helper.insertCostItemBulk(db, name);
+            helper.updateCostItemBudgetBulk(db, (int) localId, monthlyBudget);
 
             helper.markImportKeyUsedBulk(db, importKey);
             counts.costItemsImported++;
@@ -2490,6 +2553,135 @@ public class ImportVyaparActivity extends Activity {
         }
 
         c.close();
+    }
+
+    // =====================
+    // SEASONAL CALENDAR (businesserp_seasonal_calendar) - this app's
+    // own extension, only present when hasSeasonalCalendarTable was
+    // true. Nothing references an entry by id, so this is a plain
+    // import rather than a proper id-remapped one - same reasoning as
+    // importCostItems() above.
+    // =====================
+    private void importSeasonalCalendar(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        Counts counts) {
+
+        Cursor c = vyaparDb.rawQuery(
+            "SELECT id, label, month, multiplier FROM businesserp_seasonal_calendar", null);
+
+        while (c.moveToNext()) {
+
+            long id = c.getLong(0);
+            String label = c.getString(1);
+            int month = c.getInt(2);
+            double multiplier = c.getDouble(3);
+
+            String importKey = "vyb_seasonal_calendar_" + id;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.seasonalCalendarDuplicate++;
+                continue;
+            }
+
+            if (label == null || label.trim().length() == 0) {
+                continue;
+            }
+
+            helper.insertSeasonalCalendarEntryBulk(db, label.trim(), month, multiplier);
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.seasonalCalendarImported++;
+        }
+
+        c.close();
+    }
+
+    // =====================
+    // STOCK TAKE (businesserp_stock_take_sessions/lines) - only present
+    // when hasStockTakeSessionsTable was true, and only ever holds
+    // completed sessions (see ExportVyaparActivity.exportStockTake()).
+    // A session's own id is preserved exactly (insertStockTakeSessionBulk()
+    // writes it back verbatim), so its lines can reference session_id
+    // with no remapping - safe because clearAllDataBulk() already wiped
+    // both tables before any import method runs. A line's item/combo
+    // id still needs the normal remap though, since those get fresh
+    // local ids like everywhere else; a line whose item no longer
+    // exists in this backup is dropped (not the whole session), same
+    // as every other per-row skip above.
+    // =====================
+    private void importStockTake(
+        SQLiteDatabase vyaparDb,
+        DatabaseHelper helper,
+        SQLiteDatabase db,
+        HashMap<Long, Integer> itemIdMap,
+        HashMap<Long, Integer> comboIdMap,
+        ArrayList<SkippedRow> skipped,
+        Counts counts) {
+
+        Cursor sessionCursor = vyaparDb.rawQuery(
+            "SELECT id, started_date, started_time, completed_date, completed_time, " +
+            "item_count, discrepancy_count FROM businesserp_stock_take_sessions", null);
+
+        while (sessionCursor.moveToNext()) {
+
+            long vybSessionId = sessionCursor.getLong(0);
+
+            String importKey = "vyb_stock_take_session_" + vybSessionId;
+
+            if (helper.isImportKeyUsedBulk(db, importKey)) {
+                counts.stockTakeDuplicate++;
+                continue;
+            }
+
+            helper.insertStockTakeSessionBulk(
+                db, vybSessionId, sessionCursor.getString(1), sessionCursor.getString(2),
+                sessionCursor.getString(3), sessionCursor.getString(4),
+                sessionCursor.getInt(5), sessionCursor.getInt(6)
+            );
+
+            Cursor lineCursor = vyaparDb.rawQuery(
+                "SELECT item_id, combo_id, expected_qty, counted_qty FROM " +
+                "businesserp_stock_take_lines WHERE session_id=?",
+                new String[]{String.valueOf(vybSessionId)}
+            );
+
+            while (lineCursor.moveToNext()) {
+
+                long vybItemId = lineCursor.getLong(0);
+
+                Integer itemId = resolveItem(helper, db, itemIdMap, vybItemId);
+
+                if (itemId == null) {
+
+                    addSkipped(
+                        skipped, "stock_take_line", vybItemId,
+                        "Its item no longer exists in this backup"
+                    );
+
+                    continue;
+                }
+
+                Integer comboId = null;
+
+                if (!lineCursor.isNull(1)) {
+                    comboId = resolveVarietyCombo(helper, db, comboIdMap, lineCursor.getLong(1));
+                }
+
+                helper.insertStockTakeLineBulk(
+                    db, vybSessionId, itemId, comboId,
+                    lineCursor.getDouble(2), lineCursor.getDouble(3)
+                );
+            }
+
+            lineCursor.close();
+
+            helper.markImportKeyUsedBulk(db, importKey);
+            counts.stockTakeImported++;
+        }
+
+        sessionCursor.close();
     }
 
     // Rewrites a Purchase/Sale draft's embedded ids (party_id, each line's

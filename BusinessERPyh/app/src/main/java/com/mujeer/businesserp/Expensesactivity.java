@@ -11,6 +11,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,6 +31,66 @@ public class Expensesactivity extends Activity {
 	private ArrayList<HashMap<String, Object>> expenseList;
 
 	private ExpenseAdapter adapter;
+
+	private final ExpenseAdapter.RowActionListener rowActionListener =
+		new ExpenseAdapter.RowActionListener() {
+
+			@Override
+			public void onRowEdit(HashMap<String, Object> expense) {
+
+				Intent intent = new Intent(
+					Expensesactivity.this,
+					Expenseeditactivity.class
+				);
+
+				intent.putExtra(
+					"expense_id",
+					Integer.parseInt(expense.get("id").toString())
+				);
+
+				startActivity(intent);
+			}
+
+			@Override
+			public void onRowDelete(final HashMap<String, Object> expense) {
+
+				final int expenseId = Integer.parseInt(expense.get("id").toString());
+
+				new android.app.AlertDialog.Builder(Expensesactivity.this)
+					.setTitle("Delete Expense")
+					.setMessage("Are you sure you want to delete this expense?")
+					.setPositiveButton(
+						"Delete",
+						new android.content.DialogInterface.OnClickListener() {
+
+							@Override
+							public void onClick(android.content.DialogInterface dialog, int which) {
+
+								if (db.deleteExpense(expenseId)) {
+
+									Toast.makeText(
+										Expensesactivity.this,
+										"Expense deleted successfully.",
+										Toast.LENGTH_SHORT
+									).show();
+
+									loadExpenses();
+
+								} else {
+
+									Toast.makeText(
+										Expensesactivity.this,
+										"Failed to delete expense.",
+										Toast.LENGTH_SHORT
+									).show();
+								}
+							}
+						}
+					)
+					.setNegativeButton("Cancel", null)
+					.show();
+			}
+		};
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -252,6 +313,8 @@ public class Expensesactivity extends Activity {
 		lv_expenses.setAdapter(adapter);
 
 		lv_expenses.setEmptyView(tv_empty);
+
+		adapter.setRowActionListener(rowActionListener);
 
 		// Set only when launched from DayCloseReportActivity's Expenses
 		// card - pins the list to that one day, same mechanism as the

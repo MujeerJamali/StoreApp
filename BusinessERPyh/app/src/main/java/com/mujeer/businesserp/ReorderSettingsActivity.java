@@ -63,6 +63,8 @@ public class ReorderSettingsActivity extends Activity {
 		Button btn_save = findViewById(R.id.btn_save_reorder_settings);
 		Button btn_reset = findViewById(R.id.btn_reset_reorder_settings);
 		Button btn_export_reorder_history = findViewById(R.id.btn_export_reorder_history);
+		Button btn_seasonal_calendar = findViewById(R.id.btn_seasonal_calendar);
+		Button btn_reorder_threshold_checklist = findViewById(R.id.btn_reorder_threshold_checklist);
 
 		loadCurrentValues();
 
@@ -86,6 +88,24 @@ public class ReorderSettingsActivity extends Activity {
 				@Override
 				public void onClick(View v) {
 					exportReorderHistory();
+				}
+			}
+		);
+
+		btn_seasonal_calendar.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					startActivity(new Intent(
+						ReorderSettingsActivity.this, SeasonalCalendarActivity.class));
+				}
+			}
+		);
+
+		btn_reorder_threshold_checklist.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					startActivity(new Intent(
+						ReorderSettingsActivity.this, ReorderThresholdChecklistActivity.class));
 				}
 			}
 		);

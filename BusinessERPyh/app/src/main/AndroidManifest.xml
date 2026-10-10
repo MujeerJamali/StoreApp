@@ -146,6 +146,41 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".SeasonalCalendarActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".ReorderThresholdChecklistActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".StockTakeActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".StockTakeHistoryActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".QuickSaleActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".WinBackListActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".TodayActionsActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".BulkItemUpdateActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />
@@ -279,6 +314,16 @@
         <activity
             android:name=".CashFlowForecastReportActivity"
             android:label="Cash Flow Forecast"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".BudgetPlannerActivity"
+            android:label="Budget Planner"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".ScenarioCheckActivity"
+            android:label="Scenario Check"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity

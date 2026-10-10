@@ -28,6 +28,14 @@
                 android:hint="e.g. Petrol, Shipping, Packaging"
                 android:inputType="text|textNoSuggestions" />
 
+            <TextView style="@style/FieldLabel" android:text="Monthly Budget (0 = no alert)" />
+            <EditText
+                android:id="@+id/et_cost_item_budget"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. 5000"
+                android:inputType="numberDecimal" />
+
         </LinearLayout>
 
         <Button

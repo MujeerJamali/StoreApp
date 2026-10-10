@@ -158,6 +158,26 @@
             android:background="@color/stroke" />
 
         <Button
+            android:id="@+id/btn_report_budget_planner"
+            style="@style/ToolRow"
+            android:text="Budget Planner" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
+            android:id="@+id/btn_report_scenario_check"
+            style="@style/ToolRow"
+            android:text="Scenario Check" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
             android:id="@+id/btn_report_slow_moving_stock"
             style="@style/ToolRow"
             android:text="Slow-Moving Stock" />
@@ -301,6 +321,16 @@
             android:id="@+id/btn_report_combo_stock"
             style="@style/ToolRow"
             android:text="Combo/Variety Stock" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/stroke" />
+
+        <Button
+            android:id="@+id/btn_report_win_back"
+            style="@style/ToolRow"
+            android:text="Win-Back List" />
 
     </LinearLayout>
 

@@ -19,6 +19,8 @@ public class Reportsactivity extends Activity {
 	Button btn_report_low_stock;
 	Button btn_report_day_close;
 	Button btn_report_cash_flow_forecast;
+	Button btn_report_budget_planner;
+	Button btn_report_scenario_check;
 	Button btn_report_slow_moving_stock;
 	Button btn_report_discount_stop_restock;
 	Button btn_report_stock_value;
@@ -34,6 +36,7 @@ public class Reportsactivity extends Activity {
 	Button btn_report_profit_split;
 	Button btn_report_shoes_vs_non_shoes;
 	Button btn_report_combo_stock;
+	Button btn_report_win_back;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -58,6 +61,8 @@ public class Reportsactivity extends Activity {
 		btn_report_low_stock = findViewById(R.id.btn_report_low_stock);
 		btn_report_day_close = findViewById(R.id.btn_report_day_close);
 		btn_report_cash_flow_forecast = findViewById(R.id.btn_report_cash_flow_forecast);
+		btn_report_budget_planner = findViewById(R.id.btn_report_budget_planner);
+		btn_report_scenario_check = findViewById(R.id.btn_report_scenario_check);
 		btn_report_slow_moving_stock = findViewById(R.id.btn_report_slow_moving_stock);
 		btn_report_discount_stop_restock = findViewById(R.id.btn_report_discount_stop_restock);
 		btn_report_stock_value = findViewById(R.id.btn_report_stock_value);
@@ -73,6 +78,7 @@ public class Reportsactivity extends Activity {
 		btn_report_profit_split = findViewById(R.id.btn_report_profit_split);
 		btn_report_shoes_vs_non_shoes = findViewById(R.id.btn_report_shoes_vs_non_shoes);
 		btn_report_combo_stock = findViewById(R.id.btn_report_combo_stock);
+		btn_report_win_back = findViewById(R.id.btn_report_win_back);
 
 		btn_report_sales.setOnClickListener(new View.OnClickListener() {
 				@Override
@@ -211,6 +217,32 @@ public class Reportsactivity extends Activity {
 					Intent intent = new Intent(
 						Reportsactivity.this,
 						CashFlowForecastReportActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_report_budget_planner.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						Reportsactivity.this,
+						BudgetPlannerActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_report_scenario_check.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						Reportsactivity.this,
+						ScenarioCheckActivity.class
 					);
 
 					startActivity(intent);
@@ -406,6 +438,19 @@ public class Reportsactivity extends Activity {
 					Intent intent = new Intent(
 						Reportsactivity.this,
 						ComboStockReportActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_report_win_back.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						Reportsactivity.this,
+						WinBackListActivity.class
 					);
 
 					startActivity(intent);

@@ -12,10 +12,20 @@ import java.util.HashMap;
 
 public class ExpenseAdapter extends BaseAdapter {
 
+	// Swipe-left-to-reveal Edit/Delete row actions (see SwipeRevealLayout) -
+	// the activity owns the actual edit-navigation/delete-confirm logic
+	// since it needs an Activity context for the Intent/AlertDialog.
+	public interface RowActionListener {
+		void onRowEdit(HashMap<String, Object> expense);
+		void onRowDelete(HashMap<String, Object> expense);
+	}
+
 	private Activity activity;
 
 	private ArrayList<HashMap<String, Object>> originalList;
 	private ArrayList<HashMap<String, Object>> filteredList;
+
+	private RowActionListener rowActionListener;
 
 	private TextView tv_code;
 	private TextView tv_item;
@@ -32,6 +42,10 @@ public class ExpenseAdapter extends BaseAdapter {
 
 		this.filteredList =
 			new ArrayList<HashMap<String, Object>>(list);
+	}
+
+	public void setRowActionListener(RowActionListener listener) {
+		this.rowActionListener = listener;
 	}
 
 	@Override
@@ -76,8 +90,32 @@ public class ExpenseAdapter extends BaseAdapter {
 		tv_date = convertView.findViewById(R.id.tv_date);
 		tv_amount = convertView.findViewById(R.id.tv_amount);
 
-		HashMap<String, Object> expense =
+		final HashMap<String, Object> expense =
 			filteredList.get(position);
+
+		final SwipeRevealLayout swipeLayout = (SwipeRevealLayout) convertView;
+		swipeLayout.close(false);
+
+		swipeLayout.wireActionButtons(
+			convertView.findViewById(R.id.btn_swipe_edit),
+			convertView.findViewById(R.id.btn_swipe_delete)
+		);
+
+		swipeLayout.setOnSwipeActionListener(new SwipeRevealLayout.OnSwipeActionListener() {
+				@Override
+				public void onEditAction() {
+					if (rowActionListener != null) {
+						rowActionListener.onRowEdit(expense);
+					}
+				}
+
+				@Override
+				public void onDeleteAction() {
+					if (rowActionListener != null) {
+						rowActionListener.onRowDelete(expense);
+					}
+				}
+			});
 
 		tv_code.setText(
 			expense.get("code").toString()
