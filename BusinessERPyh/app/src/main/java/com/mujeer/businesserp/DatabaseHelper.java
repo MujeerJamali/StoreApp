@@ -154,7 +154,30 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // getHolidaySeasonalMultiplier()). Real standing user data (the
     // shop owner's own classification of this item), so it's included
     // in the Vyapar round-trip.
-    public static final int DATABASE_VERSION = 35;
+    // Bumped 35 -> 36 to add createPerformanceIndexes() - every query
+    // that filters/joins sale_items/sales/purchase_items/purchases/
+    // payments/expenses on item_id/combo_id/date/party_id (the Reorder
+    // List's suggestion engine above all - it runs several of these per
+    // item) was doing a full table scan with no index behind any of
+    // them, which only gets slower as a shop's transaction history
+    // grows. No schema meaning changed and no user data involved, so
+    // this is NOT part of the Vyapar round-trip (same reasoning as
+    // excluding reorder_suggestion_log) - only the version bump itself,
+    // to make onUpgrade() actually run once for an existing install.
+    // Bumped 36 -> 37 to add items.min_order_qty (0 = not manually set) -
+    // the Reorder List was only honoring ReorderSettings' single
+    // app-wide minimum order quantity, so an item/combo normally bought
+    // in bulk (a carton of 12, say) could still get suggested a
+    // quantity of 1-2. getEffectiveMinOrderQty() now takes the largest
+    // of: this explicit per-item override, 6 for any shoe item
+    // (ShoeIdentity.isShoe()) with no override set, or a quantity
+    // derived from that item/combo's own most recent Purchase line
+    // (deriveMinOrderQtyFromLastPurchase()) - and the app-wide setting
+    // still applies underneath all of that as a floor. Set from the Min
+    // Order Quantities screen (MinOrderQtyActivity). Real standing user
+    // data (the shop owner's own override), so it's included in the
+    // Vyapar round-trip.
+    public static final int DATABASE_VERSION = 37;
 
     // A party's customer tagging (default REGULAR) - see DATABASE_VERSION's
     // comment, Partieseditactivity's Customer Type spinner, and the
@@ -367,7 +390,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"active INTEGER NOT NULL DEFAULT 1, " +
 			"reorder_threshold REAL NOT NULL DEFAULT 0, " +
 			"locations TEXT NOT NULL DEFAULT '', " +
-			"holiday_seasonal INTEGER NOT NULL DEFAULT 0" +
+			"holiday_seasonal INTEGER NOT NULL DEFAULT 0, " +
+			"min_order_qty REAL NOT NULL DEFAULT 0" +
 			");"
 		);
 
@@ -704,7 +728,79 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			")"
 		);
 
+		createPerformanceIndexes(db);
+
     }
+
+	// Every index behind the hot columns the Reorder List/reports/
+	// dashboard filter or join on - see DATABASE_VERSION's comment.
+	// Plain performance structures, not user data, so (like
+	// reorder_suggestion_log) these are deliberately NOT part of the
+	// Vyapar round-trip - a restore rebuilds them here via onCreate()
+	// regardless. "IF NOT EXISTS" makes this safe to call unconditionally
+	// from onUpgrade() too (same pattern as addColumnIfMissing()), so an
+	// existing install picks these up on its next open without a
+	// version-gated migration.
+	private void createPerformanceIndexes(SQLiteDatabase db) {
+
+		db.execSQL("CREATE INDEX IF NOT EXISTS idx_sale_items_item_id ON sale_items(item_id)");
+		db.execSQL("CREATE INDEX IF NOT EXISTS idx_sale_items_combo_id ON sale_items(combo_id)");
+		db.execSQL("CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id)");
+		db.execSQL("CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date)");
+		db.execSQL("CREATE INDEX IF NOT EXISTS idx_sales_party_id ON sales(party_id)");
+
+		db.execSQL(
+			"CREATE INDEX IF NOT EXISTS idx_purchase_items_item_id ON " +
+			TABLE_PURCHASE_ITEMS + "(item_id)"
+		);
+		db.execSQL(
+			"CREATE INDEX IF NOT EXISTS idx_purchase_items_combo_id ON " +
+			TABLE_PURCHASE_ITEMS + "(combo_id)"
+		);
+		db.execSQL(
+			"CREATE INDEX IF NOT EXISTS idx_purchase_items_purchase_id ON " +
+			TABLE_PURCHASE_ITEMS + "(purchase_id)"
+		);
+		db.execSQL(
+			"CREATE INDEX IF NOT EXISTS idx_purchases_date ON " + TABLE_PURCHASES + "(date)"
+		);
+		db.execSQL(
+			"CREATE INDEX IF NOT EXISTS idx_purchases_party_id ON " + TABLE_PURCHASES + "(party_id)"
+		);
+
+		db.execSQL(
+			"CREATE INDEX IF NOT EXISTS idx_payments_date ON " + TABLE_PAYMENTS + "(date)"
+		);
+		db.execSQL(
+			"CREATE INDEX IF NOT EXISTS idx_payments_party_id ON " + TABLE_PAYMENTS + "(party_id)"
+		);
+
+		db.execSQL(
+			"CREATE INDEX IF NOT EXISTS idx_expenses_date ON " + TABLE_EXPENSES + "(date)"
+		);
+		db.execSQL(
+			"CREATE INDEX IF NOT EXISTS idx_expenses_party_id ON " + TABLE_EXPENSES + "(party_id)"
+		);
+
+		db.execSQL(
+			"CREATE INDEX IF NOT EXISTS idx_reorder_log_item_combo ON " +
+			TABLE_REORDER_SUGGESTION_LOG + "(item_id, combo_id)"
+		);
+
+		db.execSQL(
+			"CREATE INDEX IF NOT EXISTS idx_variety_combos_item_id ON " +
+			TABLE_VARIETY_COMBOS + "(item_id)"
+		);
+		db.execSQL(
+			"CREATE INDEX IF NOT EXISTS idx_variety_groups_item_id ON " +
+			TABLE_VARIETY_GROUPS + "(item_id)"
+		);
+		db.execSQL(
+			"CREATE INDEX IF NOT EXISTS idx_variety_values_group_id ON " +
+			TABLE_VARIETY_VALUES + "(group_id)"
+		);
+	}
+
 	@Override
 	public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
 
@@ -801,7 +897,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		// DATABASE_VERSION's comment and Itemseditactivity.
 		addColumnIfMissing(db, TABLE_ITEMS, "holiday_seasonal", "INTEGER NOT NULL DEFAULT 0");
 
+		// Explicit per-item minimum order quantity override (0 = not set
+		// - falls back to the shoe/purchase-history-derived default) -
+		// see DATABASE_VERSION's comment and MinOrderQtyActivity.
+		addColumnIfMissing(db, TABLE_ITEMS, "min_order_qty", "REAL NOT NULL DEFAULT 0");
+
 		dropPurchaseCodeColumnIfPresent(db);
+
+		// See DATABASE_VERSION's comment - "IF NOT EXISTS" makes this
+		// safe to call unconditionally on every upgrade, same as
+		// addColumnIfMissing() above.
+		createPerformanceIndexes(db);
 	}
 
 	// =====================
@@ -1237,18 +1343,38 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		db.update(TABLE_PARTIES, values, "id=?", new String[]{String.valueOf(partyId)});
 	}
 
+	public static final int WINBACK_SORT_DAYS_SINCE = 0;
+	public static final int WINBACK_SORT_PROFIT_DESC = 1;
+
+	public ArrayList<HashMap<String, Object>> getWinBackList(int minDaysSinceActivity) {
+		return getWinBackList(minDaysSinceActivity, WINBACK_SORT_DAYS_SINCE);
+	}
+
 	// Every party whose last activity (Sale/Purchase/Payment/Expense/
 	// Party Transfer - see getPartiesWithActivity()) was at least
-	// minDaysSinceActivity days ago, longest-gone first - the "Win-Back
-	// List" report's whole point is customers worth reaching out to, so
-	// a party with no activity at all (days_since == -1, i.e. never a
-	// real customer) is deliberately excluded rather than sorting as
-	// "longest ago."
-	public ArrayList<HashMap<String, Object>> getWinBackList(int minDaysSinceActivity) {
+	// minDaysSinceActivity days ago, longest-gone first by default (or
+	// highest lifetime sales profit first under WINBACK_SORT_PROFIT_DESC)
+	// - the "Win-Back List" report's whole point is customers worth
+	// reaching out to, so a party with no activity at all (days_since ==
+	// -1, i.e. never a real customer) is deliberately excluded rather
+	// than sorting as "longest ago," and so is a party we've only ever
+	// bought from (a supplier, with Purchases but zero Sales) - there's
+	// no sales relationship there to win back. ascending=false here (not
+	// true) is deliberate: for PARTY_SORT_LATEST_TXN, ascending=true
+	// sorts by days_since ascending, i.e. most-recently-active first -
+	// see getPartiesWithActivity()'s own comment - so "longest-gone
+	// first" needs ascending=false. A prior version of this method
+	// passed true, which inverted this screen's one legible default
+	// sort; caught alongside the identical inverted pair in
+	// Partiesactivity's and PartyBalanceReportActivity's own
+	// PARTY_SORT_ASCENDING arrays.
+	public ArrayList<HashMap<String, Object>> getWinBackList(int minDaysSinceActivity, int sortBy) {
 
 		ArrayList<HashMap<String, Object>> all = getPartiesWithActivity(
-			PARTY_SORT_LATEST_TXN, true, PARTY_BALANCE_FILTER_ALL, null
+			PARTY_SORT_LATEST_TXN, false, PARTY_BALANCE_FILTER_ALL, null
 		);
+
+		SQLiteDatabase db = this.getReadableDatabase();
 
 		ArrayList<HashMap<String, Object>> winBack = new ArrayList<>();
 
@@ -1256,9 +1382,48 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 			int daysSince = (Integer) party.get("days_since");
 
-			if (daysSince >= minDaysSinceActivity) {
-				winBack.add(party);
+			if (daysSince < minDaysSinceActivity) {
+				continue;
 			}
+
+			int partyId = (Integer) party.get("id");
+
+			double saleCount = sumColumn(
+				db, "SELECT COUNT(*) FROM sales WHERE party_id=?",
+				new String[]{String.valueOf(partyId)}
+			);
+
+			double purchaseCount = sumColumn(
+				db, "SELECT COUNT(*) FROM " + TABLE_PURCHASES + " WHERE party_id=?",
+				new String[]{String.valueOf(partyId)}
+			);
+
+			if (saleCount < 0.5 && purchaseCount > 0.5) {
+				continue;
+			}
+
+			double lifetimeProfit = sumColumn(
+				db,
+				"SELECT COALESCE(SUM(si.amount - si.qty * (i.purchase_price + i.extra_cost_per_unit)), 0) " +
+				"FROM sale_items si INNER JOIN " + TABLE_ITEMS + " i ON i.id = si.item_id " +
+				"WHERE si.sale_id IN (SELECT id FROM sales WHERE party_id=?)",
+				new String[]{String.valueOf(partyId)}
+			);
+
+			party.put("lifetime_profit", lifetimeProfit);
+			winBack.add(party);
+		}
+
+		if (sortBy == WINBACK_SORT_PROFIT_DESC) {
+
+			Collections.sort(winBack, new Comparator<HashMap<String, Object>>() {
+				@Override
+				public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+					return Double.compare(
+						(Double) b.get("lifetime_profit"), (Double) a.get("lifetime_profit")
+					);
+				}
+			});
 		}
 
 		return winBack;
@@ -1652,7 +1817,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		Cursor cursor = db.rawQuery(
 			"SELECT code, name, purchase_price, sale_price, balance, extra_cost_per_unit, active, " +
-			"reorder_threshold, locations, holiday_seasonal FROM " +
+			"reorder_threshold, locations, holiday_seasonal, min_order_qty FROM " +
 			TABLE_ITEMS +
 			" WHERE id=?",
 			new String[]{String.valueOf(id)}
@@ -1670,6 +1835,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("reorder_threshold", cursor.getDouble(7));
 			map.put("locations", cursor.getString(8));
 			map.put("holiday_seasonal", cursor.getInt(9) != 0);
+			map.put("min_order_qty", cursor.getDouble(10));
 		}
 
 		cursor.close();
@@ -1708,6 +1874,73 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("holiday_seasonal", holidaySeasonal ? 1 : 0);
 
 		db.update(TABLE_ITEMS, values, "id=?", new String[]{String.valueOf(itemId)});
+	}
+
+	// Explicit per-item minimum order quantity override (0 = not set -
+	// see getEffectiveMinOrderQty()) - set from MinOrderQtyActivity.
+	// Same pattern as updateItemHolidaySeasonal()/Bulk() above.
+	public void updateItemMinOrderQty(int itemId, double minOrderQty) {
+		updateItemMinOrderQtyBulk(this.getWritableDatabase(), itemId, minOrderQty);
+	}
+
+	public void updateItemMinOrderQtyBulk(SQLiteDatabase db, int itemId, double minOrderQty) {
+
+		ContentValues values = new ContentValues();
+		values.put("min_order_qty", minOrderQty);
+
+		db.update(TABLE_ITEMS, values, "id=?", new String[]{String.valueOf(itemId)});
+	}
+
+	// Every active item for MinOrderQtyActivity's flashcard setup screen -
+	// "suggested_min_order_qty" is what getEffectiveMinOrderQty() would
+	// derive right now (6 for a shoe item, else from the item's last
+	// Purchase line, else 1) so the screen can show a sensible starting
+	// value for an item that's never had one explicitly set.
+	public ArrayList<HashMap<String, Object>> getItemsForMinOrderQtySetup() {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, code, name, min_order_qty FROM " + TABLE_ITEMS +
+			" WHERE active = 1 ORDER BY name",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> map = new HashMap<String, Object>();
+
+			int itemId = cursor.getInt(0);
+			String name = cursor.getString(2);
+			double explicitMinOrderQty = cursor.getDouble(3);
+
+			map.put("id", itemId);
+			map.put("code", cursor.getString(1));
+			map.put("name", name);
+			map.put("min_order_qty", explicitMinOrderQty);
+
+			double suggested = explicitMinOrderQty;
+
+			if (suggested <= 0) {
+
+				suggested = ShoeIdentity.isShoe(name) ?
+					6 : deriveMinOrderQtyFromLastPurchase(db, itemId, 0);
+			}
+
+			if (suggested <= 0) {
+				suggested = 1;
+			}
+
+			map.put("suggested_min_order_qty", suggested);
+
+			list.add(map);
+		}
+
+		cursor.close();
+
+		return list;
 	}
 
 	// Wherever an item's active/inactive state alone needs updating,
@@ -2342,6 +2575,76 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			db.setTransactionSuccessful();
 
 			return valueId;
+
+		} finally {
+
+			db.endTransaction();
+		}
+	}
+
+	// Deletes a variety value and every combo built from it (a combo is
+	// deleted wholesale, not just unlinked from this one value, since a
+	// combo missing one of its own dimensions isn't a real combination
+	// any more - see addVarietyValue()'s own auto-grid for how a combo
+	// gets created in the first place) - only when every one of those
+	// combos is at zero stock, the same guard Itemseditactivity's own
+	// long-press-to-delete confirms before ever calling this. Returns
+	// false (and deletes nothing) if that guard would be violated - e.g.
+	// stock changed between the screen loading and the user confirming -
+	// so the caller can report that instead of silently losing stock.
+	public boolean deleteVarietyValue(int valueId) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.beginTransaction();
+
+		try {
+
+			ArrayList<Integer> comboIds = new ArrayList<Integer>();
+
+			Cursor cursor = db.rawQuery(
+				"SELECT DISTINCT combo_id FROM " + TABLE_VARIETY_COMBO_VALUES +
+				" WHERE value_id=?",
+				new String[]{String.valueOf(valueId)}
+			);
+
+			while (cursor.moveToNext()) {
+				comboIds.add(cursor.getInt(0));
+			}
+
+			cursor.close();
+
+			for (int comboId : comboIds) {
+
+				double balance = sumColumn(
+					db,
+					"SELECT balance FROM " + TABLE_VARIETY_COMBOS + " WHERE id=?",
+					new String[]{String.valueOf(comboId)}
+				);
+
+				if (balance != 0) {
+					return false;
+				}
+			}
+
+			for (int comboId : comboIds) {
+
+				db.delete(
+					TABLE_VARIETY_COMBO_VALUES, "combo_id=?",
+					new String[]{String.valueOf(comboId)}
+				);
+
+				db.delete(
+					TABLE_VARIETY_COMBOS, "id=?",
+					new String[]{String.valueOf(comboId)}
+				);
+			}
+
+			db.delete(TABLE_VARIETY_VALUES, "id=?", new String[]{String.valueOf(valueId)});
+
+			db.setTransactionSuccessful();
+
+			return true;
 
 		} finally {
 
@@ -5737,6 +6040,135 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return result;
 	}
 
+	// Every sold item with its top few cross-sell partners, for the
+	// Cross-Sell Insight screen's own landing list (see
+	// CrossSellReportActivity) - picking one item there still drills
+	// into the full getCrossSellInsight() breakdown above. Deliberately
+	// NOT built by calling getCrossSellInsight() once per item (that
+	// method's own cost - a join across every sale_items row for that
+	// one item - multiplied by every item in the shop would be exactly
+	// the kind of unindexed-style N-query blowup this session's other
+	// fixes removed elsewhere): a single self-join over sale_items
+	// computes every item pair's co-occurrence count at once, and the
+	// top-N-per-item trim happens in Java afterward.
+	public ArrayList<HashMap<String, Object>> getTopCrossSellSummary(int topN) {
+		return getTopCrossSellSummary(topN, SHOES_FILTER_ALL);
+	}
+
+	// shoesFilter only narrows which item each row is *about* - its top
+	// cross-sell partners are never filtered by it, since what a shoe
+	// actually sells alongside (even a non-shoe accessory) is the whole
+	// point of the insight.
+	public ArrayList<HashMap<String, Object>> getTopCrossSellSummary(int topN, int shoesFilter) {
+
+		ArrayList<HashMap<String, Object>> result = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		HashMap<Integer, String> nameById = new HashMap<Integer, String>();
+		HashMap<Integer, String> codeById = new HashMap<Integer, String>();
+		ArrayList<Integer> soldItemIds = new ArrayList<Integer>();
+
+		String shoesFilterClause = "";
+
+		if (shoesFilter == SHOES_FILTER_SHOES_ONLY) {
+			shoesFilterClause = " AND i.name LIKE 'Shoe%'";
+		} else if (shoesFilter == SHOES_FILTER_NON_SHOES_ONLY) {
+			shoesFilterClause = " AND i.name NOT LIKE 'Shoe%'";
+		}
+
+		Cursor itemCursor = db.rawQuery(
+			"SELECT DISTINCT i.id, i.code, i.name FROM " + TABLE_ITEMS + " i " +
+			"INNER JOIN sale_items si ON si.item_id = i.id " +
+			"WHERE i.active = 1" + shoesFilterClause + " ORDER BY i.name",
+			null
+		);
+
+		while (itemCursor.moveToNext()) {
+
+			int id = itemCursor.getInt(0);
+
+			soldItemIds.add(id);
+			codeById.put(id, itemCursor.getString(1));
+			nameById.put(id, itemCursor.getString(2));
+		}
+
+		itemCursor.close();
+
+		HashMap<Integer, ArrayList<HashMap<String, Object>>> partnersById =
+			new HashMap<Integer, ArrayList<HashMap<String, Object>>>();
+
+		Cursor pairCursor = db.rawQuery(
+			"SELECT a.item_id, b.item_id, COUNT(DISTINCT a.sale_id) FROM sale_items a " +
+			"INNER JOIN sale_items b ON b.sale_id = a.sale_id AND b.item_id != a.item_id " +
+			"GROUP BY a.item_id, b.item_id",
+			null
+		);
+
+		while (pairCursor.moveToNext()) {
+
+			int itemId = pairCursor.getInt(0);
+			int partnerId = pairCursor.getInt(1);
+			int count = pairCursor.getInt(2);
+
+			if (!nameById.containsKey(partnerId)) {
+				continue;
+			}
+
+			ArrayList<HashMap<String, Object>> partners = partnersById.get(itemId);
+
+			if (partners == null) {
+				partners = new ArrayList<HashMap<String, Object>>();
+				partnersById.put(itemId, partners);
+			}
+
+			HashMap<String, Object> partnerRow = new HashMap<String, Object>();
+			partnerRow.put("item_id", partnerId);
+			partnerRow.put("code", codeById.get(partnerId));
+			partnerRow.put("name", nameById.get(partnerId));
+			partnerRow.put("co_occurrence_count", count);
+
+			partners.add(partnerRow);
+		}
+
+		pairCursor.close();
+
+		for (int itemId : soldItemIds) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+			row.put("item_id", itemId);
+			row.put("code", codeById.get(itemId));
+			row.put("name", nameById.get(itemId));
+
+			ArrayList<HashMap<String, Object>> partners = partnersById.get(itemId);
+
+			if (partners == null) {
+				partners = new ArrayList<HashMap<String, Object>>();
+			}
+
+			Collections.sort(
+				partners,
+				new Comparator<HashMap<String, Object>>() {
+					@Override
+					public int compare(HashMap<String, Object> a, HashMap<String, Object> b) {
+						return (Integer) b.get("co_occurrence_count") - (Integer) a.get("co_occurrence_count");
+					}
+				}
+			);
+
+			row.put(
+				"top_partners",
+				new ArrayList<HashMap<String, Object>>(
+					partners.subList(0, Math.min(topN, partners.size()))
+				)
+			);
+
+			result.add(row);
+		}
+
+		return result;
+	}
+
 	// =====================
 	// REPORT: NET PROFIT BY ITEM - the same Net Profit period, broken
 	// down per item (only items with at least one sale in the period -
@@ -6123,22 +6555,77 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return result;
 	}
 
-	// Sorts size labels numerically when both parse as a number (the
-	// common case - "7", "8.5", "10") so the curve reads smallest to
-	// largest, falling back to plain alphabetical for anything that
-	// doesn't (e.g. a non-numeric size label).
+	// Sorts size labels high to low by leading number when both have
+	// one (row #94's own request - "sizes high-to-low", and the chart
+	// above draws bars in this same list order, so fixing this one
+	// comparator fixes the chart's bar order too). A plain
+	// Double.parseDouble(a) only ever matched a bare number like "7" or
+	// "8.5" - size is just as often a range in this shop's data (e.g.
+	// "7-10"), which threw and fell back to alphabetical, scrambling a
+	// mix of both shapes (alphabetically, "10-13" sorts before "9-12").
+	// leadingNumber() below pulls the number either shape starts with,
+	// so both compare the same way; only a label with no leading number
+	// at all falls back to alphabetical (reversed, to match the same
+	// high-to-low direction).
 	private int compareSizeLabels(String a, String b) {
 
+		Double numA = leadingNumber(a);
+		Double numB = leadingNumber(b);
+
+		if (numA != null && numB != null) {
+			return numB.compareTo(numA);
+		}
+
+		if (numA != null) {
+			return -1;
+		}
+
+		if (numB != null) {
+			return 1;
+		}
+
+		return b.compareTo(a);
+	}
+
+	// The leading numeric token of a size label - "7" -> 7.0, "8.5" ->
+	// 8.5, "7-10" -> 7.0 (a range sorts by its low end), null for a
+	// label that doesn't start with a number at all.
+	private Double leadingNumber(String label) {
+
+		if (label == null) {
+			return null;
+		}
+
+		int end = 0;
+		boolean seenDigit = false;
+
+		while (end < label.length()) {
+
+			char c = label.charAt(end);
+
+			if (Character.isDigit(c)) {
+
+				seenDigit = true;
+				end++;
+
+			} else if (c == '.' && seenDigit) {
+
+				end++;
+
+			} else {
+
+				break;
+			}
+		}
+
+		if (!seenDigit || end == 0) {
+			return null;
+		}
+
 		try {
-
-			double numA = Double.parseDouble(a);
-			double numB = Double.parseDouble(b);
-
-			return Double.compare(numA, numB);
-
+			return Double.parseDouble(label.substring(0, end));
 		} catch (NumberFormatException e) {
-
-			return a.compareTo(b);
+			return null;
 		}
 	}
 
@@ -6291,7 +6778,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		int velocityWindowDays = ReorderSettings.getVelocityWindowDays(context);
 		double safetyStockPercent = ReorderSettings.getSafetyStockPercent(context);
 		int leadTimeDays = ReorderSettings.getDefaultLeadTimeDays(context);
-		double minOrderQty = ReorderSettings.getMinOrderQty(context);
+		double globalMinOrderQty = ReorderSettings.getMinOrderQty(context);
 		double maxOrderQty = ReorderSettings.getMaxOrderQty(context);
 
 		Calendar windowStart = Calendar.getInstance();
@@ -6302,7 +6789,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		Cursor itemCursor = db.rawQuery(
 			"SELECT id, code, name, balance, purchase_price, reorder_threshold, " +
-			"holiday_seasonal FROM " + TABLE_ITEMS + " WHERE active = 1",
+			"holiday_seasonal, min_order_qty FROM " + TABLE_ITEMS + " WHERE active = 1",
 			null
 		);
 
@@ -6315,15 +6802,20 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			double purchasePrice = itemCursor.getDouble(4);
 			double manualThreshold = itemCursor.getDouble(5);
 			boolean holidaySeasonal = itemCursor.getInt(6) != 0;
+			double explicitMinOrderQty = itemCursor.getDouble(7);
 
 			ArrayList<HashMap<String, Object>> combos = getVarietyCombos(itemId);
 
 			if (combos.isEmpty()) {
 
+				double effectiveMinOrderQty = getEffectiveMinOrderQty(
+					db, itemId, 0, name, explicitMinOrderQty, globalMinOrderQty
+				);
+
 				HashMap<String, Object> suggestion = buildReorderSuggestion(
 					db, itemId, 0, null, code, name, itemBalance, purchasePrice,
 					manualThreshold, holidaySeasonal, windowStartDate, velocityWindowDays,
-					leadTimeDays, safetyStockPercent, minOrderQty, maxOrderQty
+					leadTimeDays, safetyStockPercent, effectiveMinOrderQty, maxOrderQty
 				);
 
 				if (suggestion != null) {
@@ -6338,11 +6830,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 					double comboBalance = (Double) combo.get("balance");
 					String comboLabel = (String) combo.get("label");
 
+					double effectiveMinOrderQty = getEffectiveMinOrderQty(
+						db, itemId, comboId, name, explicitMinOrderQty, globalMinOrderQty
+					);
+
 					HashMap<String, Object> suggestion = buildReorderSuggestion(
 						db, itemId, comboId, comboLabel, code, name, comboBalance,
 						purchasePrice, manualThreshold, holidaySeasonal, windowStartDate,
 						velocityWindowDays, leadTimeDays, safetyStockPercent,
-						minOrderQty, maxOrderQty
+						effectiveMinOrderQty, maxOrderQty
 					);
 
 					if (suggestion != null) {
@@ -6363,6 +6859,76 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		});
 
 		return list;
+	}
+
+	// The largest of: this item/combo's explicit min_order_qty override
+	// (0 = not set), 6 for a shoe item (ShoeIdentity.isShoe()) with no
+	// override, a quantity derived from that item/combo's own most
+	// recent Purchase line (deriveMinOrderQtyFromLastPurchase() - a
+	// non-shoe item with no override but a purchase history of buying
+	// in dozens shouldn't get suggested a quantity of 1-2), and the
+	// app-wide ReorderSettings minimum, which still applies as a floor
+	// underneath all of the above. See DATABASE_VERSION's comment.
+	private double getEffectiveMinOrderQty(
+		SQLiteDatabase db, int itemId, int comboId, String itemName,
+		double explicitMinOrderQty, double globalMinOrderQty) {
+
+		double perItemMinOrderQty = explicitMinOrderQty;
+
+		if (perItemMinOrderQty <= 0) {
+
+			if (ShoeIdentity.isShoe(itemName)) {
+
+				perItemMinOrderQty = 6;
+
+			} else {
+
+				perItemMinOrderQty = deriveMinOrderQtyFromLastPurchase(db, itemId, comboId);
+			}
+		}
+
+		return Math.max(perItemMinOrderQty, globalMinOrderQty);
+	}
+
+	// The quantity line from this item/combo's single most recent
+	// Purchase - "whatever we normally order this in" is a far better
+	// default minimum than nothing at all, and far less effort than
+	// asking the owner to set one for every item up front (they can
+	// still override it from MinOrderQtyActivity). Returns 0 (no floor)
+	// when there's no purchase history yet.
+	private double deriveMinOrderQtyFromLastPurchase(SQLiteDatabase db, int itemId, int comboId) {
+
+		Cursor cursor;
+
+		if (comboId > 0) {
+
+			cursor = db.rawQuery(
+				"SELECT pi.qty FROM " + TABLE_PURCHASE_ITEMS + " pi " +
+				"INNER JOIN " + TABLE_PURCHASES + " p ON p.id = pi.purchase_id " +
+				"WHERE pi.combo_id = ? ORDER BY p.date DESC, pi.id DESC LIMIT 1",
+				new String[]{String.valueOf(comboId)}
+			);
+
+		} else {
+
+			cursor = db.rawQuery(
+				"SELECT pi.qty FROM " + TABLE_PURCHASE_ITEMS + " pi " +
+				"INNER JOIN " + TABLE_PURCHASES + " p ON p.id = pi.purchase_id " +
+				"WHERE pi.item_id = ? AND (pi.combo_id IS NULL OR pi.combo_id = 0) " +
+				"ORDER BY p.date DESC, pi.id DESC LIMIT 1",
+				new String[]{String.valueOf(itemId)}
+			);
+		}
+
+		double qty = 0;
+
+		if (cursor.moveToFirst()) {
+			qty = cursor.getDouble(0);
+		}
+
+		cursor.close();
+
+		return qty;
 	}
 
 	private HashMap<String, Object> buildReorderSuggestion(
@@ -7480,6 +8046,112 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return multiplier;
 	}
 
+	// =====================
+	// REORDER LEARNING HISTORY - dedicated screen (ReorderLearningHistoryActivity)
+	// to view/correct this same reorder_suggestion_log in-app, paginated
+	// 30 at a time (same convention as Itemviewactivity's transaction
+	// history), rather than only the blind "Export History" .csv button
+	// above. getReorderLearningHistoryPage() carries the raw item_id/
+	// combo_id/id alongside the same resolved display fields
+	// getReorderSuggestionLogForExport() exposes, since the history
+	// screen needs them to edit/delete a specific row, not just display
+	// it. Adding a row from that screen is deliberately item-level only
+	// (comboId null) - picking a specific variety combo would need the
+	// same combo picker Transactioneditactivity's Add/Edit Item dialog
+	// builds, which is more machinery than a manual correction/backfill
+	// screen needs; a combo-level row already in the log still displays
+	// and edits its other fields fine, it just can't have its combo
+	// changed here.
+	// =====================
+	public int getReorderLearningHistoryCount() {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		return (int) sumColumn(
+			db, "SELECT COUNT(*) FROM " + TABLE_REORDER_SUGGESTION_LOG, null
+		);
+	}
+
+	public ArrayList<HashMap<String, Object>> getReorderLearningHistoryPage(int limit, int offset) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT l.id, l.item_id, l.combo_id, l.suggested_date, i.code, i.name, " +
+			"l.suggested_qty, l.outcome, l.outcome_date " +
+			"FROM " + TABLE_REORDER_SUGGESTION_LOG + " l " +
+			"LEFT JOIN " + TABLE_ITEMS + " i ON i.id = l.item_id " +
+			"ORDER BY l.id DESC LIMIT ? OFFSET ?",
+			new String[]{String.valueOf(limit), String.valueOf(offset)}
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+
+			row.put("id", cursor.getInt(0));
+			row.put("item_id", cursor.getInt(1));
+			row.put("combo_id", cursor.isNull(2) ? null : cursor.getInt(2));
+			row.put("suggested_date", cursor.getString(3));
+			row.put("item_code", cursor.isNull(4) ? "" : cursor.getString(4));
+			row.put("item_name", cursor.isNull(5) ? "(deleted item)" : cursor.getString(5));
+
+			row.put(
+				"combo_label",
+				cursor.isNull(2) ? "" : getComboLabel(db, cursor.getInt(2))
+			);
+
+			row.put("suggested_qty", cursor.getDouble(6));
+			row.put("outcome", cursor.isNull(7) ? null : cursor.getString(7));
+			row.put("outcome_date", cursor.isNull(8) ? "" : cursor.getString(8));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	public void insertReorderLearningEntry(
+		int itemId, String suggestedDate, double suggestedQty, String outcome, String outcomeDate) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.putNull("combo_id");
+		values.put("suggested_date", suggestedDate);
+		values.put("suggested_qty", suggestedQty);
+		values.put("outcome", outcome);
+		values.put("outcome_date", outcomeDate);
+
+		db.insert(TABLE_REORDER_SUGGESTION_LOG, null, values);
+	}
+
+	public void updateReorderLearningEntry(
+		int id, int itemId, String suggestedDate, double suggestedQty, String outcome, String outcomeDate) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		ContentValues values = new ContentValues();
+		values.put("item_id", itemId);
+		values.put("suggested_date", suggestedDate);
+		values.put("suggested_qty", suggestedQty);
+		values.put("outcome", outcome);
+		values.put("outcome_date", outcomeDate);
+
+		db.update(TABLE_REORDER_SUGGESTION_LOG, values, "id=?", new String[]{String.valueOf(id)});
+	}
+
+	public void deleteReorderLearningEntry(int id) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+		db.delete(TABLE_REORDER_SUGGESTION_LOG, "id=?", new String[]{String.valueOf(id)});
+	}
+
 	// Every reorder_suggestion_log row, newest first, with the item's
 	// code/name and (if any) variety combo label already resolved -
 	// used only by ReorderSettingsActivity's "Export History" button
@@ -7611,6 +8283,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// are returned.
 	// =====================
 	public ArrayList<HashMap<String, Object>> getSlowMovingStock(Context context, int days) {
+		return getSlowMovingStock(context, days, SHOES_FILTER_ALL);
+	}
+
+	public ArrayList<HashMap<String, Object>> getSlowMovingStock(
+		Context context, int days, int shoesFilter) {
 
 		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
 
@@ -7621,6 +8298,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 		long todayMillis = new Date().getTime();
 
+		String shoesFilterClause = "";
+
+		if (shoesFilter == SHOES_FILTER_SHOES_ONLY) {
+			shoesFilterClause = " AND i.name LIKE 'Shoe%'";
+		} else if (shoesFilter == SHOES_FILTER_NON_SHOES_ONLY) {
+			shoesFilterClause = " AND i.name NOT LIKE 'Shoe%'";
+		}
+
 		// No date cutoff at the SQL level any more - a non-shoe item's
 		// cutoff is a multiple of a shoe's, which isn't expressible as a
 		// single WHERE clause, so every active in-stock item is fetched
@@ -7630,7 +8315,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"FROM " + TABLE_ITEMS + " i " +
 			"LEFT JOIN sale_items si ON si.item_id = i.id " +
 			"LEFT JOIN sales s ON s.id = si.sale_id " +
-			"WHERE i.active = 1 AND i.balance > 0 " +
+			"WHERE i.active = 1 AND i.balance > 0" + shoesFilterClause + " " +
 			"GROUP BY i.id",
 			null
 		);
@@ -7752,8 +8437,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// price.
 	// =====================
 	public ArrayList<HashMap<String, Object>> getDiscountCandidates(Context context) {
+		return getDiscountCandidates(context, SHOES_FILTER_ALL);
+	}
 
-		ArrayList<HashMap<String, Object>> list = getSlowMovingStock(context, 30);
+	public ArrayList<HashMap<String, Object>> getDiscountCandidates(Context context, int shoesFilter) {
+
+		ArrayList<HashMap<String, Object>> list = getSlowMovingStock(context, 30, shoesFilter);
 
 		for (HashMap<String, Object> row : list) {
 
@@ -7784,15 +8473,28 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// look at sales history the way Discount This Week does.
 	// =====================
 	public ArrayList<HashMap<String, Object>> getStopRestockingCandidates() {
+		return getStopRestockingCandidates(SHOES_FILTER_ALL);
+	}
+
+	public ArrayList<HashMap<String, Object>> getStopRestockingCandidates(int shoesFilter) {
 
 		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
 
 		SQLiteDatabase db = this.getReadableDatabase();
 
+		String shoesFilterClause = "";
+
+		if (shoesFilter == SHOES_FILTER_SHOES_ONLY) {
+			shoesFilterClause = " AND name LIKE 'Shoe%'";
+		} else if (shoesFilter == SHOES_FILTER_NON_SHOES_ONLY) {
+			shoesFilterClause = " AND name NOT LIKE 'Shoe%'";
+		}
+
 		Cursor cursor = db.rawQuery(
 			"SELECT id, code, name, purchase_price, extra_cost_per_unit, sale_price, balance FROM " +
 			TABLE_ITEMS +
-			" WHERE active = 1 AND sale_price <= (purchase_price + extra_cost_per_unit) " +
+			" WHERE active = 1 AND sale_price <= (purchase_price + extra_cost_per_unit)" +
+			shoesFilterClause + " " +
 			"ORDER BY name ASC",
 			null
 		);
@@ -7828,8 +8530,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// category-adjusted figure Discount This Week buckets on.
 	// =====================
 	public ArrayList<HashMap<String, Object>> getDeadStockAging(Context context) {
+		return getDeadStockAging(context, SHOES_FILTER_ALL);
+	}
 
-		ArrayList<HashMap<String, Object>> list = getSlowMovingStock(context, 60);
+	public ArrayList<HashMap<String, Object>> getDeadStockAging(Context context, int shoesFilter) {
+
+		ArrayList<HashMap<String, Object>> list = getSlowMovingStock(context, 60, shoesFilter);
 
 		for (HashMap<String, Object> row : list) {
 
@@ -12585,12 +13291,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
-	// EXPENSE RATIO TREND - Expenses as a % of Sales for each of the
-	// last `months` calendar months, oldest first (the current month is
+	// EXPENSE RATIO TREND - Expenses as a % of Sales (ratio_percent) AND
+	// as a % of gross profit (profit_ratio_percent) for each of the last
+	// `months` calendar months, oldest first (the current month is
 	// included even though it's partial, same "1st through today"
-	// convention Month-over-Month uses elsewhere). A rising ratio means
-	// expenses are growing faster than sales - worth watching even when
-	// both totals are individually growing.
+	// convention Month-over-Month uses elsewhere) - both are always
+	// computed so the activity's mode toggle can switch between them
+	// without a second query, same reasoning as getSalesByParty()'s
+	// always-computed profit column. A rising ratio means expenses are
+	// growing faster than sales/profit - worth watching even when the
+	// totals are individually growing.
 	// =====================
 	public ArrayList<HashMap<String, Object>> getExpenseRatioTrend(int months) {
 
@@ -12633,13 +13343,34 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 			double expensesTotal = getExpenseTotalForRange(fromDate, toDate);
 
+			// Gross profit (sales minus item cost, before expenses are
+			// subtracted) - the standard base for an Expense-to-Profit
+			// ratio, i.e. "what share of this month's profit margin did
+			// expenses eat", same cost-basis simplification as
+			// getNetProfitSummary() (current purchase_price +
+			// extra_cost_per_unit, not a historical snapshot).
+			double itemCost = sumColumn(
+				db,
+				"SELECT COALESCE(SUM(si.qty * (i.purchase_price + i.extra_cost_per_unit)), 0) " +
+				"FROM sale_items si " +
+				"INNER JOIN sales s ON s.id = si.sale_id " +
+				"INNER JOIN " + TABLE_ITEMS + " i ON i.id = si.item_id " +
+				"WHERE s.date BETWEEN ? AND ?",
+				new String[]{fromDate, toDate}
+			);
+
+			double grossProfit = salesTotal - itemCost;
+
 			double ratioPercent = salesTotal > 0.01 ? expensesTotal / salesTotal * 100 : 0;
+			double profitRatioPercent = grossProfit > 0.01 ? expensesTotal / grossProfit * 100 : 0;
 
 			HashMap<String, Object> row = new HashMap<String, Object>();
 			row.put("month_label", monthFormat.format(monthStart.getTime()));
 			row.put("sales_total", salesTotal);
 			row.put("expenses_total", expensesTotal);
+			row.put("gross_profit", grossProfit);
 			row.put("ratio_percent", ratioPercent);
+			row.put("profit_ratio_percent", profitRatioPercent);
 
 			list.add(row);
 
@@ -12805,6 +13536,25 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	public HashMap<String, Object> getCashProjection(
 		android.content.Context context, String fromDate, String toDate) {
 
+		return getCashProjection(context, fromDate, toDate, true, true, true);
+	}
+
+	// includeSales/includeExpenses/includeReorder (row #80's own request)
+	// let the caller zero out a whole category's contribution to the
+	// totals below without losing its own raw figure - each is still
+	// returned and shown, just not added in, so unchecking one lets the
+	// user see "what if I ignore this" without re-deriving the math
+	// themselves. estimated_sales_revenue is new here too (same request,
+	// "should also factor in estimated sales" - dues_in alone only ever
+	// counted a Sale already made with a future due_date, never a Sale
+	// that hasn't happened yet): the shop's own average daily sales
+	// over Reorder Settings' velocity window, extended across the
+	// projection period - the same "recent reality, not a guess" approach
+	// the reorder formula itself uses, not a separate model.
+	public HashMap<String, Object> getCashProjection(
+		android.content.Context context, String fromDate, String toDate,
+		boolean includeSales, boolean includeExpenses, boolean includeReorder) {
+
 		HashMap<String, Object> result = new HashMap<String, Object>();
 
 		SQLiteDatabase db = this.getReadableDatabase();
@@ -12826,6 +13576,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		double recurringExpensesOut = getProjectedRecurringExpenseTotal(fromDate, toDate);
 
+		double estimatedSalesRevenue = getEstimatedSalesRevenueForPeriod(context, fromDate, toDate);
+
 		double reorderCostEstimate = 0;
 
 		ArrayList<HashMap<String, Object>> reorderSuggestions = getReorderSuggestions(context);
@@ -12834,17 +13586,63 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			reorderCostEstimate += (Double) suggestion.get("estimated_cost");
 		}
 
-		double projectedCash = startingCash + duesIn - billsOut - recurringExpensesOut;
+		double salesIn = includeSales ? (duesIn + estimatedSalesRevenue) : 0;
+		double expensesOut = includeExpenses ? (billsOut + recurringExpensesOut) : 0;
+		double reorderOut = includeReorder ? reorderCostEstimate : 0;
+
+		double projectedCash = startingCash + salesIn - expensesOut;
 
 		result.put("starting_cash", startingCash);
 		result.put("dues_in", duesIn);
+		result.put("estimated_sales_revenue", estimatedSalesRevenue);
 		result.put("bills_out", billsOut);
 		result.put("recurring_expenses_out", recurringExpensesOut);
 		result.put("projected_cash", projectedCash);
 		result.put("reorder_cost_estimate", reorderCostEstimate);
-		result.put("projected_cash_after_reorder", projectedCash - reorderCostEstimate);
+		result.put("projected_cash_after_reorder", projectedCash - reorderOut);
 
 		return result;
+	}
+
+	// This shop's own average daily sales (grand_total, every Sale
+	// regardless of payment status - cash projection cares what's
+	// coming in overall) over Reorder Settings' velocity window, times
+	// however many days are in [fromDate, toDate] - 0 for a shop with no
+	// sales history yet rather than a guess.
+	private double getEstimatedSalesRevenueForPeriod(
+		android.content.Context context, String fromDate, String toDate) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		int velocityWindowDays = ReorderSettings.getVelocityWindowDays(context);
+
+		Calendar windowStart = Calendar.getInstance();
+		windowStart.add(Calendar.DAY_OF_MONTH, -velocityWindowDays);
+
+		String windowStartDate =
+			new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(windowStart.getTime());
+
+		double recentTotal = sumColumn(
+			db,
+			"SELECT SUM(grand_total) FROM sales WHERE date >= ?",
+			new String[]{windowStartDate}
+		);
+
+		double avgDailySales = recentTotal / velocityWindowDays;
+
+		long periodDays = 1;
+
+		try {
+
+			SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+
+			long diffMillis = isoFormat.parse(toDate).getTime() - isoFormat.parse(fromDate).getTime();
+			periodDays = (diffMillis / (24L * 60 * 60 * 1000)) + 1;
+
+		} catch (Exception e) {
+		}
+
+		return avgDailySales * periodDays;
 	}
 
 	// Simulates every active recurring_expenses rule day by day across
@@ -12974,7 +13772,25 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// than yesterday isolates a real trend instead of just that
 	// mismatch. percent_change is null (not 0) when last week's day had
 	// no sales at all, since "0% change from zero" would be misleading.
+	public static final int TREND_COMPARE_TODAY_VS_LAST_WEEK = 0;
+	public static final int TREND_COMPARE_WEEK_VS_WEEK = 1;
+	public static final int TREND_COMPARE_MONTH_VS_MONTH = 2;
+
 	public HashMap<String, Object> getTodayVsLastWeekSales() {
+		return getSalesTrendComparison(TREND_COMPARE_TODAY_VS_LAST_WEEK);
+	}
+
+	// Three comparison modes for the Dashboard's Sales Trend card:
+	// Today vs the same calendar weekday one week ago (the original,
+	// still-default comparison - a week-ago weekday is a fairer baseline
+	// than yesterday, since a Monday is naturally busier/quieter than a
+	// Sunday), This Week-so-far vs the same elapsed days of last week,
+	// and This Month-so-far vs the same elapsed days of last month - all
+	// three compare an *elapsed* window against the same-length elapsed
+	// window of the prior period, never a partial period against a
+	// full one, so the percentage is never misleadingly skewed by one
+	// side simply having fewer days counted.
+	public HashMap<String, Object> getSalesTrendComparison(int mode) {
 
 		SQLiteDatabase db = this.getReadableDatabase();
 
@@ -12982,26 +13798,114 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 
-		String today = sdf.format(new Date());
+		double currentTotal;
+		double comparisonTotal;
+		String currentLabel;
+		String comparisonLabel;
 
-		Calendar lastWeekCal = Calendar.getInstance();
-		lastWeekCal.add(Calendar.DAY_OF_MONTH, -7);
-		String sameDayLastWeek = sdf.format(lastWeekCal.getTime());
+		if (mode == TREND_COMPARE_WEEK_VS_WEEK) {
 
-		double todayTotal = sumColumn(
-			db, "SELECT SUM(grand_total) FROM sales WHERE date=?", new String[]{today}
-		);
+			Calendar today = Calendar.getInstance();
 
-		double lastWeekTotal = sumColumn(
-			db, "SELECT SUM(grand_total) FROM sales WHERE date=?", new String[]{sameDayLastWeek}
-		);
+			Calendar weekStart = (Calendar) today.clone();
+			weekStart.setFirstDayOfWeek(Calendar.MONDAY);
+			weekStart.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
 
-		result.put("today_total", todayTotal);
-		result.put("last_week_total", lastWeekTotal);
+			// Monday-indexed (Monday=0 ... Sunday=6), independent of the
+			// Calendar.DAY_OF_WEEK constants' own Sunday-first numbering.
+			int daysIntoWeek = (today.get(Calendar.DAY_OF_WEEK) + 5) % 7;
+
+			Calendar lastWeekStart = (Calendar) weekStart.clone();
+			lastWeekStart.add(Calendar.DAY_OF_YEAR, -7);
+
+			Calendar lastWeekComparable = (Calendar) lastWeekStart.clone();
+			lastWeekComparable.add(Calendar.DAY_OF_YEAR, daysIntoWeek);
+
+			String weekStartStr = sdf.format(weekStart.getTime());
+			String todayStr = sdf.format(today.getTime());
+			String lastWeekStartStr = sdf.format(lastWeekStart.getTime());
+			String lastWeekComparableStr = sdf.format(lastWeekComparable.getTime());
+
+			currentTotal = sumColumn(
+				db, "SELECT SUM(grand_total) FROM sales WHERE date BETWEEN ? AND ?",
+				new String[]{weekStartStr, todayStr}
+			);
+
+			comparisonTotal = sumColumn(
+				db, "SELECT SUM(grand_total) FROM sales WHERE date BETWEEN ? AND ?",
+				new String[]{lastWeekStartStr, lastWeekComparableStr}
+			);
+
+			currentLabel = "This week";
+			comparisonLabel = "Last week";
+
+		} else if (mode == TREND_COMPARE_MONTH_VS_MONTH) {
+
+			Calendar today = Calendar.getInstance();
+			int dayOfMonth = today.get(Calendar.DAY_OF_MONTH);
+
+			Calendar thisMonthStart = (Calendar) today.clone();
+			thisMonthStart.set(Calendar.DAY_OF_MONTH, 1);
+
+			Calendar lastMonthStart = (Calendar) thisMonthStart.clone();
+			lastMonthStart.add(Calendar.MONTH, -1);
+
+			// Clamped so e.g. "the 31st so far" against a 28/29/30-day
+			// last month compares against that month's last day instead
+			// of rolling over into the month after it (Calendar.add()'s
+			// own day-of-month rollover behavior, which would silently
+			// compare against the wrong month).
+			int lastMonthMaxDay = lastMonthStart.getActualMaximum(Calendar.DAY_OF_MONTH);
+
+			Calendar lastMonthComparable = (Calendar) lastMonthStart.clone();
+			lastMonthComparable.set(Calendar.DAY_OF_MONTH, Math.min(dayOfMonth, lastMonthMaxDay));
+
+			String thisMonthStartStr = sdf.format(thisMonthStart.getTime());
+			String todayStr = sdf.format(today.getTime());
+			String lastMonthStartStr = sdf.format(lastMonthStart.getTime());
+			String lastMonthComparableStr = sdf.format(lastMonthComparable.getTime());
+
+			currentTotal = sumColumn(
+				db, "SELECT SUM(grand_total) FROM sales WHERE date BETWEEN ? AND ?",
+				new String[]{thisMonthStartStr, todayStr}
+			);
+
+			comparisonTotal = sumColumn(
+				db, "SELECT SUM(grand_total) FROM sales WHERE date BETWEEN ? AND ?",
+				new String[]{lastMonthStartStr, lastMonthComparableStr}
+			);
+
+			currentLabel = "This month";
+			comparisonLabel = "Last month";
+
+		} else {
+
+			String today = sdf.format(new Date());
+
+			Calendar lastWeekCal = Calendar.getInstance();
+			lastWeekCal.add(Calendar.DAY_OF_MONTH, -7);
+			String sameDayLastWeek = sdf.format(lastWeekCal.getTime());
+
+			currentTotal = sumColumn(
+				db, "SELECT SUM(grand_total) FROM sales WHERE date=?", new String[]{today}
+			);
+
+			comparisonTotal = sumColumn(
+				db, "SELECT SUM(grand_total) FROM sales WHERE date=?", new String[]{sameDayLastWeek}
+			);
+
+			currentLabel = "Today";
+			comparisonLabel = "Last week";
+		}
+
+		result.put("current_total", currentTotal);
+		result.put("comparison_total", comparisonTotal);
+		result.put("current_label", currentLabel);
+		result.put("comparison_label", comparisonLabel);
 
 		result.put(
 			"percent_change",
-			lastWeekTotal > 0 ? ((todayTotal - lastWeekTotal) / lastWeekTotal * 100.0) : null
+			comparisonTotal > 0 ? ((currentTotal - comparisonTotal) / comparisonTotal * 100.0) : null
 		);
 
 		return result;
@@ -13036,8 +13940,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		}
 
 		int currentStreak = 0;
+		String currentStreakStartDate = null;
+
 		while (saleDates.contains(sdf.format(cal.getTime()))) {
 			currentStreak++;
+			currentStreakStartDate = sdf.format(cal.getTime());
 			cal.add(Calendar.DAY_OF_MONTH, -1);
 		}
 
@@ -13069,6 +13976,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		}
 
 		result.put("current_streak", currentStreak);
+		result.put("current_streak_start_date", currentStreakStartDate);
 		result.put("best_streak", bestStreak);
 		result.put("today_has_sale", todayHasSale);
 

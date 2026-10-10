@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:maxHeight="420dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="Item" />
+        <AutoCompleteTextView
+            android:id="@+id/et_entry_item"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Start typing an item name"
+            android:inputType="text|textNoSuggestions" />
+
+        <TextView
+            android:id="@+id/tv_entry_combo_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Variety: -"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <TextView style="@style/FieldLabel" android:text="Suggested Date" />
+        <EditText
+            android:id="@+id/et_entry_suggested_date"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="false"
+            android:inputType="text|textNoSuggestions" />
+
+        <TextView style="@style/FieldLabel" android:text="Suggested Qty" />
+        <EditText
+            android:id="@+id/et_entry_suggested_qty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="e.g. 12"
+            android:inputType="numberDecimal" />
+
+        <TextView style="@style/FieldLabel" android:text="Outcome" />
+        <Spinner
+            android:id="@+id/spinner_entry_outcome"
+            style="@style/FilterSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView style="@style/FieldLabel" android:text="Outcome Date (if resolved)" />
+        <EditText
+            android:id="@+id/et_entry_outcome_date"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="false"
+            android:hint="Tap to set"
+            android:inputType="text|textNoSuggestions" />
+
+    </LinearLayout>
+
+</ScrollView>

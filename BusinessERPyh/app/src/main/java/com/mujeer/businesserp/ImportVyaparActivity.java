@@ -310,6 +310,8 @@ public class ImportVyaparActivity extends Activity {
             boolean itemsHaveLocations = columnExists(vyaparDb, "kb_items", "item_locations");
             boolean itemsHaveHolidaySeasonal =
                 columnExists(vyaparDb, "kb_items", "item_holiday_seasonal");
+            boolean itemsHaveMinOrderQty =
+                columnExists(vyaparDb, "kb_items", "item_min_order_qty");
             boolean salesHaveDueDate = columnExists(vyaparDb, "kb_transactions", "txn_due_date");
             boolean hasCostItemsTable = tableExists(vyaparDb, "businesserp_cost_items");
             boolean hasPurchaseExpenseLinksTable = tableExists(vyaparDb, "businesserp_purchase_expense_links");
@@ -351,7 +353,7 @@ public class ImportVyaparActivity extends Activity {
             importItems(
                 vyaparDb, helper, db, itemIdMap, itemsHaveExtraCost, itemsHaveActive,
                 itemsHaveReorderThreshold, itemsHaveLocations, itemsHaveHolidaySeasonal,
-                skipped, counts);
+                itemsHaveMinOrderQty, skipped, counts);
 
             if (hasVarietyTables) {
 
@@ -879,26 +881,29 @@ public class ImportVyaparActivity extends Activity {
         boolean itemsHaveReorderThreshold,
         boolean itemsHaveLocations,
         boolean itemsHaveHolidaySeasonal,
+        boolean itemsHaveMinOrderQty,
         ArrayList<SkippedRow> skipped,
         Counts counts) {
 
         // item_extra_cost_per_unit/item_active/item_reorder_threshold/
-        // item_locations/item_holiday_seasonal are this app's own
-        // extensions (see itemsHaveExtraCost/itemsHaveActive/
-        // itemsHaveReorderThreshold/itemsHaveLocations/
-        // itemsHaveHolidaySeasonal in runImport()) - only selected when
-        // the backup's kb_items actually has that column, since a real
-        // Vyapar backup or an export made before each one existed won't;
-        // item_active defaults to active, item_reorder_threshold to 0 (no
-        // alert), item_locations to "", and item_holiday_seasonal to
-        // false rather than failing in that case.
+        // item_locations/item_holiday_seasonal/item_min_order_qty are
+        // this app's own extensions (see itemsHaveExtraCost/
+        // itemsHaveActive/itemsHaveReorderThreshold/itemsHaveLocations/
+        // itemsHaveHolidaySeasonal/itemsHaveMinOrderQty in runImport()) -
+        // only selected when the backup's kb_items actually has that
+        // column, since a real Vyapar backup or an export made before
+        // each one existed won't; item_active defaults to active,
+        // item_reorder_threshold to 0 (no alert), item_locations to "",
+        // item_holiday_seasonal to false, and item_min_order_qty to 0
+        // (not set) rather than failing in that case.
         Cursor c = vyaparDb.rawQuery(
             "SELECT item_id, item_code, item_name, item_purchase_unit_price, item_sale_unit_price" +
             (itemsHaveExtraCost ? ", item_extra_cost_per_unit" : "") +
             (itemsHaveActive ? ", item_active" : "") +
             (itemsHaveReorderThreshold ? ", item_reorder_threshold" : "") +
             (itemsHaveLocations ? ", item_locations" : "") +
-            (itemsHaveHolidaySeasonal ? ", item_holiday_seasonal" : "") + " " +
+            (itemsHaveHolidaySeasonal ? ", item_holiday_seasonal" : "") +
+            (itemsHaveMinOrderQty ? ", item_min_order_qty" : "") + " " +
             "FROM kb_items " +
             "WHERE item_type != 2 " +
             "   OR item_id IN (" +
@@ -913,6 +918,7 @@ public class ImportVyaparActivity extends Activity {
         int reorderThresholdColumn = activeColumn + (itemsHaveActive ? 1 : 0);
         int locationsColumn = reorderThresholdColumn + (itemsHaveReorderThreshold ? 1 : 0);
         int holidaySeasonalColumn = locationsColumn + (itemsHaveLocations ? 1 : 0);
+        int minOrderQtyColumn = holidaySeasonalColumn + (itemsHaveHolidaySeasonal ? 1 : 0);
 
         while (c.moveToNext()) {
 
@@ -939,6 +945,9 @@ public class ImportVyaparActivity extends Activity {
                 (itemsHaveHolidaySeasonal && !c.isNull(holidaySeasonalColumn)) &&
                 c.getInt(holidaySeasonalColumn) != 0;
 
+            double minOrderQty = (itemsHaveMinOrderQty && !c.isNull(minOrderQtyColumn)) ?
+                c.getDouble(minOrderQtyColumn) : 0.0;
+
             String importKey = "vyb_item_" + itemId;
 
             if (helper.isImportKeyUsedBulk(db, importKey)) {
@@ -959,6 +968,10 @@ public class ImportVyaparActivity extends Activity {
 
             if (holidaySeasonal) {
                 helper.updateItemHolidaySeasonalBulk(db, (int) localId, true);
+            }
+
+            if (minOrderQty > 0) {
+                helper.updateItemMinOrderQtyBulk(db, (int) localId, minOrderQty);
             }
 
             helper.markImportKeyUsedBulk(db, importKey);

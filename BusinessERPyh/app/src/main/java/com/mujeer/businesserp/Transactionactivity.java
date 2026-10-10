@@ -129,6 +129,31 @@ public class Transactionactivity extends Activity {
 					.setNegativeButton("Cancel", null)
 					.show();
 			}
+
+			// Plain tap on the row (open the transaction) - see
+			// SwipeRevealLayout.onTouchEvent()'s own comment for why this
+			// can no longer be left to lv_transactions.
+			// setOnItemClickListener alone now that swipe is enabled on
+			// every row here. Never fires while selectionMode is active -
+			// the adapter hides the swipe actions panel then, so
+			// isSwipeEnabled() is false and the plain ListView click
+			// (which already handles toggling selection) takes over
+			// normally instead.
+			@Override
+			public void onRowTap(HashMap<String, Object> transaction) {
+
+				final int transactionId = (Integer) transaction.get("id");
+
+				Intent intent = new Intent(
+					Transactionactivity.this,
+					Transactionviewactivity.class
+				);
+
+				intent.putExtra("transaction_type", transactionType);
+				intent.putExtra("transaction_id", transactionId);
+
+				startActivity(intent);
+			}
 		};
 
 	@Override
@@ -484,7 +509,7 @@ public class Transactionactivity extends Activity {
 		);
 
 		adapter.setSelectionMode(selectionMode, selectedIds);
-		adapter.setSwipeEnabled(true);
+		adapter.setSwipeEnabled(SwipeGestureSettings.isEnabled(this));
 		adapter.setRowActionListener(rowActionListener);
 
 		lv_transactions.setAdapter(adapter);
@@ -817,7 +842,7 @@ public class Transactionactivity extends Activity {
 		);
 
 		adapter.setSelectionMode(selectionMode, selectedIds);
-		adapter.setSwipeEnabled(true);
+		adapter.setSwipeEnabled(SwipeGestureSettings.isEnabled(this));
 		adapter.setRowActionListener(rowActionListener);
 
 		lv_transactions.setAdapter(adapter);

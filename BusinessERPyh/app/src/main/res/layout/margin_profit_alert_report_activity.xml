@@ -38,12 +38,26 @@
             android:layout_marginBottom="10dp"
             android:text="This Month vs Last Month" />
 
-        <Spinner
-            android:id="@+id/spinner_shoes_filter"
-            style="@style/FilterSpinner"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp" />
+            android:layout_marginBottom="12dp"
+            android:orientation="horizontal">
+
+            <Spinner
+                android:id="@+id/spinner_comparison_period"
+                style="@style/FilterSpinner"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp" />
+
+            <Spinner
+                android:id="@+id/spinner_shoes_filter"
+                style="@style/FilterSpinner"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -102,14 +116,14 @@
 
         <TextView
             style="@style/FieldLabel"
-            android:text="Items that sold in both months whose margin % dropped by 5 points or more, biggest drop first." />
+            android:text="Items that sold in both periods whose margin % dropped by 5 points or more, biggest drop first." />
 
         <TextView
             android:id="@+id/tv_margin_erosion_empty"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="No item's margin has eroded by 5+ points this month."
+            android:text="No item's margin has eroded by 5+ points in this period."
             android:textColor="@color/text_secondary"
             android:textSize="14sp"
             android:visibility="gone" />
@@ -132,14 +146,14 @@
 
         <TextView
             style="@style/FieldLabel"
-            android:text="Top 10 items by the size of their profit change vs last month, up or down." />
+            android:text="Top 10 items by the size of their profit change vs the prior period, up or down." />
 
         <TextView
             android:id="@+id/tv_profit_swing_empty"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Nothing sold in either month yet."
+            android:text="Nothing sold in either period yet."
             android:textColor="@color/text_secondary"
             android:textSize="14sp"
             android:visibility="gone" />

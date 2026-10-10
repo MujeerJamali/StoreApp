@@ -18,7 +18,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="12dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -36,303 +36,315 @@
 
     </LinearLayout>
 
-    <!-- List of available reports: plain one-line text rows, no icons -
-         styled like the dashboard's Tools card so it reads consistently
-         with the rest of the app. New reports get added here as another
-         ToolRow + divider pair (never with a drawableStart icon). -->
-    <LinearLayout
+    <EditText
+        android:id="@+id/et_report_search"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_card"
-        android:elevation="@dimen/elevation_card"
-        android:orientation="vertical">
+        android:layout_marginBottom="12dp"
+        android:hint="Search reports"
+        android:inputType="text|textNoSuggestions" />
 
-        <Button
-            android:id="@+id/btn_report_sales"
-            style="@style/ToolRow"
-            android:text="Total Sales by Period" />
+    <!-- Every report is grouped into one of a handful of sections below
+         (plain one-line text rows, no icons - styled like the dashboard's
+         Tools card). Long-press any row to pin it here at the top as a
+         Favorite, same gesture/storage pattern as the Dashboard's own
+         Favorites (see ReportFavorites). Typing in the search box above
+         filters every section (and this one) down to matching rows,
+         hiding a whole section when nothing in it matches. New reports
+         get added to whichever section fits, as another row inside that
+         section's card - never with a drawableStart icon. -->
+    <LinearLayout
+        android:id="@+id/section_favorites"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:orientation="vertical"
+        android:visibility="gone">
 
-        <View
+        <TextView
+            style="@style/SectionTitle"
+            android:layout_marginTop="0dp"
+            android:text="Favorites" />
+
+        <LinearLayout
+            android:id="@+id/container_favorites"
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_party_sales"
-            style="@style/ToolRow"
-            android:text="Sales by Party" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_item_ranking"
-            style="@style/ToolRow"
-            android:text="Item Ranking (All Periods Combined)" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_party_ranking"
-            style="@style/ToolRow"
-            android:text="Party Ranking (All Periods Combined)" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_net_profit"
-            style="@style/ToolRow"
-            android:text="Net Profit by Period" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_stock_worth"
-            style="@style/ToolRow"
-            android:text="Stock Worth" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_party_balances"
-            style="@style/ToolRow"
-            android:text="Party Balances" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_credit_due"
-            style="@style/ToolRow"
-            android:text="Credit Due" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_low_stock"
-            style="@style/ToolRow"
-            android:text="Low Stock" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_day_close"
-            style="@style/ToolRow"
-            android:text="Day Close" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_cash_flow_forecast"
-            style="@style/ToolRow"
-            android:text="Cash Flow Forecast" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_budget_planner"
-            style="@style/ToolRow"
-            android:text="Budget Planner" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_scenario_check"
-            style="@style/ToolRow"
-            android:text="Scenario Check" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_slow_moving_stock"
-            style="@style/ToolRow"
-            android:text="Slow-Moving Stock" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_discount_stop_restock"
-            style="@style/ToolRow"
-            android:text="Discount &amp; Stop-Restocking" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_stock_value"
-            style="@style/ToolRow"
-            android:text="Stock Value" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_cash_projection"
-            style="@style/ToolRow"
-            android:text="Cash Projection" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_cross_sell"
-            style="@style/ToolRow"
-            android:text="Cross-Sell Insight" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_dead_stock_aging"
-            style="@style/ToolRow"
-            android:text="Dead Stock Aging" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_margin_profit_alerts"
-            style="@style/ToolRow"
-            android:text="Margin &amp; Profit Alerts" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_size_curve"
-            style="@style/ToolRow"
-            android:text="Size-Curve Analysis" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_expense_ratio_trend"
-            style="@style/ToolRow"
-            android:text="Expense Ratio Trend" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_month_over_month"
-            style="@style/ToolRow"
-            android:text="Month-over-Month" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_item_monthly_rank"
-            style="@style/ToolRow"
-            android:text="Item Monthly Rank (Sales/Profit)" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_average_cart"
-            style="@style/ToolRow"
-            android:text="Average Cart Size/Amount" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_profit_split"
-            style="@style/ToolRow"
-            android:text="Profit: Cash Sale vs Party" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_shoes_vs_non_shoes"
-            style="@style/ToolRow"
-            android:text="Shoes vs Non-Shoes" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_combo_stock"
-            style="@style/ToolRow"
-            android:text="Combo/Variety Stock" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/stroke" />
-
-        <Button
-            android:id="@+id/btn_report_win_back"
-            style="@style/ToolRow"
-            android:text="Win-Back List" />
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical" />
 
     </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/section_sales_profit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:orientation="vertical">
+
+        <TextView
+            style="@style/SectionTitle"
+            android:layout_marginTop="0dp"
+            android:text="Sales &amp; Profit" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical">
+
+            <LinearLayout android:id="@+id/row_sales" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_sales" style="@style/ToolRow" android:text="Total Sales by Period" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_party_sales" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_party_sales" style="@style/ToolRow" android:text="Sales by Party" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_net_profit" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_net_profit" style="@style/ToolRow" android:text="Net Profit by Period" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_month_over_month" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_month_over_month" style="@style/ToolRow" android:text="Month-over-Month" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_item_monthly_rank" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_item_monthly_rank" style="@style/ToolRow" android:text="Item Monthly Rank (Sales/Profit)" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_average_cart" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_average_cart" style="@style/ToolRow" android:text="Average Cart Size/Amount" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_profit_split" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_profit_split" style="@style/ToolRow" android:text="Profit: Cash Sale vs Party" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_shoes_vs_non_shoes" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_shoes_vs_non_shoes" style="@style/ToolRow" android:text="Shoes vs Non-Shoes" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/section_inventory_stock"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:orientation="vertical">
+
+        <TextView
+            style="@style/SectionTitle"
+            android:layout_marginTop="0dp"
+            android:text="Inventory &amp; Stock" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical">
+
+            <LinearLayout android:id="@+id/row_item_ranking" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_item_ranking" style="@style/ToolRow" android:text="Item Ranking (All Periods Combined)" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_stock_worth" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_stock_worth" style="@style/ToolRow" android:text="Stock Worth" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_low_stock" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_low_stock" style="@style/ToolRow" android:text="Low Stock" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_slow_moving_stock" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_slow_moving_stock" style="@style/ToolRow" android:text="Slow-Moving Stock" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_dead_stock_aging" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_dead_stock_aging" style="@style/ToolRow" android:text="Dead Stock Aging" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_stock_value" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_stock_value" style="@style/ToolRow" android:text="Stock Value" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_size_curve" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_size_curve" style="@style/ToolRow" android:text="Size-Curve Analysis" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_combo_stock" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_combo_stock" style="@style/ToolRow" android:text="Combo/Variety Stock" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_discount_stop_restock" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_discount_stop_restock" style="@style/ToolRow" android:text="Discount &amp; Stop-Restocking" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/section_reorder_planning"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:orientation="vertical">
+
+        <TextView
+            style="@style/SectionTitle"
+            android:layout_marginTop="0dp"
+            android:text="Reorder &amp; Planning" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical">
+
+            <LinearLayout android:id="@+id/row_budget_planner" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_budget_planner" style="@style/ToolRow" android:text="Budget Planner" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_scenario_check" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_scenario_check" style="@style/ToolRow" android:text="Scenario Check" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_min_order_qty" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_min_order_qty" style="@style/ToolRow" android:text="Min Order Quantities" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_cash_flow_forecast" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_cash_flow_forecast" style="@style/ToolRow" android:text="Cash Flow Forecast" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_cash_projection" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_cash_projection" style="@style/ToolRow" android:text="Cash Projection" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_cross_sell" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_cross_sell" style="@style/ToolRow" android:text="Cross-Sell Insight" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/section_parties_customers"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:orientation="vertical">
+
+        <TextView
+            style="@style/SectionTitle"
+            android:layout_marginTop="0dp"
+            android:text="Parties &amp; Customers" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical">
+
+            <LinearLayout android:id="@+id/row_party_ranking" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_party_ranking" style="@style/ToolRow" android:text="Party Ranking (All Periods Combined)" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_party_balances" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_party_balances" style="@style/ToolRow" android:text="Party Balances" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_credit_due" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_credit_due" style="@style/ToolRow" android:text="Credit Due" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_win_back" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_win_back" style="@style/ToolRow" android:text="Win-Back List" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/section_cash_operations"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            style="@style/SectionTitle"
+            android:layout_marginTop="0dp"
+            android:text="Cash &amp; Operations" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:orientation="vertical">
+
+            <LinearLayout android:id="@+id/row_day_close" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_day_close" style="@style/ToolRow" android:text="Day Close" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_margin_profit_alerts" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_margin_profit_alerts" style="@style/ToolRow" android:text="Margin &amp; Profit Alerts" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/stroke" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/row_expense_ratio_trend" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                <Button android:id="@+id/btn_report_expense_ratio_trend" style="@style/ToolRow" android:text="Expense Ratio Trend" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tv_no_reports_match"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:gravity="center"
+        android:text="No reports match your search."
+        android:textColor="@color/text_secondary"
+        android:textSize="14sp"
+        android:visibility="gone" />
 
     </LinearLayout>
 

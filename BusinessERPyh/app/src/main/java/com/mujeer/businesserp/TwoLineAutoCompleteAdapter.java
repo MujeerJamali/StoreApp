@@ -59,12 +59,21 @@ public class TwoLineAutoCompleteAdapter extends ArrayAdapter<String> {
 	// call sites for the create-and-return-selected flow this backs).
 	private final String addNewLabel;
 
+	// Extra per-row text (same order/size as 'items') that the filter
+	// below also matches typed words against, even though it's never
+	// shown - e.g. an item's code, so typing a code finds the item by
+	// code even though the dropdown displays the item's name. Null (the
+	// 3-/4-arg constructors below) means "nothing extra to search" -
+	// filtering then matches the displayed text only, same as before
+	// this was added.
+	private final List<String> extraSearchText;
+
 	public TwoLineAutoCompleteAdapter(
 		Context context,
 		List<String> items,
 		Map<String, String> subtitles) {
 
-		this(context, items, subtitles, null);
+		this(context, items, subtitles, null, null);
 	}
 
 	public TwoLineAutoCompleteAdapter(
@@ -73,11 +82,22 @@ public class TwoLineAutoCompleteAdapter extends ArrayAdapter<String> {
 		Map<String, String> subtitles,
 		String addNewLabel) {
 
+		this(context, items, subtitles, addNewLabel, null);
+	}
+
+	public TwoLineAutoCompleteAdapter(
+		Context context,
+		List<String> items,
+		Map<String, String> subtitles,
+		String addNewLabel,
+		List<String> extraSearchText) {
+
 		super(context, android.R.layout.simple_dropdown_item_1line, items);
 
 		this.subtitles = subtitles;
 		this.allItems = new ArrayList<String>(items);
 		this.addNewLabel = addNewLabel;
+		this.extraSearchText = extraSearchText;
 
 		this.originalIndices = new ArrayList<Integer>();
 
@@ -208,7 +228,11 @@ public class TwoLineAutoCompleteAdapter extends ArrayAdapter<String> {
 
 						String item = allItems.get(i);
 
-						if (SearchUtils.matchesTokensAcrossFields(search, item)) {
+						String extra =
+							extraSearchText != null && i < extraSearchText.size() ?
+							extraSearchText.get(i) : null;
+
+						if (SearchUtils.matchesTokensAcrossFields(search, item, extra)) {
 
 							matches.add(item);
 							matchedIndices.add(i);

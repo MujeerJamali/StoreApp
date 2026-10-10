@@ -65,6 +65,15 @@
   Expenses list (`ExpenseAdapter`). Like charts and info bubbles, this is
   an incremental rollout, not a one-time checklist item - pick it up again
   for another delete-capable list whenever touching that screen anyway.
+  All three already respect a single app-wide on/off switch
+  (`SwipeGestureSettings`, surfaced via the Swipe Gesture Settings
+  screen) - each adapter's own `setSwipeEnabled(boolean)` hides that
+  row's `swipe_actions` panel, which `SwipeRevealLayout.isSwipeEnabled()`
+  already treats as "no gesture here at all" (same mechanism
+  `TransactionAdapter` already used to stay inert on its read-only
+  reuses). Wire any newly-adopted list into this same setting too,
+  not just its own `setSwipeEnabled()` plumbing - don't let a new
+  adopter silently sit outside the user's own on/off control.
 - AIDE's on-device compiler does NOT accept an "effectively final" local
   variable or method parameter captured by an anonymous inner class
   (`new Foo() { ... }`) the way modern desktop javac does under Java 8 -

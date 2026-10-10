@@ -18,18 +18,44 @@ import java.util.HashMap;
 import java.util.Locale;
 
 // =====================
-// This Month (1st-today) vs Last Month at item granularity - the same
-// two periods Month-over-Month compares store-wide. Two lists:
-// Margin Erosion (DatabaseHelper.getMarginErosionAlerts() - items that
-// sold in both months whose margin % dropped by 5+ points) and
-// Biggest Profit Swings (getBiggestProfitSwings() - top 10 items by
-// the size of their profit change, up or down). MarginErosionNotifier
-// runs the same erosion check once a day and opens here when there's
-// more than one item to show.
+// This Period (1st-today, aligned to the chosen granularity) vs the
+// prior period of the same length, at item granularity - defaults to
+// This Month vs Last Month (the same pair Month-over-Month compares
+// store-wide), but spinner_comparison_period can switch it to
+// Week/Quarter/Year. Two lists: Margin Erosion
+// (DatabaseHelper.getMarginErosionAlerts() - items that sold in both
+// periods whose margin % dropped by 5+ points) and Biggest Profit
+// Swings (getBiggestProfitSwings() - top 10 items by the size of their
+// profit change, up or down). Both DB methods already take arbitrary
+// from/to date pairs, so the period selector only changes which dates
+// get passed in - no DB change needed. MarginErosionNotifier runs the
+// same erosion check once a day (always Month vs Month) and opens here
+// when there's more than one item to show.
 // =====================
 public class MarginProfitAlertReportActivity extends Activity {
 
 	private static final int PROFIT_SWING_TOP_N = 10;
+
+	private static final int PERIOD_MONTH = 0;
+	private static final int PERIOD_WEEK = 1;
+	private static final int PERIOD_QUARTER = 2;
+	private static final int PERIOD_YEAR = 3;
+
+	private static final String[] PERIOD_LABELS = {
+		"This Month vs Last Month", "This Week vs Last Week",
+		"This Quarter vs Last Quarter", "This Year vs Last Year"
+	};
+
+	private static final String[] PERIOD_THIS_LABELS = {
+		"This Month", "This Week", "This Quarter", "This Year"
+	};
+
+	private static final String[] PERIOD_LAST_LABELS = {
+		"Last Month", "Last Week", "Last Quarter", "Last Year"
+	};
+
+	private Spinner spinner_comparison_period;
+	private int selectedComparisonPeriod = PERIOD_MONTH;
 
 	private TextView tv_month_labels;
 
@@ -54,9 +80,6 @@ public class MarginProfitAlertReportActivity extends Activity {
 	private final SimpleDateFormat dateFormat =
 		new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 
-	private final SimpleDateFormat monthFormat =
-		new SimpleDateFormat("MMMM yyyy", Locale.getDefault());
-
 	// A background result is only applied if it's still the most
 	// recent request by the time it comes back.
 	private long loadGeneration = 0;
@@ -71,7 +94,7 @@ public class MarginProfitAlertReportActivity extends Activity {
 		InfoBubbleView info_bubble = findViewById(R.id.info_bubble);
 		info_bubble.setInfo(
 			"Margin & Profit Alerts",
-			"This Month vs Last Month, at the item level. Margin Erosion: items that sold in both months whose margin % dropped by 5 or more points. Biggest Profit Swings: the top 10 items by the size of their profit change vs last month, whether up or down."
+			"This Period vs the prior period, at the item level - pick the period below (Month/Week/Quarter/Year). Margin Erosion: items that sold in both periods whose margin % dropped by 5 or more points. Biggest Profit Swings: the top 10 items by the size of their profit change vs the prior period, whether up or down."
 		);
 
 		tv_month_labels = findViewById(R.id.tv_month_labels);
@@ -82,7 +105,40 @@ public class MarginProfitAlertReportActivity extends Activity {
 
 		chart_margin_profit = findViewById(R.id.chart_margin_profit);
 
+		spinner_comparison_period = findViewById(R.id.spinner_comparison_period);
 		spinner_shoes_filter = findViewById(R.id.spinner_shoes_filter);
+
+		ArrayAdapter<String> periodAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, PERIOD_LABELS
+		);
+
+		periodAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_comparison_period.setAdapter(periodAdapter);
+
+		selectedComparisonPeriod =
+			FilterMemory.getInt(this, "MarginProfitAlertReport", "comparison_period", PERIOD_MONTH);
+
+		spinner_comparison_period.setSelection(selectedComparisonPeriod);
+
+		spinner_comparison_period.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+				@Override
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+
+					selectedComparisonPeriod = position;
+
+					FilterMemory.setInt(
+						MarginProfitAlertReportActivity.this,
+						"MarginProfitAlertReport", "comparison_period", position
+					);
+
+					loadReport();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
+				}
+			}
+		);
 
 		tv_margin_erosion_empty = findViewById(R.id.tv_margin_erosion_empty);
 		container_margin_erosion = findViewById(R.id.container_margin_erosion);
@@ -146,23 +202,67 @@ public class MarginProfitAlertReportActivity extends Activity {
 
 		final long myGeneration = ++loadGeneration;
 
-		Calendar thisMonthStart = Calendar.getInstance();
-		thisMonthStart.set(Calendar.DAY_OF_MONTH, 1);
-		clearTime(thisMonthStart);
+		final int period = selectedComparisonPeriod;
 
-		final String thisMonthLabel = monthFormat.format(thisMonthStart.getTime());
-		final String thisFrom = dateFormat.format(thisMonthStart.getTime());
+		Calendar thisPeriodStart = Calendar.getInstance();
+		clearTime(thisPeriodStart);
+
+		switch (period) {
+
+			case PERIOD_WEEK:
+				thisPeriodStart.setFirstDayOfWeek(Calendar.MONDAY);
+				thisPeriodStart.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
+				break;
+
+			case PERIOD_QUARTER:
+				int quarterStartMonth = (thisPeriodStart.get(Calendar.MONTH) / 3) * 3;
+				thisPeriodStart.set(Calendar.MONTH, quarterStartMonth);
+				thisPeriodStart.set(Calendar.DAY_OF_MONTH, 1);
+				break;
+
+			case PERIOD_YEAR:
+				thisPeriodStart.set(Calendar.DAY_OF_YEAR, 1);
+				break;
+
+			case PERIOD_MONTH:
+			default:
+				thisPeriodStart.set(Calendar.DAY_OF_MONTH, 1);
+				break;
+		}
+
+		final String thisFrom = dateFormat.format(thisPeriodStart.getTime());
 		final String thisTo = dateFormat.format(new java.util.Date());
 
-		Calendar lastMonthEnd = (Calendar) thisMonthStart.clone();
-		lastMonthEnd.add(Calendar.DAY_OF_MONTH, -1);
+		Calendar lastPeriodEnd = (Calendar) thisPeriodStart.clone();
+		lastPeriodEnd.add(Calendar.DAY_OF_MONTH, -1);
 
-		Calendar lastMonthStart = (Calendar) lastMonthEnd.clone();
-		lastMonthStart.set(Calendar.DAY_OF_MONTH, 1);
+		Calendar lastPeriodStart = (Calendar) thisPeriodStart.clone();
 
-		final String lastMonthLabel = monthFormat.format(lastMonthStart.getTime());
-		final String lastFrom = dateFormat.format(lastMonthStart.getTime());
-		final String lastTo = dateFormat.format(lastMonthEnd.getTime());
+		switch (period) {
+
+			case PERIOD_WEEK:
+				lastPeriodStart.add(Calendar.DAY_OF_YEAR, -7);
+				break;
+
+			case PERIOD_QUARTER:
+				lastPeriodStart.add(Calendar.MONTH, -3);
+				break;
+
+			case PERIOD_YEAR:
+				lastPeriodStart.add(Calendar.YEAR, -1);
+				break;
+
+			case PERIOD_MONTH:
+			default:
+				lastPeriodStart.add(Calendar.MONTH, -1);
+				break;
+		}
+
+		final String lastFrom = dateFormat.format(lastPeriodStart.getTime());
+		final String lastTo = dateFormat.format(lastPeriodEnd.getTime());
+
+		final String thisPeriodLabel = PERIOD_THIS_LABELS[period];
+		final String lastPeriodLabel = PERIOD_LAST_LABELS[period];
 
 		final int shoesFilter = selectedShoesFilter;
 
@@ -186,9 +286,9 @@ public class MarginProfitAlertReportActivity extends Activity {
 									return;
 								}
 
-								tv_month_labels.setText(thisMonthLabel + " vs " + lastMonthLabel);
+								tv_month_labels.setText(PERIOD_LABELS[period]);
 
-								applyAverageMargin(erosionList, swingList);
+								applyAverageMargin(erosionList, swingList, thisPeriodLabel, lastPeriodLabel);
 								applyMarginErosion(erosionList);
 								applyProfitSwings(swingList);
 							}
@@ -212,7 +312,8 @@ public class MarginProfitAlertReportActivity extends Activity {
 	// than a third query, so it stays consistent with the shoes filter
 	// applied to the rest of this screen.
 	private void applyAverageMargin(
-		ArrayList<HashMap<String, Object>> erosionList, ArrayList<HashMap<String, Object>> swingList) {
+		ArrayList<HashMap<String, Object>> erosionList, ArrayList<HashMap<String, Object>> swingList,
+		String thisPeriodLabel, String lastPeriodLabel) {
 
 		double salesThisTotal = 0;
 		double profitThisTotal = 0;
@@ -231,18 +332,18 @@ public class MarginProfitAlertReportActivity extends Activity {
 		double marginLast = salesLastTotal > 0.01 ? profitLastTotal / salesLastTotal * 100 : 0;
 		double delta = marginThis - marginLast;
 
-		tv_margin_avg_this.setText("This Month: " + AmountFormat.formatPlain(marginThis) + "%");
-		tv_margin_avg_last.setText("Last Month: " + AmountFormat.formatPlain(marginLast) + "%");
+		tv_margin_avg_this.setText(thisPeriodLabel + ": " + AmountFormat.formatPlain(marginThis) + "%");
+		tv_margin_avg_last.setText(lastPeriodLabel + ": " + AmountFormat.formatPlain(marginLast) + "%");
 
 		if (salesThisTotal < 0.01 && salesLastTotal < 0.01) {
 
-			tv_margin_avg_delta.setText("No sales in either month");
+			tv_margin_avg_delta.setText("No sales in either period");
 			tv_margin_avg_delta.setTextColor(getResources().getColor(R.color.text_secondary));
 
 		} else {
 
 			tv_margin_avg_delta.setText(
-				(delta >= 0 ? "+" : "") + AmountFormat.formatPlain(delta) + " points vs last month"
+				(delta >= 0 ? "+" : "") + AmountFormat.formatPlain(delta) + " points vs " + lastPeriodLabel.toLowerCase(Locale.getDefault())
 			);
 
 			tv_margin_avg_delta.setTextColor(

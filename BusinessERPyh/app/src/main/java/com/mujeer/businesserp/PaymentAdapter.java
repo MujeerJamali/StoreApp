@@ -18,6 +18,10 @@ public class PaymentAdapter extends BaseAdapter {
 	public interface RowActionListener {
 		void onRowEdit(HashMap<String, Object> payment);
 		void onRowDelete(HashMap<String, Object> payment);
+
+		// Only fires for a plain tap while swipeEnabled is true - see
+		// SwipeRevealLayout.onTouchEvent()'s own comment.
+		void onRowTap(HashMap<String, Object> payment);
 	}
 
 	private Activity activity;
@@ -25,7 +29,18 @@ public class PaymentAdapter extends BaseAdapter {
 	private ArrayList<HashMap<String, Object>> originalList;
 	private ArrayList<HashMap<String, Object>> filteredList;
 
+	// Defaults true (unlike TransactionAdapter's own flag, which
+	// defaults false since that adapter is reused read-only elsewhere) -
+	// this adapter is only ever used for Paymentactivity's own live
+	// list, so the user's SwipeGestureSettings preference is the only
+	// thing that should ever turn it off.
+	private boolean swipeEnabled = true;
+
 	private RowActionListener rowActionListener;
+
+	public void setSwipeEnabled(boolean swipeEnabled) {
+		this.swipeEnabled = swipeEnabled;
+	}
 
 	private TextView tv_code;
 	private TextView tv_type;
@@ -90,6 +105,9 @@ public class PaymentAdapter extends BaseAdapter {
 		final SwipeRevealLayout swipeLayout = (SwipeRevealLayout) convertView;
 		swipeLayout.close(false);
 
+		View swipeActions = convertView.findViewById(R.id.swipe_actions);
+		swipeActions.setVisibility(swipeEnabled ? View.VISIBLE : View.GONE);
+
 		swipeLayout.wireActionButtons(
 			convertView.findViewById(R.id.btn_swipe_edit),
 			convertView.findViewById(R.id.btn_swipe_delete)
@@ -107,6 +125,13 @@ public class PaymentAdapter extends BaseAdapter {
 				public void onDeleteAction() {
 					if (rowActionListener != null) {
 						rowActionListener.onRowDelete(payment);
+					}
+				}
+
+				@Override
+				public void onRowTap() {
+					if (rowActionListener != null) {
+						rowActionListener.onRowTap(payment);
 					}
 				}
 			});

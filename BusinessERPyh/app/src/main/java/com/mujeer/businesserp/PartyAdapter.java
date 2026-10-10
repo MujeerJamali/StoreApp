@@ -58,10 +58,15 @@ public class PartyAdapter extends BaseAdapter implements Filterable {
 
         tv.setText((String) party.get("name"));
 
-        // Only shown for a tagged (non-Regular) customer - see
-        // Partieseditactivity's Customer Type spinner. Prefixed onto the
-        // meta line below rather than its own badge view, to avoid a
-        // layout change for something most rows never show.
+        // Row #96's own "simplify to single-line" request - the old
+        // two-line layout (name, then a full sentence of meta below it)
+        // becomes one short tag alongside the name instead of its own
+        // row, so the screen reads as a plain list again rather than a
+        // stack of small cards. Only present at all for a tagged
+        // (non-Regular) customer or a list that actually carries
+        // days_since (DatabaseHelper.getPartiesWithActivity()'s sorted
+        // view) - the plain getParties() list has neither, so the tag
+        // stays hidden for that case exactly as before.
         String customerType = (String) party.get("customer_type");
 
         String customerTypeTag =
@@ -69,32 +74,16 @@ public class PartyAdapter extends BaseAdapter implements Filterable {
             DatabaseHelper.CUSTOMER_TYPE_ONE_TIME.equals(customerType) ? "One-Time" :
             null;
 
-        // Only present when this list came from
-        // DatabaseHelper.getPartiesWithActivity() (the sorted view) -
-        // the plain getParties() list has no last_date/days_since, so
-        // the meta line just stays hidden for that case.
-        if (party.containsKey("days_since")) {
+        if (customerTypeTag != null) {
+
+            tvMeta.setText(customerTypeTag);
+            tvMeta.setVisibility(View.VISIBLE);
+
+        } else if (party.containsKey("days_since")) {
 
             int daysSince = party.get("days_since") == null ? -1 : (Integer) party.get("days_since");
 
-            String meta = daysSince < 0 ?
-                "No activity yet" :
-                daysSince == 0 ?
-                    "Last activity today" :
-                    daysSince == 1 ?
-                        "Last activity yesterday" :
-                        "Last activity " + daysSince + "d ago";
-
-            if (customerTypeTag != null) {
-                meta = customerTypeTag + " · " + meta;
-            }
-
-            tvMeta.setText(meta);
-            tvMeta.setVisibility(View.VISIBLE);
-
-        } else if (customerTypeTag != null) {
-
-            tvMeta.setText(customerTypeTag);
+            tvMeta.setText(daysSince < 0 ? "No activity" : daysSince + "d ago");
             tvMeta.setVisibility(View.VISIBLE);
 
         } else {

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Closed-spinner row that always shows the full option text, never
+     truncated with "..." - the stock android.R.layout.simple_spinner_item
+     is singleLine + ellipsize="marquee", which (since this view is never
+     actually focused/scrolling) just clips long text instead. Used
+     wherever a spinner's own options can run long (e.g. Scenario Check's
+     Category spinner - a category is a free-form item-name word the shop
+     owner typed, with no length limit). The dropdown list itself already
+     uses android.R.layout.simple_spinner_dropdown_item, which wraps fine
+     on its own and needs no change. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/text1"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="?android:attr/listPreferredItemHeightSmall"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:gravity="center_vertical"
+    android:textAppearance="?android:attr/textAppearanceListItemSmall" />

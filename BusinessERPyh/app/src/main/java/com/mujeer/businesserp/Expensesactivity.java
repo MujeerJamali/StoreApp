@@ -90,6 +90,23 @@ public class Expensesactivity extends Activity {
 					.setNegativeButton("Cancel", null)
 					.show();
 			}
+
+			// Plain tap on the row (open the expense) - see
+			// SwipeRevealLayout.onTouchEvent()'s own comment for why this
+			// can no longer be left to lv_expenses.setOnItemClickListener
+			// alone now that swipe is enabled on every row here.
+			@Override
+			public void onRowTap(HashMap<String, Object> expense) {
+
+				Intent intent = new Intent(
+					Expensesactivity.this,
+					Expenseviewactivity.class
+				);
+
+				intent.putExtra("expense_id", Integer.parseInt(expense.get("id").toString()));
+
+				startActivity(intent);
+			}
 		};
 
 	@Override
@@ -314,6 +331,7 @@ public class Expensesactivity extends Activity {
 
 		lv_expenses.setEmptyView(tv_empty);
 
+		adapter.setSwipeEnabled(SwipeGestureSettings.isEnabled(this));
 		adapter.setRowActionListener(rowActionListener);
 
 		// Set only when launched from DayCloseReportActivity's Expenses

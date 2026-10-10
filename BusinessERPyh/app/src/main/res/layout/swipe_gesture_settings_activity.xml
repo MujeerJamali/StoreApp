@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            style="@style/PageTitle"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginBottom="0dp"
+            android:text="Swipe Gesture Settings" />
+
+        <com.mujeer.businesserp.InfoBubbleView
+            android:id="@+id/info_bubble"
+            android:layout_width="@dimen/info_bubble_size"
+            android:layout_height="@dimen/info_bubble_size" />
+
+    </LinearLayout>
+
+    <TextView
+        style="@style/FieldLabel"
+        android:layout_marginTop="0dp"
+        android:layout_marginBottom="12dp"
+        android:text="Controls the swipe-left-to-reveal Edit/Delete gesture on the Purchases/Sales, Payments, and Expenses lists." />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_card"
+        android:elevation="@dimen/elevation_card"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <CheckBox
+            android:id="@+id/cb_swipe_gestures_enabled"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Enable swipe gestures" />
+
+        <TextView
+            style="@style/FieldLabel"
+            android:layout_marginTop="8dp"
+            android:textStyle="normal"
+            android:text="When off, those lists work exactly like every other list in the app - tap a row to open it, long-press to delete (with a confirmation). Nothing here affects swipe navigation between Add Sale/Purchase/Expense screens, which is a separate gesture." />
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -45,6 +45,8 @@ public class TodayActionsActivity extends Activity {
 
 	DatabaseHelper db;
 
+	private long summaryLoadGeneration = 0;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -113,28 +115,52 @@ public class TodayActionsActivity extends Activity {
 		loadSummary();
 	}
 
-	@SuppressWarnings("unchecked")
+	// Runs on a background thread - db.getTodayActionSummary() runs the
+	// Reorder List's full suggestion engine plus the Credit Due and
+	// Slow-Moving Stock queries, which was freezing the UI (the reported
+	// "wait dialog" crash on big reports) when called directly here on
+	// the main thread. Mirrors the generation-counter pattern used in
+	// MainActivity.loadSalesTrend()/etc.
 	private void loadSummary() {
 
-		HashMap<String, Object> summary = db.getTodayActionSummary(this);
+		final long myGeneration = ++summaryLoadGeneration;
 
-		ArrayList<HashMap<String, Object>> reorderItems =
-			(ArrayList<HashMap<String, Object>>) summary.get("reorder_items");
+		new Thread(new Runnable() {
+				@Override
+				@SuppressWarnings("unchecked")
+				public void run() {
 
-		ArrayList<HashMap<String, Object>> duesItems =
-			(ArrayList<HashMap<String, Object>>) summary.get("dues_items");
+					final HashMap<String, Object> summary = db.getTodayActionSummary(TodayActionsActivity.this);
 
-		ArrayList<HashMap<String, Object>> slowStockItems =
-			(ArrayList<HashMap<String, Object>>) summary.get("slow_stock_items");
+					runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
 
-		applyReorderSection(reorderItems);
-		applyDuesSection(duesItems);
-		applySlowStockSection(slowStockItems);
+								if (myGeneration != summaryLoadGeneration || isFinishing()) {
+									return;
+								}
 
-		boolean anyVisible =
-			!reorderItems.isEmpty() || !duesItems.isEmpty() || !slowStockItems.isEmpty();
+								ArrayList<HashMap<String, Object>> reorderItems =
+									(ArrayList<HashMap<String, Object>>) summary.get("reorder_items");
 
-		tv_all_caught_up.setVisibility(anyVisible ? View.GONE : View.VISIBLE);
+								ArrayList<HashMap<String, Object>> duesItems =
+									(ArrayList<HashMap<String, Object>>) summary.get("dues_items");
+
+								ArrayList<HashMap<String, Object>> slowStockItems =
+									(ArrayList<HashMap<String, Object>>) summary.get("slow_stock_items");
+
+								applyReorderSection(reorderItems);
+								applyDuesSection(duesItems);
+								applySlowStockSection(slowStockItems);
+
+								boolean anyVisible =
+									!reorderItems.isEmpty() || !duesItems.isEmpty() || !slowStockItems.isEmpty();
+
+								tv_all_caught_up.setVisibility(anyVisible ? View.GONE : View.VISIBLE);
+							}
+						});
+				}
+			}).start();
 	}
 
 	private void applyReorderSection(ArrayList<HashMap<String, Object>> items) {

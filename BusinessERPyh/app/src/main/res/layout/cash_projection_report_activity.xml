@@ -82,6 +82,38 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <CheckBox
+                android:id="@+id/cb_include_sales"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checked="true"
+                android:text="Sales" />
+
+            <CheckBox
+                android:id="@+id/cb_include_expenses"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checked="true"
+                android:text="Expenses" />
+
+            <CheckBox
+                android:id="@+id/cb_include_reorder"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checked="true"
+                android:text="Reorder" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:background="@drawable/bg_card"
             android:elevation="@dimen/elevation_card"
@@ -116,6 +148,16 @@
                 <TextView style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="+ Dues Coming In (Sales due in period)" />
                 <TextView
                     android:id="@+id/tv_dues_in"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textColor="@color/mod_sales"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView style="@style/FieldLabel" android:text="+ Estimated New Sales (avg. daily sales × period)" />
+                <TextView
+                    android:id="@+id/tv_estimated_sales"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="0"

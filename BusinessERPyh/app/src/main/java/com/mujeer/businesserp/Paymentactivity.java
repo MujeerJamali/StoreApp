@@ -93,6 +93,23 @@ public class Paymentactivity extends Activity {
 					.setNegativeButton("Cancel", null)
 					.show();
 			}
+
+			// Plain tap on the row (open the payment) - see
+			// SwipeRevealLayout.onTouchEvent()'s own comment for why this
+			// can no longer be left to lv_payments.setOnItemClickListener
+			// alone now that swipe is enabled on every row here.
+			@Override
+			public void onRowTap(HashMap<String, Object> payment) {
+
+				Intent intent = new Intent(
+					Paymentactivity.this,
+					Paymentviewactivity.class
+				);
+
+				intent.putExtra("payment_id", (Integer) payment.get("id"));
+
+				startActivity(intent);
+			}
 		};
 
 	@Override
@@ -209,6 +226,10 @@ public class Paymentactivity extends Activity {
 								}
 
 								if (adapter != null) {
+
+									adapter.setSwipeEnabled(
+										SwipeGestureSettings.isEnabled(Paymentactivity.this)
+									);
 
 									adapter.setRowActionListener(rowActionListener);
 
@@ -341,6 +362,7 @@ public class Paymentactivity extends Activity {
 		lv_payments.setAdapter(adapter);
 		lv_payments.setEmptyView(tv_empty);
 
+		adapter.setSwipeEnabled(SwipeGestureSettings.isEnabled(this));
 		adapter.setRowActionListener(rowActionListener);
 
 		adapter.filter(

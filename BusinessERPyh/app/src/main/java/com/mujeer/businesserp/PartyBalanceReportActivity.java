@@ -50,8 +50,12 @@ public class PartyBalanceReportActivity extends Activity {
 		DatabaseHelper.PARTY_SORT_NAME, DatabaseHelper.PARTY_SORT_NAME
 	};
 
+	// Same inverted-pair bug as Partiesactivity's identical array - see
+	// its own comment and DatabaseHelper.getPartiesWithActivity() for why
+	// "Recent Activity" needs ascending=true here while the Balance/Name
+	// sorts need the literal value.
 	private static final boolean[] PARTY_SORT_ASCENDING = {
-		false, true, false, true, true, false
+		true, false, false, true, true, false
 	};
 
 	private static final String[] PARTY_SORT_LABELS = {

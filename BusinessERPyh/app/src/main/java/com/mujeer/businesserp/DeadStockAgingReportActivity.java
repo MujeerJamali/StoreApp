@@ -8,9 +8,12 @@ import android.os.Bundle;
 import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -27,6 +30,18 @@ import java.util.HashMap;
 // =====================
 public class DeadStockAgingReportActivity extends Activity {
 
+	private static final int[] SHOES_FILTER_VALUES = {
+		DatabaseHelper.SHOES_FILTER_ALL,
+		DatabaseHelper.SHOES_FILTER_SHOES_ONLY,
+		DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY
+	};
+
+	private static final String[] SHOES_FILTER_LABELS = {
+		"All Items", "Shoes Only", "Non-Shoes Only"
+	};
+
+	private Spinner spinner_shoes_filter;
+
 	private TextView tv_clearances_empty;
 	private LinearLayout container_clearances;
 
@@ -34,6 +49,8 @@ public class DeadStockAgingReportActivity extends Activity {
 	private LinearLayout container_dead_stock;
 
 	private DatabaseHelper db;
+
+	private int selectedShoesFilter = DatabaseHelper.SHOES_FILTER_ALL;
 
 	private long loadGeneration = 0;
 
@@ -50,6 +67,8 @@ public class DeadStockAgingReportActivity extends Activity {
 			"Stock sitting unsold for 60+ effective days, bucketed into 60-89/90-119/120+ days (or Never Sold) - a non-shoe item gets 3x as long before counting as dead stock (configurable in Reorder Settings), since general merchandise naturally turns over slower than shoes. Start a clearance on any item to mark it down and track how much of it sells after - the percent shown is how much of the stock on hand when clearance began has sold since."
 		);
 
+		spinner_shoes_filter = findViewById(R.id.spinner_shoes_filter);
+
 		tv_clearances_empty = findViewById(R.id.tv_clearances_empty);
 		container_clearances = findViewById(R.id.container_clearances);
 
@@ -57,6 +76,34 @@ public class DeadStockAgingReportActivity extends Activity {
 		container_dead_stock = findViewById(R.id.container_dead_stock);
 
 		db = new DatabaseHelper(this);
+
+		ArrayAdapter<String> shoesFilterAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, SHOES_FILTER_LABELS
+		);
+
+		shoesFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_shoes_filter.setAdapter(shoesFilterAdapter);
+
+		int rememberedShoesFilterPosition =
+			FilterMemory.getInt(this, "DeadStockAgingReport", "shoes_filter", 0);
+
+		spinner_shoes_filter.setSelection(rememberedShoesFilterPosition);
+		selectedShoesFilter = SHOES_FILTER_VALUES[rememberedShoesFilterPosition];
+
+		spinner_shoes_filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+				@Override
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectedShoesFilter = SHOES_FILTER_VALUES[position];
+					FilterMemory.setInt(
+						DeadStockAgingReportActivity.this, "DeadStockAgingReport", "shoes_filter", position
+					);
+					loadReport();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
+				}
+			});
 
 		loadReport();
 	}
@@ -70,13 +117,14 @@ public class DeadStockAgingReportActivity extends Activity {
 	private void loadReport() {
 
 		final long myGeneration = ++loadGeneration;
+		final int shoesFilter_forQuery = selectedShoesFilter;
 
 		new Thread(new Runnable() {
 				@Override
 				public void run() {
 
 					final ArrayList<HashMap<String, Object>> deadStock =
-						db.getDeadStockAging(DeadStockAgingReportActivity.this);
+						db.getDeadStockAging(DeadStockAgingReportActivity.this, shoesFilter_forQuery);
 					final ArrayList<HashMap<String, Object>> clearances = db.getActiveClearances();
 
 					runOnUiThread(new Runnable() {

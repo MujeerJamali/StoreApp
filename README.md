@@ -197,6 +197,18 @@ BusinessERPyh/                  Gradle project root
   reused read-only (Partyviewactivity's/Itemviewactivity's transaction
   history). This is the first pass, not the last - every other
   delete-capable list is a candidate to pick up the same gesture later.
+  A **Swipe Gesture Settings** screen (Dashboard Tools card, pinnable
+  as a Favorite; `SwipeGestureSettings`) adds a single app-wide on/off
+  switch for this gesture across those three lists - off doesn't
+  remove Edit/Delete, it falls them back to this app's pre-swipe
+  convention (tap to open, long-press to delete with confirmation),
+  which each of those screens already wires up independently of swipe.
+  Each adapter's own `setSwipeEnabled(false)` hides that row's actions
+  panel, which `SwipeRevealLayout` already treats as "no gesture here
+  at all" (its `isSwipeEnabled()` check), so every touch falls straight
+  through to the owning list's normal row click/long-click - the exact
+  same mechanism `TransactionAdapter` already used to stay inert on
+  its own read-only reuses, just now driven by a user preference too.
 - **Recently Deleted / Undo** — deleting a Purchase or Sale (single or
   bulk) no longer just deletes it: `DatabaseHelper.
   snapshotAndDeletePurchase()`/`snapshotAndDeleteSale()` first dump
@@ -232,8 +244,15 @@ BusinessERPyh/                  Gradle project root
   reordered separately) recent sales speed vs its current stock, using
   every input in **Reorder Settings** (gear icon on the same screen):
   the sales-speed window, a safety-stock %, a default supplier lead
-  time, and a min/max order quantity - all user-editable, with
-  reasonable defaults, not hardcoded. Reorder Settings also holds the
+  time, and an app-wide min/max order quantity floor/cap - all
+  user-editable, with reasonable defaults, not hardcoded. A suggestion's
+  actual minimum is the larger of that app-wide floor and its own
+  per-item one (`getEffectiveMinOrderQty()`, see the **Min Order
+  Quantities** screen below) - 6 for a shoe item by default, or whatever
+  that item/combo was last Purchased in, unless explicitly overridden -
+  so an item normally bought by the dozen never gets suggested a
+  quantity of 1-2 just because the formula alone would land there.
+  Reorder Settings also holds the
   non-shoe turnover multiplier (default 3x) that Slow-Moving Stock/
   Discount This Week/Dead Stock Aging share - see those reports below. A unit with no sales history
   still qualifies if its own manual Reorder Threshold (Edit Item
@@ -308,15 +327,23 @@ BusinessERPyh/                  Gradle project root
   seasonal multiplier above. That log is deliberately **not** part of
   the Vyapar backup round-trip, same reasoning as Recently Deleted
   above - it's the automation's own operational memory, not a business
-  record. Since there's no in-app
-  screen that lists this raw log, Reorder Settings has its own
-  **Export History (.csv)** button (`DatabaseHelper.
-  getReorderSuggestionLogForExport()`) that writes every logged
-  suggestion - date, item, variety, quantity, and outcome - to a plain
-  .csv file (openable in Excel/Sheets) via the same system file-picker
+  record. Reorder Settings' **View / Edit History** button opens a
+  dedicated **Reorder Learning History** screen
+  (`ReorderLearningHistoryActivity`) listing this raw log 30 rows at a
+  time ("Load More" for the rest), newest first; tapping a row opens
+  an edit dialog to correct its item, suggested date/quantity, or
+  outcome, or delete it outright (with confirmation) - useful for
+  fixing a wrong outcome or removing a bad entry without it keeping
+  skewing future suggestions. **+ Add Entry** backfills a decision the
+  log missed - item-level only (it can't pick a specific variety
+  combo, unlike a row the Reorder List itself already logged against
+  one). Reorder Settings also keeps its own **Export History (.csv)**
+  button (`DatabaseHelper.getReorderSuggestionLogForExport()`), for
+  taking the whole log to Excel/Sheets via the same system file-picker
   pattern Export Vyapar Backup uses. Same reasoning as the log itself:
-  this is the automation's own history, not business data, so it's
-  deliberately separate from the Vyapar round-trip too.
+  this is the automation's own history, not business data, so both the
+  in-app screen and the export are deliberately separate from the
+  Vyapar round-trip.
 - **Loyalty Points** (Dashboard Tools card, pinnable as a Favorite) —
   every named customer earns 1 point per ₹100 spent on a Sale (floored;
   `DatabaseHelper.LOYALTY_POINTS_PER_RUPEES`), skipped for the "Cash
@@ -532,10 +559,18 @@ BusinessERPyh/                  Gradle project root
   the device, then persisting read/write access to exactly that folder
   (`takePersistableUriPermission`, `CloudBackupSettings`). Once
   connected, every backup - the manual "Export to .vyb File" button
-  and every `AutoBackupScheduler` run alike - also copies a timestamped
-  `.vyb` into that folder (`CloudBackupWriter`, built on plain framework
+  and every `AutoBackupScheduler` run alike (the latter fires roughly
+  every 7 days, armed on every app open by `AutoBackupScheduler.
+  ensureScheduled()`) - also copies a timestamped `.vyb` into that
+  folder (`CloudBackupWriter`, built on plain framework
   `DocumentsContract` calls, not a third-party Drive SDK), on top of,
-  never instead of, wherever the user already saves/writes it. A
+  never instead of, wherever the user already saves/writes it. Once
+  connected, the Cloud Backup card shows its own **Last cloud backup:
+  X days ago** status line (red once 7+ days overdue, same threshold
+  as the local backup health check above it) - proof the automatic
+  side is actually landing in Drive, not just that a folder was picked
+  once (`CloudBackupSettings.getLastBackupAt()`, updated by
+  `CloudBackupWriter` on every successful copy, manual or automatic). A
   **Disconnect** option (the same button, relabeled once connected)
   releases the permission and stops future backups from copying there,
   without deleting anything already uploaded. The connected folder
@@ -665,14 +700,28 @@ Settings' sales-speed window; shows "not enough sales history to
 estimate" rather than a false zero when the category hasn't sold
 anything in that window - see `DatabaseHelper.getCategoryScenarioEstimate()`)
 ·
+Min Order Quantities (approved feature list row #22 - flashcard-style
+bulk setter, one item at a time with a dialer-style +/- stepper instead
+of a keyboard, for `items.min_order_qty` - the explicit per-item floor
+the Reorder List's suggestion engine now respects. A card's starting
+value is whatever's already explicitly set, or otherwise
+`DatabaseHelper.getEffectiveMinOrderQty()`'s own suggested default: 6
+for a shoe item, else whatever quantity that item was last Purchased
+in, else 1) ·
 Cash Projection (today's cash balance projected across a from/to
 period you pick, defaulting to today through +30 days - adds Sales/
 Purchases due in that exact window, plus recurring expenses expected
 to fall in it, simulated day by day with the same due-check logic
-that actually generates them, not an average; a separate "What If"
-line shows what restocking everything currently on the Reorder List
-would cost and what cash would be left after, since that's not
-committed yet - see `DatabaseHelper.getCashProjection()`) ·
+that actually generates them, not an average, plus an Estimated New
+Sales figure from the shop's own trailing average daily sales x the
+period length (the same velocity window Reorder Settings already
+uses); three checkboxes - Sales/Expenses/Reorder, all on by default -
+toggle each category in or out of the totals without hiding its own
+raw figure, just dimming it, so unchecking one still shows the swing
+it would cause; a separate "What If" line shows what restocking
+everything currently on the Reorder List would cost and what cash
+would be left after, since that's not committed yet - see
+`DatabaseHelper.getCashProjection()`) ·
 Slow-Moving Stock (every active item still carrying stock that hasn't
 sold within a 30/60/90/180 Days window, oldest/never-sold first - a
 never-sold item always qualifies regardless of how young it is; a
@@ -716,30 +765,37 @@ or Never Sold; tap Start Clearance on any row to mark it down
 at a chosen discount %, which moves it into an Active Clearances
 section tracking how much of the stock on hand when clearance began
 has sold since, until End Clearance or it's all gone) · Margin &
-Profit Alerts (This Month vs Last Month at the item level, with a
-shoes/non-shoes filter: Margin Erosion lists every item that sold in
-both months whose margin % dropped 5+ points, biggest drop first;
-Biggest Profit Swings lists the top 10 items by the size of their
-profit change vs last month, up or down; see Notifications below for
-the daily alert this same check also feeds) · Size-Curve Analysis
+Profit Alerts (This Period vs the prior period at the item level - a
+period spinner picks Month/Week/Quarter/Year, defaulting to This
+Month vs Last Month, alongside a shoes/non-shoes filter: Margin
+Erosion lists every item that sold in both periods whose margin %
+dropped 5+ points, biggest drop first; Biggest Profit Swings lists the
+top 10 items by the size of their profit change vs the prior period,
+up or down; see Notifications below for the daily alert this same
+check also feeds, which always compares Month vs Month regardless of
+this screen's own spinner) · Size-Curve Analysis
 (shoes only, lifetime not period-based: every shoe size's share of
 sales vs its share of current stock - Size is parsed straight out of
 each item's name via `ShoeIdentity`, not a variety group, since every
 real shoe item here is already its own exact size; a size selling more
 than its share of stock is flagged as a stockout risk, one stocked
 more than it sells as cash sitting idle, anything within 3 points
-either way shown as Balanced) · Expense Ratio Trend (Expenses as a %
-of Sales for each of the last 6 calendar months, oldest first - a
-rising ratio means expenses are growing faster than sales, worth
-watching even when both totals are individually growing; each month's
-badge is colored by whether its ratio improved or worsened vs the
-month before it) · Win-Back List (every party whose last Sale/
-Purchase/Payment/Expense/Party Transfer was at least a chosen
-threshold ago - 30/60/90/180+ days quiet, longest-gone first, reusing
-the exact same activity-tracking query the Parties list's own "Oldest
-Activity" sort already computes; a party that's never transacted at
-all is deliberately left off, since there's no relationship yet to
-win back)
+either way shown as Balanced) · Expense Ratio Trend (a mode spinner
+picks Expenses as a % of Sales (default) or as a % of gross profit
+(Sales minus item cost), for each of the last 6 calendar months,
+oldest first - a rising ratio means expenses are growing faster than
+sales/profit, worth watching even when the totals are individually
+growing; both ratios are always computed (`DatabaseHelper.
+getExpenseRatioTrend()`) so switching modes just re-renders, no second
+query; each month's badge is colored by whether its ratio improved or
+worsened vs the month before it) · Win-Back List (every party whose
+last Sale/Purchase/Payment/Expense/Party Transfer was at least a
+chosen threshold ago - 30/60/90/180+ days quiet - excluding a party
+we've only ever bought from (a supplier, with Purchases but zero
+Sales: no sales relationship there to win back) and one that's never
+transacted at all; a sort spinner picks Longest Quiet First (default)
+or Highest Profit First, the latter by each party's lifetime sales
+profit, to call the highest-value quiet customers first)
 
 **What To Do Today** (Dashboard Tools card) is a single screen combining
 three of the reports above - Reorder Needed, Payments Due, and
@@ -776,13 +832,18 @@ shop busy lately" glance, not a profit report) using the same
 rendering (no per-bar value text, only every few bars labeled) so a
 30-point chart doesn't turn into overlapping text - every other chart
 above has far fewer entries and renders exactly as before. Below the
-chart, the card also shows today's sales so far against the same
-calendar weekday one week ago (`DatabaseHelper.getTodayVsLastWeekSales()`)
-- a Monday is naturally busier or quieter than a Sunday, so comparing
-to a week ago rather than yesterday isolates a real trend instead of
-just that day-of-week mismatch. The percent change is hidden (shown as
-"No sales last week to compare") when last week's matching day had no
-sales at all, since "0% change from zero" would be misleading. Below
+chart, a spinner (`DatabaseHelper.getSalesTrendComparison()`) picks
+the comparison shown below it: **Today vs Last Week** (the default -
+today's sales so far against the same calendar weekday one week ago,
+since a Monday is naturally busier or quieter than a Sunday, so
+comparing to a week ago rather than yesterday isolates a real trend
+instead of just that day-of-week mismatch), **This Week vs Last
+Week**, or **This Month vs Last Month** - the latter two compare an
+*elapsed* window (this week/month so far) against the same number of
+elapsed days of the prior one, never a partial period against a full
+one. The percent change is hidden (shown as "No sales in last
+week/month to compare") when the comparison period had no sales at
+all, since "0% change from zero" would be misleading. Below
 that, a streak badge (`DatabaseHelper.getSalesStreak()`) counts how
 many days in a row have had at least one sale, plus the best streak
 ever reached - a small motivational nudge, not a report. Today doesn't
@@ -797,7 +858,13 @@ Favorites card at the very top of the Dashboard, above the cash
 summary; long-pressing a pinned row there unpins it the same way. Pin
 order is preserved across app opens (`DashboardFavorites`,
 `SharedPreferences`); the Favorites card and its label are hidden
-entirely when nothing is pinned.
+entirely when nothing is pinned. The same card also shows every report
+pinned from the Reports screen's own long-press-to-favorite (so any
+report - not just a Tool Row - can become a Dashboard shortcut too):
+`MainActivity#refreshFavoritesCard()` merges `DashboardFavorites` with
+`ReportFavorites`, resolving a report's key/target through
+`Reportsactivity.getLabelForFavoriteKey()`/`getTargetForFavoriteKey()`
+rather than duplicating that lookup table.
 
 **Customize Dashboard** (Dashboard Tools card): reorders and/or hides
 the Dashboard's three glanceable info-card blocks - Favorites, Cash

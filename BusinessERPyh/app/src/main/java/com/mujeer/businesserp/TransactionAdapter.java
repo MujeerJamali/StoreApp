@@ -22,6 +22,13 @@ public class TransactionAdapter extends BaseAdapter {
 	public interface RowActionListener {
 		void onRowEdit(HashMap<String, Object> transaction);
 		void onRowDelete(HashMap<String, Object> transaction);
+
+		// Only fires for a plain tap while swipeEnabled is true - see
+		// SwipeRevealLayout.onTouchEvent()'s own comment for why the
+		// owning screen's ListView.OnItemClickListener can't be relied on
+		// for that case. Every other reuse of this adapter (swipe
+		// disabled) still gets its tap from the ListView as normal.
+		void onRowTap(HashMap<String, Object> transaction);
 	}
 
 	private Activity activity;
@@ -148,6 +155,13 @@ public class TransactionAdapter extends BaseAdapter {
 				public void onDeleteAction() {
 					if (rowActionListener != null) {
 						rowActionListener.onRowDelete(transaction);
+					}
+				}
+
+				@Override
+				public void onRowTap() {
+					if (rowActionListener != null) {
+						rowActionListener.onRowTap(transaction);
 					}
 				}
 			});

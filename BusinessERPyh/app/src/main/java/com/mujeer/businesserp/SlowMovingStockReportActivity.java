@@ -28,7 +28,18 @@ public class SlowMovingStockReportActivity extends Activity {
 		"30 Days", "60 Days", "90 Days", "180 Days"
 	};
 
+	private static final int[] SHOES_FILTER_VALUES = {
+		DatabaseHelper.SHOES_FILTER_ALL,
+		DatabaseHelper.SHOES_FILTER_SHOES_ONLY,
+		DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY
+	};
+
+	private static final String[] SHOES_FILTER_LABELS = {
+		"All Items", "Shoes Only", "Non-Shoes Only"
+	};
+
 	private Spinner spinner_window;
+	private Spinner spinner_shoes_filter;
 	private TextView tv_empty;
 	private ListView lv_slow_moving_stock;
 
@@ -40,6 +51,7 @@ public class SlowMovingStockReportActivity extends Activity {
 	private SlowMovingStockAdapter adapter;
 
 	private int selectedWindowDays = WINDOW_DAYS[0];
+	private int selectedShoesFilter = DatabaseHelper.SHOES_FILTER_ALL;
 
 	// A background result is only applied if it's still the most recent
 	// request by the time it comes back.
@@ -58,6 +70,7 @@ public class SlowMovingStockReportActivity extends Activity {
 		);
 
 		spinner_window = findViewById(R.id.spinner_window);
+		spinner_shoes_filter = findViewById(R.id.spinner_shoes_filter);
 		tv_empty = findViewById(R.id.tv_empty);
 		lv_slow_moving_stock = findViewById(R.id.lv_slow_moving_stock);
 
@@ -110,6 +123,34 @@ public class SlowMovingStockReportActivity extends Activity {
 				}
 			});
 
+		ArrayAdapter<String> shoesFilterAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, SHOES_FILTER_LABELS
+		);
+
+		shoesFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_shoes_filter.setAdapter(shoesFilterAdapter);
+
+		int rememberedShoesFilterPosition =
+			FilterMemory.getInt(this, "SlowMovingStockReport", "shoes_filter", 0);
+
+		spinner_shoes_filter.setSelection(rememberedShoesFilterPosition);
+		selectedShoesFilter = SHOES_FILTER_VALUES[rememberedShoesFilterPosition];
+
+		spinner_shoes_filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+				@Override
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectedShoesFilter = SHOES_FILTER_VALUES[position];
+					FilterMemory.setInt(
+						SlowMovingStockReportActivity.this, "SlowMovingStockReport", "shoes_filter", position
+					);
+					loadReport();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
+				}
+			});
+
 		loadReport();
 	}
 
@@ -123,13 +164,16 @@ public class SlowMovingStockReportActivity extends Activity {
 
 		final long myGeneration = ++loadGeneration;
 		final int windowDays = selectedWindowDays;
+		final int shoesFilter_forQuery = selectedShoesFilter;
 
 		new Thread(new Runnable() {
 				@Override
 				public void run() {
 
 					final ArrayList<HashMap<String, Object>> result =
-						db.getSlowMovingStock(SlowMovingStockReportActivity.this, windowDays);
+						db.getSlowMovingStock(
+							SlowMovingStockReportActivity.this, windowDays, shoesFilter_forQuery
+						);
 
 					runOnUiThread(new Runnable() {
 							@Override

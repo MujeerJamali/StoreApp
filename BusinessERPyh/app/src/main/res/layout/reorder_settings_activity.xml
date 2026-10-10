@@ -210,7 +210,15 @@
                 android:layout_marginTop="0dp"
                 android:layout_marginBottom="10dp"
                 android:textStyle="normal"
-                android:text="Every past Reorder List suggestion and what happened to it (converted to a draft Purchase, or ignored) - the raw log behind the learning loop. Exports as a .csv file you can open in Excel/Sheets." />
+                android:text="Every past Reorder List suggestion and what happened to it (converted to a draft Purchase, or ignored) - the raw log behind the learning loop. View, correct, add, or delete entries in-app, or export the whole thing as a .csv file you can open in Excel/Sheets." />
+
+            <Button
+                android:id="@+id/btn_view_reorder_history"
+                style="@style/AppButton.Outline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="View / Edit History" />
 
             <Button
                 android:id="@+id/btn_export_reorder_history"

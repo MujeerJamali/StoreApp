@@ -146,6 +146,16 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".ReorderLearningHistoryActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".SwipeGestureSettingsActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".SeasonalCalendarActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />
@@ -329,6 +339,11 @@
         <activity
             android:name=".ScenarioCheckActivity"
             android:label="Scenario Check"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
+            android:name=".MinOrderQtyActivity"
+            android:label="Min Order Quantities"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity

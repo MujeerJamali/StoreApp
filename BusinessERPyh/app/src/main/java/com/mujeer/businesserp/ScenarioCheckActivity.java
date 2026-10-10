@@ -64,8 +64,14 @@ public class ScenarioCheckActivity extends Activity {
 
 		categories = db.getDistinctItemCategories();
 
+		// A category here is just the first word of some item's name,
+		// typed by the shop owner with no length limit - the stock
+		// simple_spinner_item (singleLine + ellipsize) was silently
+		// clipping a long one in the closed spinner itself ("Not
+		// showing full name In selecter"), so this uses a layout that
+		// always shows the whole thing instead.
 		ArrayAdapter<String> categoryAdapter = new ArrayAdapter<String>(
-			this, android.R.layout.simple_spinner_item, categories
+			this, R.layout.spinner_item_full_text, categories
 		);
 
 		categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);

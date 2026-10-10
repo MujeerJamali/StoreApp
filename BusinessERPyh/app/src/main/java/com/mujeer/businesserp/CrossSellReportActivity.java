@@ -11,6 +11,7 @@ import android.widget.AdapterView;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -26,9 +27,25 @@ import java.util.HashMap;
 // =====================
 public class CrossSellReportActivity extends Activity {
 
+	private static final int[] SHOES_FILTER_VALUES = {
+		DatabaseHelper.SHOES_FILTER_ALL,
+		DatabaseHelper.SHOES_FILTER_SHOES_ONLY,
+		DatabaseHelper.SHOES_FILTER_NON_SHOES_ONLY
+	};
+
+	private static final String[] SHOES_FILTER_LABELS = {
+		"All Items", "Shoes Only", "Non-Shoes Only"
+	};
+
 	private EditText et_search_item;
 	private ListView lv_search_results;
+	private TextView tv_back_to_all_items;
 	private TextView tv_selected_item;
+
+	private Spinner spinner_shoes_filter;
+	private int selectedShoesFilter = DatabaseHelper.SHOES_FILTER_ALL;
+
+	private LinearLayout container_all_items_summary;
 
 	private LinearLayout container_cross_sell_results;
 	private TextView tv_frequently_empty;
@@ -46,6 +63,7 @@ public class CrossSellReportActivity extends Activity {
 		new ArrayList<HashMap<String, Object>>();
 
 	private long loadGeneration = 0;
+	private long summaryLoadGeneration = 0;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -62,7 +80,11 @@ public class CrossSellReportActivity extends Activity {
 
 		et_search_item = findViewById(R.id.et_search_item);
 		lv_search_results = findViewById(R.id.lv_search_results);
+		tv_back_to_all_items = findViewById(R.id.tv_back_to_all_items);
 		tv_selected_item = findViewById(R.id.tv_selected_item);
+
+		spinner_shoes_filter = findViewById(R.id.spinner_shoes_filter);
+		container_all_items_summary = findViewById(R.id.container_all_items_summary);
 
 		container_cross_sell_results = findViewById(R.id.container_cross_sell_results);
 		tv_frequently_empty = findViewById(R.id.tv_frequently_empty);
@@ -102,6 +124,150 @@ public class CrossSellReportActivity extends Activity {
 				}
 			}
 		);
+
+		tv_back_to_all_items.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					showAllItemsSummary();
+				}
+			}
+		);
+
+		ArrayAdapter<String> shoesFilterAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, SHOES_FILTER_LABELS
+		);
+
+		shoesFilterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_shoes_filter.setAdapter(shoesFilterAdapter);
+
+		int rememberedShoesFilterPosition =
+			FilterMemory.getInt(this, "CrossSellReport", "shoes_filter", 0);
+
+		spinner_shoes_filter.setSelection(rememberedShoesFilterPosition);
+		selectedShoesFilter = SHOES_FILTER_VALUES[rememberedShoesFilterPosition];
+
+		spinner_shoes_filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+				@Override
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					selectedShoesFilter = SHOES_FILTER_VALUES[position];
+					FilterMemory.setInt(
+						CrossSellReportActivity.this, "CrossSellReport", "shoes_filter", position
+					);
+					loadAllItemsSummary();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
+				}
+			});
+
+		loadAllItemsSummary();
+	}
+
+	// Landing view (approved feature list row #159's own follow-up
+	// request) - every sold item with its top 3 cross-sell partners at
+	// a glance, instead of making the user search one item at a time to
+	// find out. Tapping a row drills into the same full frequently/
+	// rarely-together breakdown the search box's own picks open (see
+	// selectItem()).
+	private void loadAllItemsSummary() {
+
+		final long myGeneration = ++summaryLoadGeneration;
+		final int shoesFilter_forQuery = selectedShoesFilter;
+
+		new Thread(new Runnable() {
+				@Override
+				public void run() {
+
+					final ArrayList<HashMap<String, Object>> summary =
+						db.getTopCrossSellSummary(3, shoesFilter_forQuery);
+
+					runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
+
+								if (myGeneration != summaryLoadGeneration || isFinishing()) {
+									return;
+								}
+
+								applyAllItemsSummary(summary);
+							}
+						}
+					);
+				}
+			}
+		).start();
+	}
+
+	private void applyAllItemsSummary(ArrayList<HashMap<String, Object>> summary) {
+
+		container_all_items_summary.removeAllViews();
+
+		for (final HashMap<String, Object> row : summary) {
+
+			View view = LayoutInflater.from(this).inflate(
+				R.layout.discount_stop_restock_row, container_all_items_summary, false
+			);
+
+			TextView tv_name = view.findViewById(R.id.tv_row_name);
+			TextView tv_detail = view.findViewById(R.id.tv_row_detail);
+			TextView tv_badge = view.findViewById(R.id.tv_row_badge);
+
+			tv_name.setText(String.valueOf(row.get("name")));
+
+			@SuppressWarnings("unchecked")
+			ArrayList<HashMap<String, Object>> topPartners =
+				(ArrayList<HashMap<String, Object>>) row.get("top_partners");
+
+			if (topPartners.isEmpty()) {
+
+				tv_detail.setText("Nothing else sold alongside this item yet");
+				tv_badge.setText("");
+
+			} else {
+
+				StringBuilder detail = new StringBuilder("Also bought: ");
+
+				for (int i = 0; i < topPartners.size(); i++) {
+
+					if (i > 0) {
+						detail.append(", ");
+					}
+
+					HashMap<String, Object> partner = topPartners.get(i);
+
+					detail.append(partner.get("name"))
+						.append(" (").append(partner.get("co_occurrence_count")).append(")");
+				}
+
+				tv_detail.setText(detail.toString());
+				tv_badge.setText(String.valueOf(topPartners.get(0).get("co_occurrence_count")));
+			}
+
+			tv_badge.setTextColor(getResources().getColor(R.color.text_secondary));
+
+			view.setOnClickListener(new View.OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						selectItem(row);
+					}
+				}
+			);
+
+			container_all_items_summary.addView(view);
+		}
+	}
+
+	private void showAllItemsSummary() {
+
+		et_search_item.setText("");
+
+		container_cross_sell_results.setVisibility(View.GONE);
+		tv_back_to_all_items.setVisibility(View.GONE);
+		tv_selected_item.setVisibility(View.GONE);
+
+		container_all_items_summary.setVisibility(View.VISIBLE);
+		spinner_shoes_filter.setVisibility(View.VISIBLE);
 	}
 
 	private void loadSoldItems() {
@@ -120,6 +286,14 @@ public class CrossSellReportActivity extends Activity {
 
 								allSoldItems.clear();
 								allSoldItems.addAll(items);
+
+								// A query typed while this background load was
+								// still running would otherwise match against
+								// an empty list and never be re-run once the
+								// data actually arrives - re-filter now against
+								// whatever's currently typed (a no-op if the
+								// box is still empty).
+								filterResults(et_search_item.getText().toString());
 							}
 						}
 					);
@@ -154,14 +328,30 @@ public class CrossSellReportActivity extends Activity {
 		searchAdapter.clear();
 		searchAdapter.addAll(labels);
 		searchAdapter.notifyDataSetChanged();
+
+		// selectItem() hides this list after a pick - show it again on
+		// the next search, otherwise every search after the first one
+		// quietly populates an invisible list and looks like searching
+		// stopped returning results at all.
+		lv_search_results.setVisibility(query.trim().length() >= 1 ? View.VISIBLE : View.GONE);
 	}
 
 	private void selectItem(HashMap<String, Object> item) {
 
-		final int itemId = (Integer) item.get("id");
+		// Rows from the search box (db.getItems()) key the id as "id";
+		// rows from the all-items summary (db.getTopCrossSellSummary())
+		// key it as "item_id" - accept either so this one method can
+		// drill into a selection from both sources.
+		final int itemId = (Integer) (
+			item.get("id") != null ? item.get("id") : item.get("item_id")
+		);
 
 		et_search_item.setText("");
 		lv_search_results.setVisibility(View.GONE);
+
+		container_all_items_summary.setVisibility(View.GONE);
+		spinner_shoes_filter.setVisibility(View.GONE);
+		tv_back_to_all_items.setVisibility(View.VISIBLE);
 
 		tv_selected_item.setText("Selected: " + item.get("name"));
 		tv_selected_item.setVisibility(View.VISIBLE);

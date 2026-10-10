@@ -60,10 +60,25 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:layout_marginBottom="10dp"
+            android:layout_marginBottom="6dp"
             android:text="Not connected. Backups are not copied to the cloud."
             android:textColor="@color/text_secondary"
             android:textSize="13sp" />
+
+        <!-- Shown only once connected - proof the automatic side is
+             actually working, not just that a folder was picked once.
+             See ExportVyaparActivity#applyCloudBackupHealthStatus(). -->
+        <TextView
+            android:id="@+id/tv_cloud_backup_health"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:background="@drawable/bg_chip"
+            android:padding="10dp"
+            android:text="No cloud backup yet"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/btn_connect_drive"

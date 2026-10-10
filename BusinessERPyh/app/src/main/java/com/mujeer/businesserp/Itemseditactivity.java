@@ -334,12 +334,16 @@ public class Itemseditactivity extends Activity {
             LinearLayout chipRow = new LinearLayout(this);
             chipRow.setOrientation(LinearLayout.HORIZONTAL);
 
-            ArrayList<HashMap<String, Object>> values = db.getVarietyValues(groupId);
+            ArrayList<HashMap<String, Object>> values = db.getVarietyValuesWithStock(groupId);
 
-            for (HashMap<String, Object> value : values) {
+            for (final HashMap<String, Object> value : values) {
+
+                final int valueId = (Integer) value.get("id");
+                final String valueLabel = (String) value.get("label");
+                final double valueStock = (Double) value.get("stock");
 
                 TextView chip = new TextView(this);
-                chip.setText((String) value.get("label"));
+                chip.setText(valueLabel);
                 chip.setBackgroundResource(R.drawable.bg_chip);
                 chip.setTextColor(getResources().getColor(R.color.text_primary));
                 chip.setTextSize(13);
@@ -350,6 +354,19 @@ public class Itemseditactivity extends Activity {
                     LinearLayout.LayoutParams.WRAP_CONTENT);
                 chipParams.setMargins(0, 0, chipMargin, 0);
                 chip.setLayoutParams(chipParams);
+
+                // Long-press to delete (row #93's own request) - only
+                // ever allowed at zero stock, same "don't lose real
+                // inventory" guard every other long-press-delete in the
+                // app already follows - a value still carrying stock
+                // just explains why instead of deleting anything.
+                chip.setOnLongClickListener(new View.OnLongClickListener() {
+                    @Override
+                    public boolean onLongClick(View v) {
+                        confirmDeleteVarietyValue(valueId, valueLabel, valueStock);
+                        return true;
+                    }
+                });
 
                 chipRow.addView(chip);
             }
@@ -442,6 +459,52 @@ public class Itemseditactivity extends Activity {
 
                     db.addVarietyValue(groupId, label);
                     loadVarieties();
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void confirmDeleteVarietyValue(
+        final int valueId, String valueLabel, double valueStock) {
+
+        if (valueStock != 0) {
+
+            Toast.makeText(
+                this,
+                "Can't delete \"" + valueLabel + "\" - it still has " +
+                AmountFormat.formatPlain(valueStock) + " in stock",
+                Toast.LENGTH_LONG
+            ).show();
+
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+            .setTitle("Delete \"" + valueLabel + "\"?")
+            .setMessage(
+                "This also removes every combination built from it. " +
+                "It's at zero stock, so nothing is lost."
+            )
+            .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+
+                    if (db.deleteVarietyValue(valueId)) {
+
+                        Toast.makeText(Itemseditactivity.this, "Deleted", Toast.LENGTH_SHORT).show();
+                        loadVarieties();
+
+                    } else {
+
+                        Toast.makeText(
+                            Itemseditactivity.this,
+                            "Couldn't delete - it now has stock",
+                            Toast.LENGTH_SHORT
+                        ).show();
+
+                        loadVarieties();
+                    }
                 }
             })
             .setNegativeButton("Cancel", null)

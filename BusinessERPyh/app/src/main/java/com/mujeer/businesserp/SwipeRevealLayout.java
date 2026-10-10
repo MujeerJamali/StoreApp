@@ -24,6 +24,12 @@ public class SwipeRevealLayout extends FrameLayout {
 	public interface OnSwipeActionListener {
 		void onEditAction();
 		void onDeleteAction();
+
+		// A plain tap on the row's own content (not a swipe, not a tap on
+		// the revealed actions panel) - see onTouchEvent()'s own comment
+		// for why this can't just be a ListView OnItemClickListener on the
+		// containing list the way every other row type in the app works.
+		void onRowTap();
 	}
 
 	// Only one row across the whole app can be open at a time - opening
@@ -41,6 +47,7 @@ public class SwipeRevealLayout extends FrameLayout {
 	private float downX;
 	private float downY;
 	private float startTranslation;
+	private boolean wasOpenAtDown;
 
 	private final int touchSlop;
 	private VelocityTracker velocityTracker;
@@ -164,13 +171,16 @@ public class SwipeRevealLayout extends FrameLayout {
 		velocityTracker.addMovement(ev);
 
 		float x = ev.getX();
+		float y = ev.getY();
 
 		switch (ev.getActionMasked()) {
 
 			case MotionEvent.ACTION_DOWN:
 
 				downX = x;
+				downY = y;
 				startTranslation = contentView.getTranslationX();
+				wasOpenAtDown = open;
 				return true;
 
 			case MotionEvent.ACTION_MOVE: {
@@ -189,7 +199,58 @@ public class SwipeRevealLayout extends FrameLayout {
 				return true;
 			}
 
-			case MotionEvent.ACTION_UP:
+			// isSwipeEnabled() above means onTouchEvent claims every
+			// touch on this row from ACTION_DOWN, whether it turns into
+			// a real swipe or not - the only way to still detect a swipe
+			// starting from a standstill (see onInterceptTouchEvent's own
+			// comment). That means a plain tap never reaches the
+			// containing ListView's own click machinery the normal way:
+			// its dispatchTouchEvent sees this row's subtree already
+			// claimed the whole gesture, so AdapterView.OnItemClickListener
+			// never fires for a swipe-enabled row no matter where on it
+			// you tap - not "some sub-areas", all of them except the
+			// revealed Edit/Delete buttons (which only exist once already
+			// open, a different code path via onInterceptTouchEvent's
+			// open-row branch). So a plain tap - barely moved, and the row
+			// wasn't already open when it started - is detected here and
+			// fed back out through onRowTap() instead, which is wired to
+			// do exactly what the row's own ListView item click would
+			// have done (see each adapter's RowActionListener).
+			case MotionEvent.ACTION_UP: {
+
+				float current = contentView.getTranslationX();
+
+				boolean wasPlainTap =
+					!wasOpenAtDown &&
+					Math.abs(x - downX) < touchSlop &&
+					Math.abs(y - downY) < touchSlop;
+
+				if (wasPlainTap) {
+
+					close(false);
+
+					if (listener != null) {
+						listener.onRowTap();
+					}
+
+				} else {
+
+					boolean shouldOpen = actionsWidth > 0 && (-current) > (actionsWidth / 2f);
+
+					if (shouldOpen) {
+						openTo(true);
+					} else {
+						close(true);
+					}
+				}
+
+				velocityTracker.recycle();
+				velocityTracker = null;
+				swiping = false;
+
+				return true;
+			}
+
 			case MotionEvent.ACTION_CANCEL: {
 
 				float current = contentView.getTranslationX();

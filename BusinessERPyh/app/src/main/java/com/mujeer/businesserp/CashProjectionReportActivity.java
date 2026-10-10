@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.app.DatePickerDialog;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.TextView;
 
@@ -29,8 +31,13 @@ public class CashProjectionReportActivity extends Activity {
 	private EditText et_from_date;
 	private EditText et_to_date;
 
+	private CheckBox cb_include_sales;
+	private CheckBox cb_include_expenses;
+	private CheckBox cb_include_reorder;
+
 	private TextView tv_starting_cash;
 	private TextView tv_dues_in;
+	private TextView tv_estimated_sales;
 	private TextView tv_bills_out;
 	private TextView tv_recurring_out;
 	private TextView tv_projected_cash;
@@ -57,8 +64,13 @@ public class CashProjectionReportActivity extends Activity {
 		et_from_date = findViewById(R.id.et_from_date);
 		et_to_date = findViewById(R.id.et_to_date);
 
+		cb_include_sales = findViewById(R.id.cb_include_sales);
+		cb_include_expenses = findViewById(R.id.cb_include_expenses);
+		cb_include_reorder = findViewById(R.id.cb_include_reorder);
+
 		tv_starting_cash = findViewById(R.id.tv_starting_cash);
 		tv_dues_in = findViewById(R.id.tv_dues_in);
+		tv_estimated_sales = findViewById(R.id.tv_estimated_sales);
 		tv_bills_out = findViewById(R.id.tv_bills_out);
 		tv_recurring_out = findViewById(R.id.tv_recurring_out);
 		tv_projected_cash = findViewById(R.id.tv_projected_cash);
@@ -87,6 +99,18 @@ public class CashProjectionReportActivity extends Activity {
 					showDatePicker(et_to_date);
 				}
 			});
+
+		CompoundButton.OnCheckedChangeListener checkboxListener =
+			new CompoundButton.OnCheckedChangeListener() {
+				@Override
+				public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+					loadProjection();
+				}
+			};
+
+		cb_include_sales.setOnCheckedChangeListener(checkboxListener);
+		cb_include_expenses.setOnCheckedChangeListener(checkboxListener);
+		cb_include_reorder.setOnCheckedChangeListener(checkboxListener);
 
 		loadProjection();
 	}
@@ -133,6 +157,9 @@ public class CashProjectionReportActivity extends Activity {
 		final String fromDate = et_from_date.getText().toString();
 		final String toDate = et_to_date.getText().toString();
 		final android.content.Context appContext = getApplicationContext();
+		final boolean includeSales = cb_include_sales.isChecked();
+		final boolean includeExpenses = cb_include_expenses.isChecked();
+		final boolean includeReorder = cb_include_reorder.isChecked();
 
 		if (fromDate.isEmpty() || toDate.isEmpty() || fromDate.compareTo(toDate) > 0) {
 			return;
@@ -142,8 +169,9 @@ public class CashProjectionReportActivity extends Activity {
 				@Override
 				public void run() {
 
-					final HashMap<String, Object> result =
-						db.getCashProjection(appContext, fromDate, toDate);
+					final HashMap<String, Object> result = db.getCashProjection(
+						appContext, fromDate, toDate, includeSales, includeExpenses, includeReorder
+					);
 
 					runOnUiThread(new Runnable() {
 							@Override
@@ -166,6 +194,7 @@ public class CashProjectionReportActivity extends Activity {
 
 		double startingCash = (Double) result.get("starting_cash");
 		double duesIn = (Double) result.get("dues_in");
+		double estimatedSales = (Double) result.get("estimated_sales_revenue");
 		double billsOut = (Double) result.get("bills_out");
 		double recurringOut = (Double) result.get("recurring_expenses_out");
 		double projectedCash = (Double) result.get("projected_cash");
@@ -174,6 +203,7 @@ public class CashProjectionReportActivity extends Activity {
 
 		tv_starting_cash.setText(AmountFormat.format(startingCash));
 		tv_dues_in.setText(AmountFormat.format(duesIn));
+		tv_estimated_sales.setText(AmountFormat.format(estimatedSales));
 		tv_bills_out.setText(AmountFormat.format(billsOut));
 		tv_recurring_out.setText(AmountFormat.format(recurringOut));
 		tv_projected_cash.setText(AmountFormat.format(projectedCash));
@@ -185,6 +215,29 @@ public class CashProjectionReportActivity extends Activity {
 		tv_reorder_cost.setText("Estimated cost: " + AmountFormat.format(reorderCost));
 		tv_projected_after_reorder.setText(
 			"Projected cash after: " + AmountFormat.format(projectedAfterReorder)
+		);
+
+		// Unchecking a category still shows its own raw figure above
+		// (so toggling it shows the swing) but dims it, since it no
+		// longer counts toward the totals - see
+		// DatabaseHelper.getCashProjection()'s own comment.
+		int includedColor = getResources().getColor(R.color.mod_sales);
+		int excludedColor = getResources().getColor(R.color.text_hint);
+
+		tv_dues_in.setTextColor(cb_include_sales.isChecked() ? includedColor : excludedColor);
+		tv_estimated_sales.setTextColor(cb_include_sales.isChecked() ? includedColor : excludedColor);
+
+		int expenseIncludedColor = getResources().getColor(R.color.mod_purchase);
+		int expenseIncludedColor2 = getResources().getColor(R.color.mod_expenses);
+
+		tv_bills_out.setTextColor(cb_include_expenses.isChecked() ? expenseIncludedColor : excludedColor);
+		tv_recurring_out.setTextColor(
+			cb_include_expenses.isChecked() ? expenseIncludedColor2 : excludedColor
+		);
+
+		tv_reorder_cost.setTextColor(
+			cb_include_reorder.isChecked() ?
+			getResources().getColor(R.color.text_secondary) : excludedColor
 		);
 
 		tv_projected_after_reorder.setTextColor(

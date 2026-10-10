@@ -33,6 +33,8 @@ public class BudgetPlannerActivity extends Activity {
 
 	private DatabaseHelper db;
 
+	private long budgetLoadGeneration = 0;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -59,9 +61,41 @@ public class BudgetPlannerActivity extends Activity {
 		loadBudget();
 	}
 
+	// db.getReorderSuggestions() is the heaviest query in the app (it
+	// runs several sub-queries per low-stock item/combo) and was being
+	// called directly here on the main thread, freezing/crashing this
+	// screen on a shop with any real amount of data - same bug as
+	// TodayActionsActivity's loadSummary(), fixed the same way.
 	private void loadBudget() {
 
-		ArrayList<HashMap<String, Object>> suggestions = db.getReorderSuggestions(this);
+		final long myGeneration = ++budgetLoadGeneration;
+
+		new Thread(new Runnable() {
+				@Override
+				public void run() {
+
+					final ArrayList<HashMap<String, Object>> suggestions =
+						db.getReorderSuggestions(BudgetPlannerActivity.this);
+
+					final double cashBalance = db.getCashBalance();
+
+					runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
+
+								if (myGeneration != budgetLoadGeneration || isFinishing()) {
+									return;
+								}
+
+								applyBudget(suggestions, cashBalance);
+							}
+						});
+				}
+			}).start();
+	}
+
+	private void applyBudget(
+		ArrayList<HashMap<String, Object>> suggestions, double cashBalance) {
 
 		double totalSuggested = 0;
 
@@ -85,7 +119,6 @@ public class BudgetPlannerActivity extends Activity {
 			itemCountBySupplier.put(supplierName, (existingCount == null ? 0 : existingCount) + 1);
 		}
 
-		double cashBalance = db.getCashBalance();
 		double effectiveCashLimit = ReorderSettings.getEffectiveCashLimit(this, cashBalance);
 
 		boolean cashAware = effectiveCashLimit < Double.MAX_VALUE;

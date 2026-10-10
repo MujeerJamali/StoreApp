@@ -138,7 +138,14 @@ public class ReorderListAdapter extends BaseAdapter {
 			}
 		);
 
+		// Seeded here (not only inside the TextWatcher below) because
+		// et_qty.setText() above runs before addTextChangedListener() is
+		// attached, so afterTextChanged() never fires for the initial
+		// value - a row whose quantity the user never touches would
+		// otherwise reach doConvertToDrafts() with "edited_cost" still
+		// null, crashing on the Double unboxing there.
 		row.put("edited_qty", suggestedQty);
+		row.put("edited_cost", suggestedQty * purchasePriceEach);
 
 		final double finalPurchasePriceEach = purchasePriceEach;
 

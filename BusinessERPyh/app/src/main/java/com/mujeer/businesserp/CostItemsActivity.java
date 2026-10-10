@@ -27,6 +27,8 @@ public class CostItemsActivity extends Activity {
 	private ArrayList<HashMap<String, Object>> costItemList;
 	private CostItemAdapter adapter;
 
+	private long loadGeneration = 0;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -103,35 +105,61 @@ public class CostItemsActivity extends Activity {
 		loadCostItems();
 	}
 
+	// getCategoryBudgetStatus() runs one extra spend-sum query per
+	// budgeted category (see its own comment in DatabaseHelper) on top
+	// of getCostItems() - cheap for a handful of categories, but still
+	// real DB work that doesn't belong on the main thread, same
+	// reasoning as every other loadXxx() in this app that talks to the
+	// database.
 	private void loadCostItems() {
 
-		costItemList = db.getCostItems();
+		final long myGeneration = ++loadGeneration;
 
-		// Merges in this month's spend for every category that has a
-		// budget set, so the list can show a status badge without
-		// CostItemAdapter needing its own DB access.
-		ArrayList<HashMap<String, Object>> budgetStatus = db.getCategoryBudgetStatus();
+		new Thread(new Runnable() {
+				@Override
+				public void run() {
 
-		for (HashMap<String, Object> costItem : costItemList) {
+					final ArrayList<HashMap<String, Object>> items = db.getCostItems();
 
-			for (HashMap<String, Object> status : budgetStatus) {
+					final ArrayList<HashMap<String, Object>> budgetStatus =
+						db.getCategoryBudgetStatus();
 
-				if (costItem.get("id").equals(status.get("id"))) {
+					for (HashMap<String, Object> costItem : items) {
 
-					costItem.put("spent", status.get("spent"));
-					costItem.put("percent_used", status.get("percent_used"));
-					costItem.put("over_budget", status.get("over_budget"));
-					break;
+						for (HashMap<String, Object> status : budgetStatus) {
+
+							if (costItem.get("id").equals(status.get("id"))) {
+
+								costItem.put("spent", status.get("spent"));
+								costItem.put("percent_used", status.get("percent_used"));
+								costItem.put("over_budget", status.get("over_budget"));
+								break;
+							}
+						}
+					}
+
+					runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
+
+								if (myGeneration != loadGeneration || isFinishing()) {
+									return;
+								}
+
+								costItemList = items;
+
+								adapter = new CostItemAdapter(CostItemsActivity.this, costItemList);
+
+								lv_cost_items.setAdapter(adapter);
+
+								if (et_search_cost_item != null) {
+									adapter.getFilter().filter(et_search_cost_item.getText().toString());
+								}
+							}
+						}
+					);
 				}
 			}
-		}
-
-		adapter = new CostItemAdapter(this, costItemList);
-
-		lv_cost_items.setAdapter(adapter);
-
-		if (et_search_cost_item != null) {
-			adapter.getFilter().filter(et_search_cost_item.getText().toString());
-		}
+		).start();
 	}
 }

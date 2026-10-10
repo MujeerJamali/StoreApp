@@ -32,10 +32,18 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/tv_ratio_description"
             style="@style/FieldLabel"
             android:layout_marginTop="0dp"
             android:layout_marginBottom="10dp"
             android:text="Expenses as a % of Sales, last 6 calendar months. A rising ratio means expenses are growing faster than sales." />
+
+        <Spinner
+            android:id="@+id/spinner_ratio_mode"
+            style="@style/FilterSpinner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp" />
 
         <com.mujeer.businesserp.SimpleBarChartView
             android:id="@+id/chart_expense_ratio"

@@ -18,6 +18,10 @@ public class ExpenseAdapter extends BaseAdapter {
 	public interface RowActionListener {
 		void onRowEdit(HashMap<String, Object> expense);
 		void onRowDelete(HashMap<String, Object> expense);
+
+		// Only fires for a plain tap while swipeEnabled is true - see
+		// SwipeRevealLayout.onTouchEvent()'s own comment.
+		void onRowTap(HashMap<String, Object> expense);
 	}
 
 	private Activity activity;
@@ -25,7 +29,18 @@ public class ExpenseAdapter extends BaseAdapter {
 	private ArrayList<HashMap<String, Object>> originalList;
 	private ArrayList<HashMap<String, Object>> filteredList;
 
+	// Defaults true (unlike TransactionAdapter's own flag, which
+	// defaults false since that adapter is reused read-only elsewhere) -
+	// this adapter is only ever used for Expensesactivity's own live
+	// list, so the user's SwipeGestureSettings preference is the only
+	// thing that should ever turn it off.
+	private boolean swipeEnabled = true;
+
 	private RowActionListener rowActionListener;
+
+	public void setSwipeEnabled(boolean swipeEnabled) {
+		this.swipeEnabled = swipeEnabled;
+	}
 
 	private TextView tv_code;
 	private TextView tv_item;
@@ -96,6 +111,9 @@ public class ExpenseAdapter extends BaseAdapter {
 		final SwipeRevealLayout swipeLayout = (SwipeRevealLayout) convertView;
 		swipeLayout.close(false);
 
+		View swipeActions = convertView.findViewById(R.id.swipe_actions);
+		swipeActions.setVisibility(swipeEnabled ? View.VISIBLE : View.GONE);
+
 		swipeLayout.wireActionButtons(
 			convertView.findViewById(R.id.btn_swipe_edit),
 			convertView.findViewById(R.id.btn_swipe_delete)
@@ -113,6 +131,13 @@ public class ExpenseAdapter extends BaseAdapter {
 				public void onDeleteAction() {
 					if (rowActionListener != null) {
 						rowActionListener.onRowDelete(expense);
+					}
+				}
+
+				@Override
+				public void onRowTap() {
+					if (rowActionListener != null) {
+						rowActionListener.onRowTap(expense);
 					}
 				}
 			});

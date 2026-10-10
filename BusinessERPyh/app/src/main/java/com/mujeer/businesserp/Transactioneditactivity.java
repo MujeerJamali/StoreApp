@@ -1212,10 +1212,21 @@ public class Transactioneditactivity extends Activity {
 		final ArrayList<String> itemNames =
 			new ArrayList<String>();
 
+		// Parallel to itemNames (same order/size) - lets the dropdown's
+		// filter also match a typed item code, even though the code
+		// itself is never the text shown/selected (see
+		// TwoLineAutoCompleteAdapter's extraSearchText).
+		final ArrayList<String> itemCodesForSearch =
+			new ArrayList<String>();
+
 		for (HashMap<String, Object> item : items) {
 
 			itemNames.add(
 				(String) item.get("name")
+			);
+
+			itemCodesForSearch.add(
+				(String) item.get("code")
 			);
 		}
 
@@ -1242,7 +1253,8 @@ public class Transactioneditactivity extends Activity {
 			this,
 			itemNames,
 			itemSubtitles,
-			"+ Add New Item"
+			"+ Add New Item",
+			itemCodesForSearch
 		);
 
 		actvItem.setAdapter(adapter);
@@ -1992,10 +2004,16 @@ public class Transactioneditactivity extends Activity {
 		// safety net for this type is no longer needed.
 		DraftAutosave.clear(db, type);
 
+		// Spells out what tapping this actually does - row #48's own
+		// feedback ("Hold/resume a sale - I don't know how it works")
+		// was this exact button under a different name than the user
+		// expected: there's no separate "Hold Sale" concept, this one
+		// button both holds it now and is how to resume it later (open
+		// Drafts, tap the row, finish the sale from where it left off).
 		android.widget.Toast.makeText(
 			this,
-			"Saved as draft",
-			android.widget.Toast.LENGTH_SHORT
+			"Held - resume it anytime from Drafts",
+			android.widget.Toast.LENGTH_LONG
 		).show();
 
 		finishOrGoToDashboard();
@@ -2743,6 +2761,11 @@ public class Transactioneditactivity extends Activity {
 		final ArrayList<String> itemNames =
 			new ArrayList<String>();
 
+		// Parallel to itemNames (same order/size) - see
+		// TwoLineAutoCompleteAdapter's extraSearchText.
+		final ArrayList<String> itemCodesForSearch =
+			new ArrayList<String>();
+
 		int selectedPosition = 0;
 
 		int matchAgainstItemId = presetItemId != null ?
@@ -2755,6 +2778,10 @@ public class Transactioneditactivity extends Activity {
 
 			itemNames.add(
 				(String) item.get("name")
+			);
+
+			itemCodesForSearch.add(
+				(String) item.get("code")
 			);
 
 			if (((Integer) item.get("id")).intValue() == matchAgainstItemId) {
@@ -2786,7 +2813,8 @@ public class Transactioneditactivity extends Activity {
 			this,
 			itemNames,
 			itemSubtitlesEdit,
-			"+ Add New Item"
+			"+ Add New Item",
+			itemCodesForSearch
 		);
 
 		actvItem.setAdapter(adapter);

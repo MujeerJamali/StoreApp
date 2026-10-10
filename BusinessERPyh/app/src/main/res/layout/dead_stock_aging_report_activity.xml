@@ -37,6 +37,13 @@
             android:layout_marginBottom="10dp"
             android:text="Stock sitting unsold for 60+ days, bucketed by how long. Start a clearance on any item to track how much of it sells after marking it down." />
 
+        <Spinner
+            android:id="@+id/spinner_shoes_filter"
+            style="@style/FilterSpinner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

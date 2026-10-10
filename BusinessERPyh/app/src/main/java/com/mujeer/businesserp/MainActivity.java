@@ -54,6 +54,7 @@ public class MainActivity extends Activity {
 	Button btn_quick_sale;
 	Button btn_today_actions;
 	Button btn_customize_dashboard;
+	Button btn_swipe_gesture_settings;
 
 	Button btn_quick_add;
 
@@ -64,6 +65,7 @@ public class MainActivity extends Activity {
 
 	Spinner spinner_sales_trend_horizon;
 	SimpleBarChartView chart_sales_trend;
+	Spinner spinner_trend_compare_mode;
 	TextView tv_today_vs_last_week;
 	TextView tv_today_vs_last_week_change;
 	TextView tv_sales_streak;
@@ -73,6 +75,18 @@ public class MainActivity extends Activity {
 	private static final String[] TREND_HORIZON_LABELS = {"7 Days", "30 Days"};
 
 	private int selectedTrendHorizonDays = TREND_HORIZON_DAYS[0];
+
+	private static final int[] TREND_COMPARE_MODE_VALUES = {
+		DatabaseHelper.TREND_COMPARE_TODAY_VS_LAST_WEEK,
+		DatabaseHelper.TREND_COMPARE_WEEK_VS_WEEK,
+		DatabaseHelper.TREND_COMPARE_MONTH_VS_MONTH
+	};
+
+	private static final String[] TREND_COMPARE_MODE_LABELS = {
+		"Today vs Last Week", "This Week vs Last Week", "This Month vs Last Month"
+	};
+
+	private int selectedTrendCompareMode = DatabaseHelper.TREND_COMPARE_TODAY_VS_LAST_WEEK;
 
 	// A background result is only applied if it's still the most
 	// recent request by the time it comes back.
@@ -99,7 +113,8 @@ public class MainActivity extends Activity {
 		"btn_recurring_expenses", "btn_drafts", "btn_cost_items",
 		"btn_display_shoes", "btn_sample_shoes", "btn_recently_deleted",
 		"btn_reorder_list", "btn_bulk_item_update", "btn_loyalty_points",
-		"btn_stock_take", "btn_quick_sale", "btn_today_actions", "btn_customize_dashboard"
+		"btn_stock_take", "btn_quick_sale", "btn_today_actions", "btn_customize_dashboard",
+		"btn_swipe_gesture_settings"
 	};
 
 	private static final String[] SHORTCUT_LABELS = {
@@ -109,7 +124,8 @@ public class MainActivity extends Activity {
 		"Recurring Expenses", "Drafts", "Cost Items",
 		"Display Shoes", "Sample Shoes", "Recently Deleted",
 		"Reorder List", "Bulk Item Update", "Loyalty Points",
-		"Stock Take", "Quick Sale", "What To Do Today", "Customize Dashboard"
+		"Stock Take", "Quick Sale", "What To Do Today", "Customize Dashboard",
+		"Swipe Gesture Settings"
 	};
 
 	DatabaseHelper db;
@@ -149,6 +165,7 @@ public class MainActivity extends Activity {
 		btn_quick_sale = findViewById(R.id.btn_quick_sale);
 		btn_today_actions = findViewById(R.id.btn_today_actions);
 		btn_customize_dashboard = findViewById(R.id.btn_customize_dashboard);
+		btn_swipe_gesture_settings = findViewById(R.id.btn_swipe_gesture_settings);
 
 		btn_quick_add = findViewById(R.id.btn_quick_add);
 
@@ -165,6 +182,7 @@ public class MainActivity extends Activity {
 
 		spinner_sales_trend_horizon = findViewById(R.id.spinner_sales_trend_horizon);
 		chart_sales_trend = findViewById(R.id.chart_sales_trend);
+		spinner_trend_compare_mode = findViewById(R.id.spinner_trend_compare_mode);
 		tv_today_vs_last_week = findViewById(R.id.tv_today_vs_last_week);
 		tv_today_vs_last_week_change = findViewById(R.id.tv_today_vs_last_week_change);
 		tv_sales_streak = findViewById(R.id.tv_sales_streak);
@@ -173,7 +191,7 @@ public class MainActivity extends Activity {
 		InfoBubbleView info_bubble_sales_trend = findViewById(R.id.info_bubble_sales_trend);
 		info_bubble_sales_trend.setInfo(
 			"Sales Trend",
-			"Daily sales total for the last 7/30 days, including a day with zero sales - a quick \"is the shop busy lately\" glance, not a profit report. Below it, today's sales so far are compared against the same calendar weekday one week ago (not yesterday) - a Monday is naturally busier or quieter than a Sunday, so this isolates a real trend instead of just that mismatch. At the bottom, a streak counter shows how many days in a row have had at least one sale, plus the best streak ever - a small motivational nudge, not a report."
+			"Daily sales total for the last 7/30 days, including a day with zero sales - a quick \"is the shop busy lately\" glance, not a profit report. Below it, pick Today/This Week/This Month to compare its sales-so-far against the same elapsed window of the period before it (a week-ago weekday instead of yesterday, since a Monday is naturally busier or quieter than a Sunday) - never a partial period against a full one, so the percentage isn't skewed by one side simply having fewer days counted. At the bottom, a streak counter shows how many days in a row have had at least one sale, plus the best streak ever - a small motivational nudge, not a report."
 		);
 
 		et_dashboard_search = findViewById(R.id.et_dashboard_search);
@@ -187,7 +205,7 @@ public class MainActivity extends Activity {
 		InfoBubbleView info_bubble_favorites = findViewById(R.id.info_bubble_favorites);
 		info_bubble_favorites.setInfo(
 			"Favorites",
-			"Long-press any row in the Modules or Tools card below to pin it here for quick access - long-press a pinned row here to unpin it. Pin order is remembered across app opens."
+			"Long-press any row in the Modules or Tools card below, or any report in the Reports screen, to pin it here for quick access - long-press a pinned row here to unpin it. Pin order is remembered across app opens."
 		);
 
 		db = new DatabaseHelper(this);
@@ -224,6 +242,7 @@ public class MainActivity extends Activity {
 		attachFavoriteLongPress(btn_quick_sale, "btn_quick_sale");
 		attachFavoriteLongPress(btn_today_actions, "btn_today_actions");
 		attachFavoriteLongPress(btn_customize_dashboard, "btn_customize_dashboard");
+		attachFavoriteLongPress(btn_swipe_gesture_settings, "btn_swipe_gesture_settings");
 
 		ArrayAdapter<String> trendHorizonAdapter = new ArrayAdapter<String>(
 			this, android.R.layout.simple_spinner_item, TREND_HORIZON_LABELS
@@ -237,6 +256,35 @@ public class MainActivity extends Activity {
 				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
 					selectedTrendHorizonDays = TREND_HORIZON_DAYS[position];
 					loadSalesTrend();
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
+				}
+			});
+
+		ArrayAdapter<String> trendCompareAdapter = new ArrayAdapter<String>(
+			this, android.R.layout.simple_spinner_item, TREND_COMPARE_MODE_LABELS
+		);
+
+		trendCompareAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		spinner_trend_compare_mode.setAdapter(trendCompareAdapter);
+
+		int rememberedCompareModePosition =
+			FilterMemory.getInt(this, "Dashboard", "trend_compare_mode", 0);
+
+		spinner_trend_compare_mode.setSelection(rememberedCompareModePosition);
+		selectedTrendCompareMode = TREND_COMPARE_MODE_VALUES[rememberedCompareModePosition];
+
+		spinner_trend_compare_mode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+				@Override
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+
+					selectedTrendCompareMode = TREND_COMPARE_MODE_VALUES[position];
+
+					FilterMemory.setInt(MainActivity.this, "Dashboard", "trend_compare_mode", position);
+
+					loadTodayVsLastWeek();
 				}
 
 				@Override
@@ -565,6 +613,19 @@ public class MainActivity extends Activity {
 				}
 			});
 
+		btn_swipe_gesture_settings.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						SwipeGestureSettingsActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
 		btn_quick_add.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
@@ -719,12 +780,24 @@ public class MainActivity extends Activity {
 			}
 		}
 
-		return key;
+		String reportLabel = Reportsactivity.getLabelForFavoriteKey(key);
+
+		return reportLabel != null ? reportLabel : key;
 	}
 
+	// Combines both pinning stores - DashboardFavorites (long-press on a
+	// Tool Row here) and ReportFavorites (long-press on a report in
+	// Reportsactivity) - into one Favorites card, so any report or tool
+	// can become a Dashboard shortcut, not just the fixed Modules/Tools
+	// buttons on this screen. Tool and report favoriteKeys live in
+	// disjoint namespaces (every Tool Row key starts with "btn_"; no
+	// report favoriteKey does), so a key's own shape says which store it
+	// came from - see unfavorite(key) below.
 	private void refreshFavoritesCard() {
 
-		java.util.ArrayList<String> favorites = DashboardFavorites.getFavorites(this);
+		java.util.ArrayList<String> favorites = new java.util.ArrayList<String>();
+		favorites.addAll(DashboardFavorites.getFavorites(this));
+		favorites.addAll(ReportFavorites.getFavorites(this));
 
 		card_favorites.removeAllViews();
 
@@ -761,7 +834,7 @@ public class MainActivity extends Activity {
 					@Override
 					public boolean onLongClick(View v) {
 
-						DashboardFavorites.toggleFavorite(MainActivity.this, key);
+						unfavorite(key);
 
 						Toast.makeText(
 							MainActivity.this, "Removed from Favorites", Toast.LENGTH_SHORT
@@ -787,6 +860,22 @@ public class MainActivity extends Activity {
 
 				card_favorites.addView(divider);
 			}
+		}
+	}
+
+	// A Tool Row key always starts with "btn_" (see SHORTCUT_KEYS); a
+	// report favoriteKey never does, so this is enough to route the
+	// unpin to whichever store actually holds the key.
+	private boolean isToolRowKey(String key) {
+		return key.startsWith("btn_");
+	}
+
+	private void unfavorite(String key) {
+
+		if (isToolRowKey(key)) {
+			DashboardFavorites.toggleFavorite(this, key);
+		} else {
+			ReportFavorites.toggleFavorite(this, key);
 		}
 	}
 
@@ -898,8 +987,24 @@ public class MainActivity extends Activity {
 				intent = new Intent(this, DashboardCustomizeActivity.class);
 				break;
 
+			case "btn_swipe_gesture_settings":
+				intent = new Intent(this, SwipeGestureSettingsActivity.class);
+				break;
+
 			default:
-				return;
+
+				// Not a Tool Row key - check whether it's a report
+				// pinned via ReportFavorites instead (see
+				// refreshFavoritesCard()'s merged list).
+				Class<? extends Activity> reportTarget =
+					Reportsactivity.getTargetForFavoriteKey(key);
+
+				if (reportTarget == null) {
+					return;
+				}
+
+				intent = new Intent(this, reportTarget);
+				break;
 		}
 
 		startActivity(intent);
@@ -1039,18 +1144,21 @@ public class MainActivity extends Activity {
 		chart_sales_trend.setEntries(chartEntries);
 	}
 
-	// Today's sales so far vs the same calendar weekday one week ago,
-	// shown inside the Sales Trend card (see DatabaseHelper.getTodayVsLastWeekSales()
-	// for why a week-ago weekday, not yesterday, is the fairer comparison).
+	// This period's sales so far vs the same elapsed window of the prior
+	// period, shown inside the Sales Trend card - spinner_trend_compare_mode
+	// picks Today vs Last Week (the original default; a week-ago weekday,
+	// not yesterday, is the fairer baseline), This Week vs Last Week, or
+	// This Month vs Last Month (see DatabaseHelper.getSalesTrendComparison()).
 	private void loadTodayVsLastWeek() {
 
 		final long myGeneration = ++todayVsLastWeekLoadGeneration;
+		final int compareMode = selectedTrendCompareMode;
 
 		new Thread(new Runnable() {
 				@Override
 				public void run() {
 
-					final HashMap<String, Object> result = db.getTodayVsLastWeekSales();
+					final HashMap<String, Object> result = db.getSalesTrendComparison(compareMode);
 
 					runOnUiThread(new Runnable() {
 							@Override
@@ -1069,17 +1177,20 @@ public class MainActivity extends Activity {
 
 	private void applyTodayVsLastWeek(HashMap<String, Object> result) {
 
-		double todayTotal = (Double) result.get("today_total");
-		double lastWeekTotal = (Double) result.get("last_week_total");
+		double currentTotal = (Double) result.get("current_total");
+		double comparisonTotal = (Double) result.get("comparison_total");
+		String currentLabel = (String) result.get("current_label");
+		String comparisonLabel = (String) result.get("comparison_label");
 		Double percentChange = (Double) result.get("percent_change");
 
 		tv_today_vs_last_week.setText(
-			"Today: " + AmountFormat.format(todayTotal) + "  ·  Last week: " + AmountFormat.format(lastWeekTotal)
+			currentLabel + ": " + AmountFormat.format(currentTotal) + "  ·  " +
+			comparisonLabel + ": " + AmountFormat.format(comparisonTotal)
 		);
 
 		if (percentChange == null) {
 
-			tv_today_vs_last_week_change.setText("No sales last week to compare");
+			tv_today_vs_last_week_change.setText("No sales in " + comparisonLabel.toLowerCase(Locale.getDefault()) + " to compare");
 			tv_today_vs_last_week_change.setTextColor(getResources().getColor(R.color.text_secondary));
 
 		} else {
@@ -1125,6 +1236,7 @@ public class MainActivity extends Activity {
 
 		int currentStreak = (Integer) result.get("current_streak");
 		int bestStreak = (Integer) result.get("best_streak");
+		String streakStartDate = (String) result.get("current_streak_start_date");
 
 		if (currentStreak <= 0) {
 
@@ -1133,8 +1245,30 @@ public class MainActivity extends Activity {
 
 		} else {
 
+			// A long streak with no date range looks like a bug report
+			// waiting to happen (row #35's "wrong/confusing 335 days") -
+			// showing since-when turns a surprising raw count into
+			// something the user can actually verify against their own
+			// sales history (e.g. a bulk historical backfill via
+			// GenerateEntriesActivity legitimately starts a long streak).
+			String sinceText = "";
+
+			if (streakStartDate != null) {
+
+				try {
+
+					java.util.Date parsed =
+						new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(streakStartDate);
+
+					sinceText = " (since " +
+						new SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(parsed) + ")";
+
+				} catch (Exception e) {
+				}
+			}
+
 			tv_sales_streak.setText(
-				currentStreak + (currentStreak == 1 ? " day" : " days") + " sales streak"
+				currentStreak + (currentStreak == 1 ? " day" : " days") + " sales streak" + sinceText
 			);
 
 			tv_sales_streak_best.setText(

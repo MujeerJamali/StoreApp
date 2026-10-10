@@ -41,6 +41,17 @@
         android:inputType="text|textNoSuggestions" />
 
     <TextView
+        android:id="@+id/tv_back_to_all_items"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:padding="4dp"
+        android:text="&#8592; All Items"
+        android:textColor="@color/primary"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/tv_selected_item"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -65,7 +76,22 @@
                 android:id="@+id/lv_search_results"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:visibility="gone" />
+
+            <Spinner
+                android:id="@+id/spinner_shoes_filter"
+                style="@style/FilterSpinner"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="8dp" />
+
+            <LinearLayout
+                android:id="@+id/container_all_items_summary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical" />
 
             <LinearLayout
                 android:id="@+id/container_cross_sell_results"

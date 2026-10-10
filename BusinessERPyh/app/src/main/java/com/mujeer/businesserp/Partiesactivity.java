@@ -56,8 +56,17 @@ import java.util.HashMap;
         DatabaseHelper.PARTY_SORT_NAME, DatabaseHelper.PARTY_SORT_NAME
     };
 
+    // For PARTY_SORT_LATEST_TXN, "ascending" sorts by days_since itself
+    // (smallest first = most recently active first) - see
+    // DatabaseHelper.getPartiesWithActivity()'s own comment. So "Recent
+    // Activity" needs ascending=true and "Oldest Activity" needs
+    // ascending=false - the reverse of what the Balance/Name sorts need,
+    // where ascending genuinely means "low value first". Previously had
+    // these two swapped (showed oldest-first under "Recent Activity" and
+    // vice versa) - caught while building the Win-Back List's own sort,
+    // which depends on the exact same convention.
     private static final boolean[] PARTY_SORT_ASCENDING = {
-        false, true, false, true, true, false
+        true, false, false, true, true, false
     };
 
     private static final String[] PARTY_SORT_LABELS = {

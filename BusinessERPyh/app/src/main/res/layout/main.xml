@@ -274,11 +274,12 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp" />
 
-                <!-- Today's Sales so far vs the same calendar weekday one
-                     week ago - a Monday is naturally busier/quieter than a
-                     Sunday, so comparing to a week ago rather than
-                     yesterday isolates a real trend instead of just that
-                     mismatch (see MainActivity#loadTodayVsLastWeek()). -->
+                <!-- This period's Sales so far vs the same elapsed window
+                     of the prior period - spinner_trend_compare_mode picks
+                     Today vs Last Week (default; a week-ago weekday, not
+                     yesterday, since a Monday is naturally busier/quieter
+                     than a Sunday), This Week vs Last Week, or This Month
+                     vs Last Month (see MainActivity#loadTodayVsLastWeek()). -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
@@ -298,12 +299,12 @@
                         android:layout_weight="1"
                         android:orientation="vertical">
 
-                        <TextView
-                            android:layout_width="match_parent"
+                        <Spinner
+                            android:id="@+id/spinner_trend_compare_mode"
+                            style="@style/FilterSpinner"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Today vs same day last week"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="12sp" />
+                            android:layout_marginBottom="4dp" />
 
                         <TextView
                             android:id="@+id/tv_today_vs_last_week"
@@ -625,6 +626,16 @@
                     android:id="@+id/btn_customize_dashboard"
                     style="@style/ToolRow"
                     android:text="Customize Dashboard" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <Button
+                    android:id="@+id/btn_swipe_gesture_settings"
+                    style="@style/ToolRow"
+                    android:text="Swipe Gesture Settings" />
 
             </LinearLayout>
 
