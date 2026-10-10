@@ -55,7 +55,7 @@ public class ReorderListAdapter extends BaseAdapter {
 	}
 
 	@Override
-	public View getView(int position, View convertView, ViewGroup parent) {
+	public View getView(final int position, View convertView, ViewGroup parent) {
 
 		// Always inflates a fresh row rather than reusing convertView -
 		// this list is small (one suggestion per low-stock item/combo in

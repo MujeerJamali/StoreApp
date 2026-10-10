@@ -65,3 +65,21 @@
   Expenses list (`ExpenseAdapter`). Like charts and info bubbles, this is
   an incremental rollout, not a one-time checklist item - pick it up again
   for another delete-capable list whenever touching that screen anyway.
+- AIDE's on-device compiler does NOT accept an "effectively final" local
+  variable or method parameter captured by an anonymous inner class
+  (`new Foo() { ... }`) the way modern desktop javac does under Java 8 -
+  it errors with "This variable must be final to be used in a local
+  class" unless the variable is explicitly declared `final`. Never rely
+  on effectively-final inference in this project: explicitly mark
+  `final` anything (a method parameter, a loop variable, a local) that
+  gets referenced inside an anonymous `OnClickListener`/`TextWatcher`/
+  adapter callback/etc., even though the sandbox's own desktop-side
+  static checks won't catch this (AIDE's compiler is stricter here than
+  the javac used anywhere else). Caught once in `ReorderListAdapter
+  .getView()`, where the `position` parameter was used directly inside
+  an anonymous `OnClickListener` without being `final` - the established
+  safe pattern elsewhere in the codebase (see every other `Adapter
+  .getView()`) is to capture a parameter into a `final` local copy right
+  away (e.g. `final HashMap<String, Object> row = list.get(position);`)
+  and reference only that local inside any anonymous class, or mark the
+  parameter itself `final` in the method signature.
