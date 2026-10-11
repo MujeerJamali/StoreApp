@@ -16,6 +16,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 
 // =====================
@@ -35,10 +37,29 @@ import java.util.Locale;
 // =====================
 public class CashActivity extends Activity {
 
+    // Every ledger_type DatabaseHelper.getCashLedger() can hand back,
+    // in display order, mapped to its multi-select label - LinkedHashMap
+    // so iteration order matches this fixed order rather than hash order.
+    private static final LinkedHashMap<String, String> LEDGER_TYPE_LABELS = new LinkedHashMap<>();
+
+    static {
+        LEDGER_TYPE_LABELS.put("sale", "Sales");
+        LEDGER_TYPE_LABELS.put("purchase", "Purchases");
+        LEDGER_TYPE_LABELS.put("payment_in", "Payment In");
+        LEDGER_TYPE_LABELS.put("payment_out", "Payment Out");
+        LEDGER_TYPE_LABELS.put("expense", "Expenses");
+        LEDGER_TYPE_LABELS.put("adjustment", "Adjustments");
+    }
+
     private TextView tvCashBalance;
     private TextView tvEmpty;
+    private TextView tvTypeFilter;
     private ListView lvLedger;
     private Button btnAddAdjustment;
+
+    // All types shown by default - nothing is filtered out until the
+    // user deliberately narrows it down.
+    private final HashSet<String> selectedLedgerTypes = new HashSet<>(LEDGER_TYPE_LABELS.keySet());
 
     private DatabaseHelper db;
 
@@ -49,10 +70,20 @@ public class CashActivity extends Activity {
 
         tvCashBalance = findViewById(R.id.tv_cash_balance);
         tvEmpty = findViewById(R.id.tv_cash_empty);
+        tvTypeFilter = findViewById(R.id.tv_cash_type_filter);
         lvLedger = findViewById(R.id.lv_cash_ledger);
         btnAddAdjustment = findViewById(R.id.btn_add_adjustment);
 
         db = new DatabaseHelper(this);
+
+        updateTypeFilterText();
+
+        tvTypeFilter.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                promptTypeFilter();
+            }
+        });
 
         btnAddAdjustment.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -106,8 +137,16 @@ public class CashActivity extends Activity {
                 String filterDate = getIntent().getStringExtra("date");
 
                 final double balance = db.getCashBalance();
-                final ArrayList<HashMap<String, Object>> ledger =
+                final ArrayList<HashMap<String, Object>> fullLedger =
                     filterDate != null ? db.getCashLedger(filterDate) : db.getCashLedger();
+
+                final ArrayList<HashMap<String, Object>> ledger = new ArrayList<>();
+
+                for (HashMap<String, Object> row : fullLedger) {
+                    if (selectedLedgerTypes.contains(row.get("ledger_type"))) {
+                        ledger.add(row);
+                    }
+                }
 
                 runOnUiThread(new Runnable() {
                     @Override
@@ -373,5 +412,70 @@ public class CashActivity extends Activity {
                 });
             }
         }).start();
+    }
+
+    // Excel-style multi-select, but as a plain AlertDialog with checkbox
+    // items rather than a dropdown - a real Spinner can only ever select
+    // one row at a time, so it can't drive this.
+    private void promptTypeFilter() {
+
+        final String[] keys = LEDGER_TYPE_LABELS.keySet().toArray(new String[0]);
+        final String[] labels = LEDGER_TYPE_LABELS.values().toArray(new String[0]);
+        final boolean[] checked = new boolean[keys.length];
+
+        for (int i = 0; i < keys.length; i++) {
+            checked[i] = selectedLedgerTypes.contains(keys[i]);
+        }
+
+        new AlertDialog.Builder(this)
+            .setTitle("Show Transaction Types")
+            .setMultiChoiceItems(labels, checked, new DialogInterface.OnMultiChoiceClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which, boolean isChecked) {
+                    checked[which] = isChecked;
+                }
+            })
+            .setPositiveButton("Apply", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+
+                    selectedLedgerTypes.clear();
+
+                    for (int i = 0; i < keys.length; i++) {
+                        if (checked[i]) {
+                            selectedLedgerTypes.add(keys[i]);
+                        }
+                    }
+
+                    if (selectedLedgerTypes.isEmpty()) {
+                        selectedLedgerTypes.addAll(LEDGER_TYPE_LABELS.keySet());
+                        Toast.makeText(
+                            CashActivity.this, "At least one type must stay selected - showing all",
+                            Toast.LENGTH_SHORT
+                        ).show();
+                    }
+
+                    updateTypeFilterText();
+                    loadCash();
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void updateTypeFilterText() {
+
+        if (selectedLedgerTypes.size() == LEDGER_TYPE_LABELS.size()) {
+
+            tvTypeFilter.setText("All Types");
+
+        } else if (selectedLedgerTypes.size() == 1) {
+
+            tvTypeFilter.setText(LEDGER_TYPE_LABELS.get(selectedLedgerTypes.iterator().next()));
+
+        } else {
+
+            tvTypeFilter.setText(selectedLedgerTypes.size() + " Types Selected");
+        }
     }
 }

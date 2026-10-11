@@ -246,6 +246,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
+            android:name=".NetPositionReportActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <activity
             android:name=".LoyaltyPointsActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />

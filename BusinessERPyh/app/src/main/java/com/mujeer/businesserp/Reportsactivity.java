@@ -142,6 +142,9 @@ public class Reportsactivity extends Activity {
 		new ReportEntry(R.id.btn_report_expense_ratio_trend, R.id.row_expense_ratio_trend, R.id.section_cash_operations,
 			"expense_ratio_trend", "Expense Ratio Trend", ExpenseRatioTrendReportActivity.class,
 			"unusual expense flag anomaly"),
+		new ReportEntry(R.id.btn_report_net_position, R.id.row_net_position, R.id.section_cash_operations,
+			"net_position", "Net Position", NetPositionReportActivity.class,
+			"net worth cash plus stock minus debit payable"),
 	};
 
 	private final int[] sectionIds = new int[]{

@@ -45,6 +45,16 @@
   user asked for the whole app to be more minimalist. Apply it to every
   new filter, and convert an existing button-row filter to match
   whenever you're touching that screen anyway.
+  **Exception for a genuine multi-select** (pick any combination, not
+  just one row) - a real `Spinner` can only ever select one row, so it
+  physically can't drive this. Use a plain `TextView` styled
+  `@style/FilterSpinner` instead (same minimalist look, it just ignores
+  the `Spinner`-only `popupBackground` attribute harmlessly) that opens
+  an `AlertDialog.setMultiChoiceItems()` on tap and shows a short summary
+  of the current selection as its own text ("All Types" / "3 Types
+  Selected" / the one type's name when exactly one is picked) - see
+  `CashActivity`'s Show filter. Still never a button or a row of
+  checkboxes sitting directly on the screen.
 - Charts use `SimpleBarChartView`/`SimplePieChartView`/`SimpleLineChartView`
   (plain Canvas drawing, no third-party library, all three sharing the
   same `SimpleBarChartView.Entry(label, value, color)` data-point class)

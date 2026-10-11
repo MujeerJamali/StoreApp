@@ -177,7 +177,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // Order Quantities screen (MinOrderQtyActivity). Real standing user
     // data (the shop owner's own override), so it's included in the
     // Vyapar round-trip.
-    public static final int DATABASE_VERSION = 37;
+    // Bumped 37 -> 38 to add action_log - a plain, permanent, view-only
+    // record of every DB-changing action the user takes (see
+    // ActionLogActivity/logAction()). Deliberately NOT included in the
+    // Vyapar round-trip, same reasoning as recently_deleted/
+    // reorder_suggestion_log above: it's a record of what happened
+    // operationally, not business state itself - a restore brings back
+    // the data as it stands, not a replay of every action that ever
+    // produced it.
+    public static final int DATABASE_VERSION = 38;
 
     // A party's customer tagging (default REGULAR) - see DATABASE_VERSION's
     // comment, Partieseditactivity's Customer Type spinner, and the
@@ -264,6 +272,22 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// buildSaleSnapshot()/buildPurchaseSnapshot() and
 	// restoreSaleFromSnapshot()/restorePurchaseFromSnapshot().
 	public static final String TABLE_RECENTLY_DELETED = "recently_deleted";
+
+	// One row per DB-changing action the user took (create/update/
+	// delete a Party/Item/Sale/Purchase/Payment/Expense/etc) - a plain,
+	// permanent, view-only audit trail (see ActionLogActivity). Logged
+	// by logAction(), called from inside each DatabaseHelper write
+	// method right after it succeeds (not from the calling Activity),
+	// so every current and future caller of that method is covered
+	// automatically regardless of which screen it's reached from. Not
+	// every write in this file logs here - a bulk import/restore
+	// (Vyapar import, Generate Entries, clearAllDataBulk) logs one
+	// summary line for the whole operation rather than one row per
+	// imported record, and a handful of high-frequency/low-signal
+	// writes (autosave drafts, one stock-take line at a time, the
+	// reorder-learning feedback loop) are deliberately left out - see
+	// DATABASE_VERSION's bump comment for the full reasoning.
+	public static final String TABLE_ACTION_LOG = "action_log";
 
 	// See DATABASE_VERSION's bump comment above for what this tracks and
 	// why it's excluded from the Vyapar round-trip.
@@ -622,6 +646,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"data TEXT NOT NULL, " +
 			"deleted_date TEXT NOT NULL, " +
 			"deleted_time TEXT NOT NULL" +
+			")"
+		);
+
+		db.execSQL(
+			"CREATE TABLE IF NOT EXISTS " + TABLE_ACTION_LOG + " (" +
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+			"action_type TEXT NOT NULL, " +
+			"entity_type TEXT NOT NULL, " +
+			"label TEXT NOT NULL, " +
+			"action_date TEXT NOT NULL, " +
+			"action_time TEXT NOT NULL" +
 			")"
 		);
 
@@ -1062,6 +1097,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
         long id = db.insert(TABLE_PARTIES, null, values);
 
+        if (id > 0) {
+            logAction("Created", "Party", name);
+        }
 
         return id;
     }
@@ -1290,12 +1328,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
+		String name = lookupSingleText(db, TABLE_PARTIES, "name", id);
+
 		int rows = db.delete(
             TABLE_PARTIES,
             "id=?",
             new String[]{String.valueOf(id)}
 		);
 
+		if (rows > 0) {
+			logAction("Deleted", "Party", name != null ? name : ("Party #" + id));
+		}
 
 		return rows > 0;
 	}
@@ -1318,6 +1361,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             new String[]{String.valueOf(id)}
 		);
 
+		if (rows > 0) {
+			logAction("Updated", "Party", name);
+		}
 
 		return rows > 0;
 	}
@@ -1329,7 +1375,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	public void updatePartyCustomerType(int partyId, String customerType) {
 
 		SQLiteDatabase db = this.getWritableDatabase();
+
+		String name = lookupSingleText(db, TABLE_PARTIES, "name", partyId);
+
 		updatePartyCustomerTypeBulk(db, partyId, customerType);
+
+		logAction(
+			"Updated", "Party",
+			(name != null ? name : ("Party #" + partyId)) + " - Customer Type: " + customerType
+		);
 	}
 
 	public void updatePartyCustomerTypeBulk(SQLiteDatabase db, int partyId, String customerType) {
@@ -1539,6 +1593,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		long id = db.insert(TABLE_ITEMS, null, values);
 
+		if (id > 0) {
+			logAction("Created", "Item", finalCode + " - " + name);
+		}
 
 		return id;
 	}
@@ -1880,7 +1937,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	// see getEffectiveMinOrderQty()) - set from MinOrderQtyActivity.
 	// Same pattern as updateItemHolidaySeasonal()/Bulk() above.
 	public void updateItemMinOrderQty(int itemId, double minOrderQty) {
-		updateItemMinOrderQtyBulk(this.getWritableDatabase(), itemId, minOrderQty);
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		String name = lookupSingleText(db, TABLE_ITEMS, "name", itemId);
+
+		updateItemMinOrderQtyBulk(db, itemId, minOrderQty);
+
+		logAction(
+			"Updated", "Item",
+			(name != null ? name : ("Item #" + itemId)) + " - Min Order Qty: " + AmountFormat.formatPlain(minOrderQty)
+		);
 	}
 
 	public void updateItemMinOrderQtyBulk(SQLiteDatabase db, int itemId, double minOrderQty) {
@@ -1952,12 +2019,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
+		String name = lookupSingleText(db, TABLE_ITEMS, "name", id);
+
 		ContentValues values = new ContentValues();
 		values.put("active", active ? 1 : 0);
 
 		int rows = db.update(
 			TABLE_ITEMS, values, "id=?", new String[]{String.valueOf(id)}
 		);
+
+		if (rows > 0) {
+			logAction(
+				active ? "Activated" : "Deactivated", "Item",
+				name != null ? name : ("Item #" + id)
+			);
+		}
 
 		return rows > 0;
 	}
@@ -2070,6 +2146,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			new String[]{String.valueOf(id)}
 		);
 
+		if (rows > 0) {
+			logAction("Updated", "Item", name);
+		}
 
 		return rows > 0;
 	}
@@ -2155,6 +2234,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			}
 		}
 
+		if (items.size() > 0) {
+
+			logAction(
+				"Updated", "Item",
+				"Bulk price update \"" + filterText + "\" (" + items.size() + " items): " +
+				(percentChange >= 0 ? "+" : "") + AmountFormat.formatPlain(percentChange) + "%"
+			);
+		}
+
 		return items.size();
 	}
 
@@ -2172,6 +2260,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		for (java.util.HashMap<String, Object> item : items) {
 
 			db.update(TABLE_ITEMS, values, "id=?", new String[]{String.valueOf(item.get("id"))});
+		}
+
+		if (items.size() > 0) {
+
+			logAction(
+				"Updated", "Item",
+				"Bulk reorder threshold update \"" + filterText + "\" (" + items.size() +
+				" items): " + AmountFormat.formatPlain(threshold)
+			);
 		}
 
 		return items.size();
@@ -2239,10 +2336,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
+		String name = lookupSingleText(db, TABLE_ITEMS, "name", itemId);
+
 		ContentValues values = new ContentValues();
 		values.put("reorder_threshold", threshold);
 
 		int rows = db.update(TABLE_ITEMS, values, "id=?", new String[]{String.valueOf(itemId)});
+
+		if (rows > 0) {
+
+			logAction(
+				"Updated", "Item",
+				(name != null ? name : ("Item #" + itemId)) + " - Reorder Threshold: " +
+				AmountFormat.formatPlain(threshold)
+			);
+		}
 
 		return rows > 0;
 	}
@@ -2255,12 +2363,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
+		String name = lookupSingleText(db, TABLE_ITEMS, "name", id);
+
 		int rows = db.delete(
 			TABLE_ITEMS,
 			"id=?",
 			new String[]{String.valueOf(id)}
 		);
 
+		if (rows > 0) {
+			logAction("Deleted", "Item", name != null ? name : ("Item #" + id));
+		}
 
 		return rows > 0;
 	}
@@ -3723,6 +3836,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		double due = grandTotal - amountPaid;
 		adjustPartyBalance(db, partyId, -due);
 
+		if (id > 0) {
+			String partyName = lookupSingleText(db, TABLE_PARTIES, "name", partyId);
+			logAction("Created", "Purchase", "Invoice " + invoiceNumber + " - " +
+				(partyName != null ? partyName : "Party #" + partyId) + " - " +
+				AmountFormat.format(grandTotal));
+		}
 
 		return id;
 	}
@@ -4536,10 +4655,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			// stranded with an adjustment for a purchase that no longer
 			// exists.
 			Cursor oldCursor = db.rawQuery(
-				"SELECT party_id, grand_total, amount_paid FROM " +
+				"SELECT party_id, grand_total, amount_paid, invoice_number FROM " +
 				TABLE_PURCHASES + " WHERE id=?",
 				new String[]{String.valueOf(purchaseId)}
 			);
+
+			String deletedInvoiceNumber = null;
+			int deletedPartyId = 0;
+			double deletedGrandTotal = 0;
+			boolean foundOldPurchase = false;
 
 			if (oldCursor.moveToFirst()) {
 
@@ -4547,6 +4671,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 				double oldDue = oldCursor.getDouble(1) - oldCursor.getDouble(2);
 
 				adjustPartyBalance(db, oldPartyId, oldDue);
+
+				foundOldPurchase = true;
+				deletedPartyId = oldPartyId;
+				deletedGrandTotal = oldCursor.getDouble(1);
+				deletedInvoiceNumber = oldCursor.getString(3);
 			}
 
 			oldCursor.close();
@@ -4607,6 +4736,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			);
 
 			db.setTransactionSuccessful();
+
+			if (rows > 0 && foundOldPurchase) {
+				String partyName = lookupSingleText(db, TABLE_PARTIES, "name", deletedPartyId);
+				logAction("Deleted", "Purchase", "Invoice " + deletedInvoiceNumber + " - " +
+					(partyName != null ? partyName : "Party #" + deletedPartyId) + " - " +
+					AmountFormat.format(deletedGrandTotal));
+			}
 
 			return rows > 0;
 
@@ -4961,6 +5097,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		adjustPartyBalance(db, partyId, -(grandTotal - amountPaid));
 
+		if (rows > 0) {
+			String partyName = lookupSingleText(db, TABLE_PARTIES, "name", partyId);
+			logAction("Edited", "Purchase", "Invoice " + invoiceNumber + " - " +
+				(partyName != null ? partyName : "Party #" + partyId) + " - " +
+				AmountFormat.format(grandTotal));
+		}
 
 		return rows > 0;
 	}
@@ -5072,6 +5214,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		// Any unpaid portion of this sale is money the party now owes
 		// us, so it's added to their balance.
 		adjustPartyBalance(db, partyId, due);
+
+		if (id > 0) {
+			String partyName = lookupSingleText(db, TABLE_PARTIES, "name", partyId);
+			logAction("Created", "Sale", "Invoice " + saleData.get("invoice_no") + " - " +
+				(partyName != null ? partyName : "Party #" + partyId) + " - " +
+				AmountFormat.format(Double.parseDouble(saleData.get("grand_total").toString())));
+		}
 
 		return id;
 	}
@@ -8891,6 +9040,68 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	// =====================
+	// REPORT: NET POSITION - Cash in hand, plus the value of "running"
+	// stock (everything NOT classified as dead/slow-moving - see
+	// getSlowMovingStock()'s 60-day effective-days-since-sale cutoff,
+	// the same cutoff Dead Stock Aging uses), valued at purchase_price
+	// only with no landed-cost extra (same basis getStockWorthSummary()
+	// already uses, hence "without cost" - the extra_cost_per_unit
+	// landed-cost add-on is left out), minus Debit (what the business
+	// currently owes its parties - the sum of every negative party
+	// balance, i.e. Payable; see getPartyBalance()'s sign convention).
+	// Receivables (parties who owe the business) are deliberately left
+	// out - this is a conservative "what you could cover your payables
+	// with right now" figure, not a full net-worth statement. A
+	// snapshot of right now, same limitation getStockWorthSummary() has.
+	// =====================
+	public HashMap<String, Object> getNetPositionSummary(Context context) {
+
+		HashMap<String, Object> map = new HashMap<>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		double cash = getCashBalance();
+
+		HashSet<Integer> deadItemIds = new HashSet<>();
+
+		for (HashMap<String, Object> row : getSlowMovingStock(context, 60)) {
+			deadItemIds.add((Integer) row.get("item_id"));
+		}
+
+		double runningStockValue = 0;
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, balance, purchase_price FROM " + TABLE_ITEMS +
+			" WHERE active = 1 AND balance > 0",
+			null
+		);
+
+		while (cursor.moveToNext()) {
+
+			if (deadItemIds.contains(cursor.getInt(0))) {
+				continue;
+			}
+
+			runningStockValue += cursor.getDouble(1) * cursor.getDouble(2);
+		}
+
+		cursor.close();
+
+		double debit = sumColumn(
+			db,
+			"SELECT COALESCE(SUM(-balance), 0) FROM " + TABLE_PARTIES + " WHERE balance < 0",
+			null
+		);
+
+		map.put("cash", cash);
+		map.put("running_stock_value", runningStockValue);
+		map.put("debit", debit);
+		map.put("net_position", cash + runningStockValue - debit);
+
+		return map;
+	}
+
+	// =====================
 	// REPORT: STOCK VALUE BY CATEGORY/AGE - "where's my money tied up".
 	// Category here is the first word of the item's name - there's no
 	// formal category field, but this shop's naming convention already
@@ -9424,9 +9635,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		// or the party's balance would be left stranded with an
 		// adjustment for a sale that no longer exists.
 		Cursor oldCursor = db.rawQuery(
-			"SELECT party_id, balance FROM sales WHERE id=?",
+			"SELECT party_id, balance, invoice_no, grand_total FROM sales WHERE id=?",
 			new String[]{saleId}
 		);
+
+		int deletedPartyId = 0;
+		String deletedInvoiceNo = null;
+		double deletedGrandTotal = 0;
+		boolean foundOldSale = false;
 
 		if (oldCursor.moveToFirst()) {
 
@@ -9434,15 +9650,27 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			double oldDue = oldCursor.getDouble(1);
 
 			adjustPartyBalance(db, oldPartyId, -oldDue);
+
+			foundOldSale = true;
+			deletedPartyId = oldPartyId;
+			deletedInvoiceNo = oldCursor.getString(2);
+			deletedGrandTotal = oldCursor.getDouble(3);
 		}
 
 		oldCursor.close();
 
-		db.delete(
+		int rows = db.delete(
 			"sales",
 			"id=?",
 			new String[]{saleId}
 		);
+
+		if (rows > 0 && foundOldSale) {
+			String partyName = lookupSingleText(db, TABLE_PARTIES, "name", deletedPartyId);
+			logAction("Deleted", "Sale", "Invoice " + deletedInvoiceNo + " - " +
+				(partyName != null ? partyName : "Party #" + deletedPartyId) + " - " +
+				AmountFormat.format(deletedGrandTotal));
+		}
 	}
 
 	// =====================
@@ -9653,6 +9881,100 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			row.put("label", cursor.getString(2));
 			row.put("deleted_date", cursor.getString(3));
 			row.put("deleted_time", cursor.getString(4));
+
+			list.add(row);
+		}
+
+		cursor.close();
+
+		return list;
+	}
+
+	// Appends one row to action_log - see TABLE_ACTION_LOG's own
+	// comment for who calls this and why. Computes its own date/time
+	// (always "right now") rather than taking them as parameters, so
+	// every call site stays a single line - every other write method
+	// in this file that calls this one is already running on the
+	// thread that made the actual DB change, same as every other
+	// insert here.
+	// Small reusable helper for building an action_log label when a
+	// delete/update method only has an id in hand and needs that row's
+	// own name/description first, before the row is gone. `column` is
+	// always a hardcoded literal at every call site, never user input.
+	private String lookupSingleText(SQLiteDatabase db, String table, String column, int id) {
+
+		Cursor cursor = db.rawQuery(
+			"SELECT " + column + " FROM " + table + " WHERE id=?",
+			new String[]{String.valueOf(id)}
+		);
+
+		String value = null;
+
+		if (cursor.moveToFirst()) {
+			value = cursor.getString(0);
+		}
+
+		cursor.close();
+
+		return value;
+	}
+
+	public void logAction(String actionType, String entityType, String label) {
+
+		ContentValues values = new ContentValues();
+		values.put("action_type", actionType);
+		values.put("entity_type", entityType);
+		values.put("label", label);
+		values.put("action_date", new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date()));
+		values.put("action_time", new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date()));
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		db.insert(TABLE_ACTION_LOG, null, values);
+	}
+
+	public int getActionLogCount() {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_ACTION_LOG, null);
+
+		int count = 0;
+
+		if (cursor.moveToFirst()) {
+			count = cursor.getInt(0);
+		}
+
+		cursor.close();
+
+		return count;
+	}
+
+	// Newest first, same "Load More" 30-at-a-time pagination convention
+	// as ReorderLearningHistoryActivity - this table is append-only and
+	// can grow large over a shop's lifetime, so the whole thing is
+	// never loaded at once.
+	public ArrayList<HashMap<String, Object>> getActionLogPage(int limit, int offset) {
+
+		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT id, action_type, entity_type, label, action_date, action_time FROM " +
+			TABLE_ACTION_LOG + " ORDER BY id DESC LIMIT ? OFFSET ?",
+			new String[]{String.valueOf(limit), String.valueOf(offset)}
+		);
+
+		while (cursor.moveToNext()) {
+
+			HashMap<String, Object> row = new HashMap<String, Object>();
+			row.put("id", cursor.getInt(0));
+			row.put("action_type", cursor.getString(1));
+			row.put("entity_type", cursor.getString(2));
+			row.put("label", cursor.getString(3));
+			row.put("action_date", cursor.getString(4));
+			row.put("action_time", cursor.getString(5));
 
 			list.add(row);
 		}
@@ -10368,6 +10690,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		adjustPartyBalance(db, newPartyId, newDue);
 
+		if (rows > 0) {
+			String partyName = lookupSingleText(db, TABLE_PARTIES, "name", newPartyId);
+			logAction("Edited", "Sale", "Invoice " + saleData.get("invoice_no") + " - " +
+				(partyName != null ? partyName : "Party #" + newPartyId) + " - " +
+				AmountFormat.format(Double.parseDouble(saleData.get("grand_total").toString())));
+		}
 
 		return rows > 0;
 	}
@@ -10448,6 +10776,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			type == PAYMENT_IN ? -amount : amount
 		);
 
+		if (id > 0) {
+			String partyName = lookupSingleText(db, TABLE_PARTIES, "name", partyId);
+			logAction("Created", type == PAYMENT_IN ? "Payment In" : "Payment Out",
+				(partyName != null ? partyName : "Party #" + partyId) + " - " +
+				AmountFormat.format(amount));
+		}
 
 		return id;
 	}
@@ -10606,6 +10940,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			type == PAYMENT_IN ? -amount : amount
 		);
 
+		if (rows > 0) {
+			String partyName = lookupSingleText(db, TABLE_PARTIES, "name", partyId);
+			logAction("Edited", type == PAYMENT_IN ? "Payment In" : "Payment Out",
+				(partyName != null ? partyName : "Party #" + partyId) + " - " +
+				AmountFormat.format(amount));
+		}
 
 		return rows > 0;
 	}
@@ -10628,6 +10968,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			new String[]{String.valueOf(paymentId)}
 		);
 
+		int deletedType = 0;
+		int deletedPartyId = 0;
+		double deletedAmount = 0;
+		boolean foundOldPayment = false;
+
 		if (oldCursor.moveToFirst()) {
 
 			int oldType = oldCursor.getInt(0);
@@ -10639,6 +10984,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 				oldPartyId,
 				oldType == PAYMENT_IN ? oldAmount : -oldAmount
 			);
+
+			foundOldPayment = true;
+			deletedType = oldType;
+			deletedPartyId = oldPartyId;
+			deletedAmount = oldAmount;
 		}
 
 		oldCursor.close();
@@ -10651,6 +11001,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			}
 		);
 
+		if (rows > 0 && foundOldPayment) {
+			String partyName = lookupSingleText(db, TABLE_PARTIES, "name", deletedPartyId);
+			logAction("Deleted", deletedType == PAYMENT_IN ? "Payment In" : "Payment Out",
+				(partyName != null ? partyName : "Party #" + deletedPartyId) + " - " +
+				AmountFormat.format(deletedAmount));
+		}
 
 		return rows > 0;
 	}
@@ -11057,6 +11413,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			adjustPartyBalance(db, partyId, -due);
 		}
 
+		if (id > 0) {
+			logAction("Created", "Expense", item + " - " + AmountFormat.format(amount));
+		}
+
 		return id;
 	}
 
@@ -11408,6 +11768,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			adjustPartyBalance(db, partyId, -(amount - paidAmount));
 		}
 
+		if (rows > 0) {
+			logAction("Edited", "Expense", item + " - " + AmountFormat.format(amount));
+		}
+
 		return rows > 0;
 	}
 
@@ -11427,17 +11791,28 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		// disappears, same as updateExpense()'s reversal, or the
 		// party's balance would be left stranded.
 		Cursor oldCursor = db.rawQuery(
-			"SELECT party_id, amount, paid_amount FROM " +
+			"SELECT party_id, amount, paid_amount, item FROM " +
 			TABLE_EXPENSES + " WHERE id=?",
 			new String[]{String.valueOf(expenseId)}
 		);
 
-		if (oldCursor.moveToFirst() && !oldCursor.isNull(0)) {
+		String deletedItem = null;
+		double deletedAmount = 0;
+		boolean foundOldExpense = false;
 
-			int oldPartyId = oldCursor.getInt(0);
-			double oldDue = oldCursor.getDouble(1) - oldCursor.getDouble(2);
+		if (oldCursor.moveToFirst()) {
 
-			adjustPartyBalance(db, oldPartyId, oldDue);
+			foundOldExpense = true;
+			deletedItem = oldCursor.getString(3);
+			deletedAmount = oldCursor.getDouble(1);
+
+			if (!oldCursor.isNull(0)) {
+
+				int oldPartyId = oldCursor.getInt(0);
+				double oldDue = oldCursor.getDouble(1) - oldCursor.getDouble(2);
+
+				adjustPartyBalance(db, oldPartyId, oldDue);
+			}
 		}
 
 		oldCursor.close();
@@ -11460,6 +11835,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			}
 		);
 
+		if (rows > 0 && foundOldExpense) {
+			logAction("Deleted", "Expense", deletedItem + " - " + AmountFormat.format(deletedAmount));
+		}
 
 		return rows > 0;
 	}
@@ -13011,42 +13389,42 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		Cursor cursor = db.rawQuery(
 			"SELECT date, time, paid_amount AS amount, " +
-			"('Sale - ' || COALESCE(pa.name, 'Cash Sale')) AS label, source, 0, NULL, 'sale', s.id " +
+			"('Sale - ' || COALESCE(pa.name, 'Cash Sale')) AS label, source, 0, NULL, 'sale', s.id, 'sale' " +
 			"FROM sales s LEFT JOIN " + TABLE_PARTIES + " pa ON s.party_id = pa.id " +
 			"WHERE paid_amount != 0 " + dateFilter +
 
 			"UNION ALL " +
 
 			"SELECT date, time, -amount_paid, " +
-			"('Purchase - ' || pa.name), source, 0, NULL, 'purchase', p.id " +
+			"('Purchase - ' || pa.name), source, 0, NULL, 'purchase', p.id, 'purchase' " +
 			"FROM " + TABLE_PURCHASES + " p " +
 			"INNER JOIN " + TABLE_PARTIES + " pa ON p.party_id = pa.id " +
 			"WHERE amount_paid != 0 " + dateFilter +
 
 			"UNION ALL " +
 
-			"SELECT date, time, amount, ('Payment In - ' || pa.name), source, 0, NULL, 'payment', pm.id " +
+			"SELECT date, time, amount, ('Payment In - ' || pa.name), source, 0, NULL, 'payment', pm.id, 'payment_in' " +
 			"FROM " + TABLE_PAYMENTS + " pm " +
 			"INNER JOIN " + TABLE_PARTIES + " pa ON pm.party_id = pa.id " +
 			"WHERE type=" + PAYMENT_IN + " " + dateFilter +
 
 			"UNION ALL " +
 
-			"SELECT date, time, -amount, ('Payment Out - ' || pa.name), source, 0, NULL, 'payment', pm.id " +
+			"SELECT date, time, -amount, ('Payment Out - ' || pa.name), source, 0, NULL, 'payment', pm.id, 'payment_out' " +
 			"FROM " + TABLE_PAYMENTS + " pm " +
 			"INNER JOIN " + TABLE_PARTIES + " pa ON pm.party_id = pa.id " +
 			"WHERE type=" + PAYMENT_OUT + " " + dateFilter +
 
 			"UNION ALL " +
 
-			"SELECT date, time, -paid_amount, ('Expense - ' || item), source, 0, NULL, 'expense', id " +
+			"SELECT date, time, -paid_amount, ('Expense - ' || item), source, 0, NULL, 'expense', id, 'expense' " +
 			"FROM " + TABLE_EXPENSES + " WHERE paid_amount != 0 " + dateFilter +
 
 			"UNION ALL " +
 
 			"SELECT date, time, amount, " +
 			"('Adjustment' || CASE WHEN notes IS NOT NULL AND notes != '' " +
-			"THEN ' - ' || notes ELSE '' END), source, id, notes, 'adjustment', id " +
+			"THEN ' - ' || notes ELSE '' END), source, id, notes, 'adjustment', id, 'adjustment' " +
 			"FROM " + TABLE_CASH_ADJUSTMENTS +
 			(date != null ? " WHERE date=? " : " ") +
 
@@ -13068,6 +13446,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			map.put("notes", cursor.isNull(6) ? "" : cursor.getString(6));
 			map.put("record_type", cursor.getString(7));
 			map.put("record_id", cursor.getInt(8));
+			map.put("ledger_type", cursor.getString(9));
 
 			list.add(map);
 		}
@@ -13089,7 +13468,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
-		return db.insert(TABLE_CASH_ADJUSTMENTS, null, values);
+		long id = db.insert(TABLE_CASH_ADJUSTMENTS, null, values);
+
+		if (id > 0) {
+			logAction("Created", "Cash Adjustment", AmountFormat.format(amount) +
+				(notes != null && notes.trim().length() > 0 ? " - " + notes : ""));
+		}
+
+		return id;
 	}
 
 	public long insertCashAdjustmentBulk(
@@ -13116,16 +13502,43 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
-		db.update(
+		int rows = db.update(
 			TABLE_CASH_ADJUSTMENTS, values, "id=?", new String[]{String.valueOf(id)}
 		);
+
+		if (rows > 0) {
+			logAction("Edited", "Cash Adjustment", AmountFormat.format(amount) +
+				(notes != null && notes.trim().length() > 0 ? " - " + notes : ""));
+		}
 	}
 
 	public void deleteCashAdjustment(int id) {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
-		db.delete(TABLE_CASH_ADJUSTMENTS, "id=?", new String[]{String.valueOf(id)});
+		String deletedNotes = null;
+		double deletedAmount = 0;
+		boolean foundOldAdjustment = false;
+
+		Cursor oldCursor = db.rawQuery(
+			"SELECT amount, notes FROM " + TABLE_CASH_ADJUSTMENTS + " WHERE id=?",
+			new String[]{String.valueOf(id)}
+		);
+
+		if (oldCursor.moveToFirst()) {
+			foundOldAdjustment = true;
+			deletedAmount = oldCursor.getDouble(0);
+			deletedNotes = oldCursor.getString(1);
+		}
+
+		oldCursor.close();
+
+		int rows = db.delete(TABLE_CASH_ADJUSTMENTS, "id=?", new String[]{String.valueOf(id)});
+
+		if (rows > 0 && foundOldAdjustment) {
+			logAction("Deleted", "Cash Adjustment", AmountFormat.format(deletedAmount) +
+				(deletedNotes != null && deletedNotes.trim().length() > 0 ? " - " + deletedNotes : ""));
+		}
 	}
 
 	// =====================

@@ -45,6 +45,24 @@
         android:text="+ Add Adjustment" />
 
     <TextView
+        style="@style/FieldLabel"
+        android:layout_marginTop="14dp"
+        android:layout_marginBottom="0dp"
+        android:text="Show" />
+
+    <TextView
+        android:id="@+id/tv_cash_type_filter"
+        style="@style/FilterSpinner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:text="All Types"
+        android:textColor="@color/text_primary"
+        android:textSize="13sp" />
+
+    <TextView
         android:id="@+id/tv_cash_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

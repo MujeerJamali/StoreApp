@@ -465,7 +465,12 @@ BusinessERPyh/                  Gradle project root
   mean anything yet.
 - **Cash** — a single ledger of all cash movement (sales, purchases,
   payments, expenses, manual adjustments); tapping a row opens its real
-  source transaction. **A transaction is rejected if it would take the
+  source transaction. A **Show** multi-select filter (plain dialog with
+  checkboxes, since a real dropdown Spinner can only ever pick one row)
+  narrows the ledger to any combination of Sales/Purchases/Payment In/
+  Payment Out/Expenses/Adjustments - all six on by default, and picking
+  none snaps back to all six rather than showing an empty list.
+  **A transaction is rejected if it would take the
   cash balance below 0** — Purchase/Payment Out/Expense amounts and a
   negative Cash Adjustment are all checked before saving; a Sale,
   Payment In, or positive adjustment is never blocked, since it only
@@ -791,7 +796,17 @@ sales/profit, worth watching even when the totals are individually
 growing; both ratios are always computed (`DatabaseHelper.
 getExpenseRatioTrend()`) so switching modes just re-renders, no second
 query; each month's badge is colored by whether its ratio improved or
-worsened vs the month before it) · Win-Back List (every party whose
+worsened vs the month before it) · Net Position (a single snapshot
+figure: Cash in hand, plus the value of running stock - every active
+item with stock that is NOT dead/slow-moving per Dead Stock Aging's
+own 60-effective-day cutoff, valued at purchase price only with no
+landed-cost extra, same basis Stock Worth uses - minus Debit, the sum
+of every negative party balance, i.e. what's currently owed to
+parties/Payable. Receivables (what parties owe the business) are
+deliberately left out, so this is a conservative "could you cover
+what you owe right now" figure, not a full net-worth statement; see
+`DatabaseHelper.getNetPositionSummary()`. A single number plus its
+3-line breakdown, no chart, no list) · Win-Back List (every party whose
 last Sale/Purchase/Payment/Expense/Party Transfer was at least a
 chosen threshold ago - 30/60/90/180+ days quiet - excluding a party
 we've only ever bought from (a supplier, with Purchases but zero
@@ -821,7 +836,7 @@ the Party Balances report.
 All period-based reports share the same range selector: Today, Yesterday,
 Week, Month, Quarter, Year, Custom Range.
 
-**Charts**: 26 of the app's 30 report screens show a small chart
+**Charts**: 26 of the app's 31 report screens show a small chart
 alongside their summary figures, drawn by dependency-free custom views
 (`SimpleBarChartView`/`SimplePieChartView`/`SimpleLineChartView` - no
 charting library is wired into the project). Which type depends on the
