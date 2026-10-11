@@ -86,11 +86,18 @@
 
     </LinearLayout>
 
-    <com.mujeer.businesserp.SimpleBarChartView
-        android:id="@+id/chart_credit_due"
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp" />
+        android:layout_marginBottom="12dp"
+        android:scrollbars="none">
+
+        <com.mujeer.businesserp.SimpleBarChartView
+            android:id="@+id/chart_credit_due"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+    </HorizontalScrollView>
 
     <TextView
         android:id="@+id/tv_empty"

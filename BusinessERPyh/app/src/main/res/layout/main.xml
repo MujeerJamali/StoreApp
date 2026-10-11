@@ -268,18 +268,25 @@
 
                 </LinearLayout>
 
-                <com.mujeer.businesserp.SimpleBarChartView
-                    android:id="@+id/chart_sales_trend"
+                <HorizontalScrollView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp" />
+                    android:layout_marginTop="6dp"
+                    android:scrollbars="none">
+
+                    <com.mujeer.businesserp.SimpleBarChartView
+                        android:id="@+id/chart_sales_trend"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+
+                </HorizontalScrollView>
 
                 <!-- This period's Sales so far vs the same elapsed window
-                     of the prior period - spinner_trend_compare_mode picks
-                     Today vs Last Week (default; a week-ago weekday, not
+                     of the prior period, for all three comparisons at
+                     once (Today vs Last Week - a week-ago weekday, not
                      yesterday, since a Monday is naturally busier/quieter
-                     than a Sunday), This Week vs Last Week, or This Month
-                     vs Last Month (see MainActivity#loadTodayVsLastWeek()). -->
+                     than a Sunday; This Week vs Last Week; This Month
+                     vs Last Month) - see MainActivity#loadTodayVsLastWeek(). -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
@@ -287,44 +294,110 @@
                     android:layout_marginBottom="10dp"
                     android:background="@color/stroke" />
 
+                <!-- All three period comparisons listed at once (no
+                     spinner to pick just one) - see
+                     MainActivity#loadTodayVsLastWeek(), which now loads
+                     and renders all of TREND_COMPARE_MODE_VALUES
+                     together instead of just whichever one a spinner
+                     had selected. -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/FieldLabel"
+                        android:layout_marginTop="0dp"
+                        android:layout_marginBottom="2dp"
+                        android:text="Today vs Last Week" />
 
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <Spinner
-                            android:id="@+id/spinner_trend_compare_mode"
-                            style="@style/FilterSpinner"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginBottom="4dp" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
                         <TextView
-                            android:id="@+id/tv_today_vs_last_week"
-                            android:layout_width="match_parent"
+                            android:id="@+id/tv_trend_compare_0_text"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_weight="1"
                             android:text="0 vs 0"
                             android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_trend_compare_0_change"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
                             android:textSize="14sp"
                             android:textStyle="bold" />
 
                     </LinearLayout>
 
                     <TextView
-                        android:id="@+id/tv_today_vs_last_week_change"
-                        android:layout_width="wrap_content"
+                        style="@style/FieldLabel"
+                        android:layout_marginBottom="2dp"
+                        android:text="This Week vs Last Week" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tv_trend_compare_1_text"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="0 vs 0"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_trend_compare_1_change"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        style="@style/FieldLabel"
+                        android:layout_marginBottom="2dp"
+                        android:text="This Month vs Last Month" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tv_trend_compare_2_text"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="0 vs 0"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_trend_compare_2_change"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
 
                 </LinearLayout>
 

@@ -37,11 +37,18 @@
             android:layout_marginBottom="10dp"
             android:text="Every shoe size's share of lifetime sales vs its share of current stock. A size selling more than it's stocked risks running out; a size stocked more than it sells is cash sitting idle." />
 
-        <com.mujeer.businesserp.SimpleBarChartView
-            android:id="@+id/chart_size_curve"
+        <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp" />
+            android:layout_marginBottom="12dp"
+            android:scrollbars="none">
+
+            <com.mujeer.businesserp.SimpleBarChartView
+                android:id="@+id/chart_size_curve"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </HorizontalScrollView>
 
         <TextView
             android:id="@+id/tv_size_curve_empty"

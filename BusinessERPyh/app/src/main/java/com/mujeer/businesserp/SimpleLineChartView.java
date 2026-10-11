@@ -23,8 +23,19 @@ import java.util.List;
 //
 // A single point has no trend to show, so this renders nothing (height
 // 0) below 2 points - this view's own version of this feature's "skip a
-// chart that doesn't fit the data" rule.
+// chart that doesn't fit the data" rule. Every point always gets its
+// own value and label (never thinned out), with a guaranteed minimum
+// width per point (MIN_SLOT_WIDTH_DP) and the view reporting its own
+// width as wider than its parent whenever that needs more room than
+// available - same mechanism as SimpleBarChartView, and like that view
+// it only does anything useful when wrapped in a HorizontalScrollView
+// (every XML usage in this app is), so a long trend scrolls instead of
+// cramming every point into one screen width. A label still too long
+// for its minimum width wraps onto a second line - see
+// SimpleBarChartView.wrapLabel()'s twin here.
 public class SimpleLineChartView extends View {
+
+	private static final float MIN_SLOT_WIDTH_DP = 56f;
 
 	private List<SimpleBarChartView.Entry> entries = new ArrayList<SimpleBarChartView.Entry>();
 
@@ -91,11 +102,71 @@ public class SimpleLineChartView extends View {
 
 		float density = getResources().getDisplayMetrics().density;
 
-		int desiredHeight = entries.isEmpty() ? 0 : (int) (150 * density);
+		int count = entries.size();
 
-		int width = MeasureSpec.getSize(widthMeasureSpec);
+		if (count == 0) {
+			setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), 0);
+			return;
+		}
+
+		int minContentWidth = (int) (MIN_SLOT_WIDTH_DP * density * count);
+
+		int widthMode = MeasureSpec.getMode(widthMeasureSpec);
+
+		int width = widthMode == MeasureSpec.UNSPECIFIED ?
+			minContentWidth :
+			Math.max(MeasureSpec.getSize(widthMeasureSpec), minContentWidth);
+
+		int desiredHeight = (int) (150 * density);
+
+		if (needsTwoLineLabels(width, count)) {
+			desiredHeight += (int) (14 * density);
+		}
 
 		setMeasuredDimension(width, desiredHeight);
+	}
+
+	private boolean needsTwoLineLabels(int width, int count) {
+
+		if (count == 0) {
+			return false;
+		}
+
+		float density = getResources().getDisplayMetrics().density;
+		float slotWidth = width / (float) count;
+		float available = slotWidth - 4 * density;
+
+		for (SimpleBarChartView.Entry e : entries) {
+
+			if (labelPaint.measureText(e.label) > available) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// Splits a label too wide for one line at the space nearest its
+	// midpoint - same approach as SimpleBarChartView.wrapLabel(), see
+	// its own comment for why a space-less label is left on one line.
+	private String[] wrapLabel(String label) {
+
+		int mid = label.length() / 2;
+
+		int spaceIndex = label.indexOf(' ', mid);
+
+		if (spaceIndex < 0) {
+			spaceIndex = label.lastIndexOf(' ', mid);
+		}
+
+		if (spaceIndex < 0) {
+			return new String[]{label};
+		}
+
+		return new String[]{
+			label.substring(0, spaceIndex).trim(),
+			label.substring(spaceIndex + 1).trim()
+		};
 	}
 
 	@Override
@@ -111,17 +182,20 @@ public class SimpleLineChartView extends View {
 		int width = getWidth();
 		int height = getHeight();
 
-		float labelHeight = 16 * density;
+		int count = entries.size();
+
+		boolean twoLineLabels = needsTwoLineLabels(width, count);
+
+		float labelHeight = (twoLineLabels ? 30 : 16) * density;
 		float valueHeight = 16 * density;
 		float topPadding = 8 * density;
 		float bottomPadding = 4 * density;
 		float dotRadius = 3 * density;
+		float labelLineHeight = 12 * density;
 
 		float plotTop = topPadding + valueHeight;
 		float plotBottom = height - bottomPadding - labelHeight;
 		float plotHeight = plotBottom - plotTop;
-
-		int count = entries.size();
 
 		double minValue = entries.get(0).value;
 		double maxValue = entries.get(0).value;
@@ -155,16 +229,6 @@ public class SimpleLineChartView extends View {
 		fillPaint.setColor(lineColor);
 		fillPaint.setAlpha(28);
 
-		// A handful of points (every trend report so far, e.g. 6 months)
-		// always gets a value above every dot and a label below it. A
-		// sparkline-style chart with many points (e.g. a 30-day cash
-		// flow forecast) would make every point's value/label overlap
-		// its neighbors, so past this threshold only every few points
-		// gets a label and none gets a value - same threshold and
-		// reasoning as SimpleBarChartView's own sparse mode.
-		boolean sparse = count > 10;
-		int labelInterval = sparse ? Math.max(1, (int) Math.ceil(count / 6.0)) : 1;
-
 		float slotWidth = width / (float) count;
 
 		float[] xs = new float[count];
@@ -174,7 +238,7 @@ public class SimpleLineChartView extends View {
 
 			SimpleBarChartView.Entry e = entries.get(i);
 
-			xs[i] = count == 1 ? width / 2f : slotWidth * i + slotWidth / 2f;
+			xs[i] = slotWidth * i + slotWidth / 2f;
 			ys[i] = (float) (plotBottom - ((e.value - minValue) / range) * plotHeight);
 		}
 
@@ -205,14 +269,26 @@ public class SimpleLineChartView extends View {
 
 			canvas.drawCircle(xs[i], ys[i], dotRadius, dotPaint);
 
-			if (!sparse) {
+			float valueY = Math.max(ys[i] - 6 * density, topPadding + valueHeight - 2 * density);
 
-				float valueY = Math.max(ys[i] - 6 * density, topPadding + valueHeight - 2 * density);
+			canvas.drawText(AmountFormat.format(e.value), xs[i], valueY, valuePaint);
 
-				canvas.drawText(AmountFormat.format(e.value), xs[i], valueY, valuePaint);
-			}
+			if (twoLineLabels && labelPaint.measureText(e.label) > slotWidth - 4 * density) {
 
-			if (!sparse || i % labelInterval == 0 || i == count - 1) {
+				String[] lines = wrapLabel(e.label);
+
+				if (lines.length == 2) {
+
+					canvas.drawText(lines[0], xs[i], height - 2 * density - labelLineHeight, labelPaint);
+					canvas.drawText(lines[1], xs[i], height - 2 * density, labelPaint);
+
+				} else {
+
+					canvas.drawText(e.label, xs[i], height - 2 * density, labelPaint);
+				}
+
+			} else {
+
 				canvas.drawText(e.label, xs[i], height - 2 * density, labelPaint);
 			}
 		}

@@ -76,11 +76,18 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp" />
 
-        <com.mujeer.businesserp.SimpleBarChartView
-            android:id="@+id/chart_stock_value"
+        <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp" />
+            android:layout_marginTop="8dp"
+            android:scrollbars="none">
+
+            <com.mujeer.businesserp.SimpleBarChartView
+                android:id="@+id/chart_stock_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </HorizontalScrollView>
 
         <LinearLayout
             android:id="@+id/container_by_category"

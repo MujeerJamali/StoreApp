@@ -67,9 +67,14 @@ public class MainActivity extends Activity {
 
 	Spinner spinner_sales_trend_horizon;
 	SimpleBarChartView chart_sales_trend;
-	Spinner spinner_trend_compare_mode;
-	TextView tv_today_vs_last_week;
-	TextView tv_today_vs_last_week_change;
+
+	// All three period comparisons are listed at once now (no spinner
+	// to pick just one - see loadTodayVsLastWeek()), so these are
+	// parallel 3-element arrays indexed the same as
+	// TREND_COMPARE_MODE_VALUES/LABELS rather than one pair of fields.
+	TextView[] tv_trend_compare_text = new TextView[3];
+	TextView[] tv_trend_compare_change = new TextView[3];
+
 	TextView tv_sales_streak;
 	TextView tv_sales_streak_best;
 
@@ -78,17 +83,16 @@ public class MainActivity extends Activity {
 
 	private int selectedTrendHorizonDays = TREND_HORIZON_DAYS[0];
 
+	// All three are now loaded and shown together (see
+	// loadTodayVsLastWeek()) rather than one at a time via a spinner,
+	// so there's no longer a single "selected" mode to track - this
+	// array is just the fixed order both that method and the three
+	// static rows in main.xml agree on.
 	private static final int[] TREND_COMPARE_MODE_VALUES = {
 		DatabaseHelper.TREND_COMPARE_TODAY_VS_LAST_WEEK,
 		DatabaseHelper.TREND_COMPARE_WEEK_VS_WEEK,
 		DatabaseHelper.TREND_COMPARE_MONTH_VS_MONTH
 	};
-
-	private static final String[] TREND_COMPARE_MODE_LABELS = {
-		"Today vs Last Week", "This Week vs Last Week", "This Month vs Last Month"
-	};
-
-	private int selectedTrendCompareMode = DatabaseHelper.TREND_COMPARE_TODAY_VS_LAST_WEEK;
 
 	// A background result is only applied if it's still the most
 	// recent request by the time it comes back.
@@ -189,9 +193,14 @@ public class MainActivity extends Activity {
 
 		spinner_sales_trend_horizon = findViewById(R.id.spinner_sales_trend_horizon);
 		chart_sales_trend = findViewById(R.id.chart_sales_trend);
-		spinner_trend_compare_mode = findViewById(R.id.spinner_trend_compare_mode);
-		tv_today_vs_last_week = findViewById(R.id.tv_today_vs_last_week);
-		tv_today_vs_last_week_change = findViewById(R.id.tv_today_vs_last_week_change);
+
+		tv_trend_compare_text[0] = findViewById(R.id.tv_trend_compare_0_text);
+		tv_trend_compare_change[0] = findViewById(R.id.tv_trend_compare_0_change);
+		tv_trend_compare_text[1] = findViewById(R.id.tv_trend_compare_1_text);
+		tv_trend_compare_change[1] = findViewById(R.id.tv_trend_compare_1_change);
+		tv_trend_compare_text[2] = findViewById(R.id.tv_trend_compare_2_text);
+		tv_trend_compare_change[2] = findViewById(R.id.tv_trend_compare_2_change);
+
 		tv_sales_streak = findViewById(R.id.tv_sales_streak);
 		tv_sales_streak_best = findViewById(R.id.tv_sales_streak_best);
 
@@ -273,36 +282,6 @@ public class MainActivity extends Activity {
 				public void onNothingSelected(AdapterView<?> parent) {
 				}
 			});
-
-		ArrayAdapter<String> trendCompareAdapter = new ArrayAdapter<String>(
-			this, android.R.layout.simple_spinner_item, TREND_COMPARE_MODE_LABELS
-		);
-
-		trendCompareAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-		spinner_trend_compare_mode.setAdapter(trendCompareAdapter);
-
-		int rememberedCompareModePosition =
-			FilterMemory.getInt(this, "Dashboard", "trend_compare_mode", 0);
-
-		spinner_trend_compare_mode.setSelection(rememberedCompareModePosition);
-		selectedTrendCompareMode = TREND_COMPARE_MODE_VALUES[rememberedCompareModePosition];
-
-		spinner_trend_compare_mode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-				@Override
-				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-
-					selectedTrendCompareMode = TREND_COMPARE_MODE_VALUES[position];
-
-					FilterMemory.setInt(MainActivity.this, "Dashboard", "trend_compare_mode", position);
-
-					loadTodayVsLastWeek();
-				}
-
-				@Override
-				public void onNothingSelected(AdapterView<?> parent) {
-				}
-			});
-
 
 		btn_expenses.setOnClickListener(
 			new View.OnClickListener() {
@@ -1296,20 +1275,25 @@ public class MainActivity extends Activity {
 	}
 
 	// This period's sales so far vs the same elapsed window of the prior
-	// period, shown inside the Sales Trend card - spinner_trend_compare_mode
-	// picks Today vs Last Week (the original default; a week-ago weekday,
-	// not yesterday, is the fairer baseline), This Week vs Last Week, or
-	// This Month vs Last Month (see DatabaseHelper.getSalesTrendComparison()).
+	// period, shown inside the Sales Trend card - all three comparisons
+	// (Today vs Last Week - a week-ago weekday, not yesterday, is the
+	// fairer baseline; This Week vs Last Week; This Month vs Last
+	// Month) are loaded and shown together now, not one at a time
+	// behind a spinner (see DatabaseHelper.getSalesTrendComparison()).
 	private void loadTodayVsLastWeek() {
 
 		final long myGeneration = ++todayVsLastWeekLoadGeneration;
-		final int compareMode = selectedTrendCompareMode;
 
 		new Thread(new Runnable() {
 				@Override
 				public void run() {
 
-					final HashMap<String, Object> result = db.getSalesTrendComparison(compareMode);
+					final ArrayList<HashMap<String, Object>> results =
+						new ArrayList<HashMap<String, Object>>();
+
+					for (int mode : TREND_COMPARE_MODE_VALUES) {
+						results.add(db.getSalesTrendComparison(mode));
+					}
 
 					runOnUiThread(new Runnable() {
 							@Override
@@ -1319,40 +1303,45 @@ public class MainActivity extends Activity {
 									return;
 								}
 
-								applyTodayVsLastWeek(result);
+								applyTodayVsLastWeek(results);
 							}
 						});
 				}
 			}).start();
 	}
 
-	private void applyTodayVsLastWeek(HashMap<String, Object> result) {
+	private void applyTodayVsLastWeek(ArrayList<HashMap<String, Object>> results) {
 
-		double currentTotal = (Double) result.get("current_total");
-		double comparisonTotal = (Double) result.get("comparison_total");
-		String currentLabel = (String) result.get("current_label");
-		String comparisonLabel = (String) result.get("comparison_label");
-		Double percentChange = (Double) result.get("percent_change");
+		for (int i = 0; i < results.size(); i++) {
 
-		tv_today_vs_last_week.setText(
-			currentLabel + ": " + AmountFormat.format(currentTotal) + "  ·  " +
-			comparisonLabel + ": " + AmountFormat.format(comparisonTotal)
-		);
+			HashMap<String, Object> result = results.get(i);
 
-		if (percentChange == null) {
+			double currentTotal = (Double) result.get("current_total");
+			double comparisonTotal = (Double) result.get("comparison_total");
+			String currentLabel = (String) result.get("current_label");
+			String comparisonLabel = (String) result.get("comparison_label");
+			Double percentChange = (Double) result.get("percent_change");
 
-			tv_today_vs_last_week_change.setText("No sales in " + comparisonLabel.toLowerCase(Locale.getDefault()) + " to compare");
-			tv_today_vs_last_week_change.setTextColor(getResources().getColor(R.color.text_secondary));
-
-		} else {
-
-			String arrow = percentChange >= 0 ? "▲" : "▼";
-			String sign = percentChange >= 0 ? "+" : "";
-
-			tv_today_vs_last_week_change.setText(arrow + " " + sign + AmountFormat.formatPlain(percentChange) + "%");
-			tv_today_vs_last_week_change.setTextColor(
-				getResources().getColor(percentChange >= 0 ? R.color.success : R.color.danger)
+			tv_trend_compare_text[i].setText(
+				currentLabel + ": " + AmountFormat.format(currentTotal) + "  ·  " +
+				comparisonLabel + ": " + AmountFormat.format(comparisonTotal)
 			);
+
+			if (percentChange == null) {
+
+				tv_trend_compare_change[i].setText("No sales in " + comparisonLabel.toLowerCase(Locale.getDefault()) + " to compare");
+				tv_trend_compare_change[i].setTextColor(getResources().getColor(R.color.text_secondary));
+
+			} else {
+
+				String arrow = percentChange >= 0 ? "▲" : "▼";
+				String sign = percentChange >= 0 ? "+" : "";
+
+				tv_trend_compare_change[i].setText(arrow + " " + sign + AmountFormat.formatPlain(percentChange) + "%");
+				tv_trend_compare_change[i].setTextColor(
+					getResources().getColor(percentChange >= 0 ? R.color.success : R.color.danger)
+				);
+			}
 		}
 	}
 

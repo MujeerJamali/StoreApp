@@ -18,6 +18,19 @@ import java.util.List;
 // resolve a new Maven dependency, so every chart in the app draws
 // itself with plain Canvas calls instead. Handles negative values
 // (e.g. a loss) by drawing them below a shared zero baseline.
+//
+// Every bar always gets its own value and label - this view never
+// hides or thins them out, however many entries it's given. Instead,
+// each bar gets a guaranteed minimum width (MIN_SLOT_WIDTH_DP) to keep
+// its label readable, and the view reports its OWN width as wider than
+// its parent's available space whenever entries*MIN_SLOT_WIDTH_DP needs
+// more room than that - which only actually does anything when the
+// caller has wrapped this view in a HorizontalScrollView (every XML
+// usage in this app does), so a chart with many entries scrolls
+// horizontally instead of squeezing everything into one screen width.
+// A single label too long for even that minimum width wraps onto a
+// second line (split at the nearest space) rather than overlapping its
+// neighbors - see needsTwoLineLabels()/wrapLabel().
 public class SimpleBarChartView extends View {
 
 	public static class Entry {
@@ -32,6 +45,8 @@ public class SimpleBarChartView extends View {
 			this.color = color;
 		}
 	}
+
+	private static final float MIN_SLOT_WIDTH_DP = 76f;
 
 	private List<Entry> entries = new ArrayList<Entry>();
 
@@ -77,11 +92,74 @@ public class SimpleBarChartView extends View {
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 
 		float density = getResources().getDisplayMetrics().density;
+
+		int count = entries.size();
+		int minContentWidth = (int) (MIN_SLOT_WIDTH_DP * density * Math.max(count, 1));
+
+		int widthMode = MeasureSpec.getMode(widthMeasureSpec);
+
+		int width = widthMode == MeasureSpec.UNSPECIFIED ?
+			minContentWidth :
+			Math.max(MeasureSpec.getSize(widthMeasureSpec), minContentWidth);
+
 		int desiredHeight = (int) (150 * density);
 
-		int width = MeasureSpec.getSize(widthMeasureSpec);
+		if (needsTwoLineLabels(width, count)) {
+			desiredHeight += (int) (14 * density);
+		}
 
 		setMeasuredDimension(width, desiredHeight);
+	}
+
+	// Whether at least one label is too wide for its own slot at this
+	// width, and so needs the extra line of height wrapLabel() below
+	// will use for it. Checked against the FULL per-entry slot width
+	// (not any narrower sparse spacing), which is the correct, exact
+	// width every label actually gets now that every bar always shows
+	// its own label.
+	private boolean needsTwoLineLabels(int width, int count) {
+
+		if (count == 0) {
+			return false;
+		}
+
+		float density = getResources().getDisplayMetrics().density;
+		float slotWidth = width / (float) count;
+		float available = slotWidth - 4 * density;
+
+		for (Entry e : entries) {
+
+			if (labelPaint.measureText(e.label) > available) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// Splits a label too wide for one line into two, breaking at the
+	// space nearest its midpoint so both halves come out roughly even.
+	// A label with no space at all (a single long word/code) is left
+	// as one line - nothing more readable can be done for it without
+	// truncating actual data, which this view never does.
+	private String[] wrapLabel(String label) {
+
+		int mid = label.length() / 2;
+
+		int spaceIndex = label.indexOf(' ', mid);
+
+		if (spaceIndex < 0) {
+			spaceIndex = label.lastIndexOf(' ', mid);
+		}
+
+		if (spaceIndex < 0) {
+			return new String[]{label};
+		}
+
+		return new String[]{
+			label.substring(0, spaceIndex).trim(),
+			label.substring(spaceIndex + 1).trim()
+		};
 	}
 
 	@Override
@@ -97,7 +175,11 @@ public class SimpleBarChartView extends View {
 		int width = getWidth();
 		int height = getHeight();
 
-		float labelHeight = 16 * density;
+		int count = entries.size();
+
+		boolean twoLineLabels = needsTwoLineLabels(width, count);
+
+		float labelHeight = (twoLineLabels ? 30 : 16) * density;
 		float valueHeight = 16 * density;
 		float topPadding = 8 * density;
 		float bottomPadding = 4 * density;
@@ -129,21 +211,10 @@ public class SimpleBarChartView extends View {
 
 		canvas.drawLine(0, baselineY, width, baselineY, baselinePaint);
 
-		int count = entries.size();
 		float slotWidth = width / (float) count;
 		float barWidth = slotWidth * 0.5f;
 
-		// A handful of entries (every report so far) always gets a
-		// value above and a label below each bar, as before. A
-		// sparkline-style chart with many entries (e.g. 30 daily
-		// points) would make every bar's value/label overlap its
-		// neighbors, so past this threshold only every few bars gets a
-		// label (never the value - with this many bars the point is the
-		// shape, not reading off individual numbers) - existing callers
-		// never pass more than a handful of entries, so this never
-		// changes their rendering.
-		boolean sparse = count > 10;
-		int labelInterval = sparse ? Math.max(1, (int) Math.ceil(count / 6.0)) : 1;
+		float labelLineHeight = 12 * density;
 
 		for (int i = 0; i < count; i++) {
 
@@ -169,14 +240,26 @@ public class SimpleBarChartView extends View {
 
 			canvas.drawRect(centerX - barWidth / 2f, top, centerX + barWidth / 2f, bottom, barPaint);
 
-			if (!sparse) {
+			float valueY = e.value >= 0 ? Math.max(top - 4 * density, topPadding + valueHeight - 2 * density) : bottom + valueHeight - 2 * density;
 
-				float valueY = e.value >= 0 ? Math.max(top - 4 * density, topPadding + valueHeight - 2 * density) : bottom + valueHeight - 2 * density;
+			canvas.drawText(AmountFormat.format(e.value), centerX, valueY, valuePaint);
 
-				canvas.drawText(AmountFormat.format(e.value), centerX, valueY, valuePaint);
-			}
+			if (twoLineLabels && labelPaint.measureText(e.label) > slotWidth - 4 * density) {
 
-			if (!sparse || i % labelInterval == 0 || i == count - 1) {
+				String[] lines = wrapLabel(e.label);
+
+				if (lines.length == 2) {
+
+					canvas.drawText(lines[0], centerX, height - 2 * density - labelLineHeight, labelPaint);
+					canvas.drawText(lines[1], centerX, height - 2 * density, labelPaint);
+
+				} else {
+
+					canvas.drawText(e.label, centerX, height - 2 * density, labelPaint);
+				}
+
+			} else {
+
 				canvas.drawText(e.label, centerX, height - 2 * density, labelPaint);
 			}
 		}

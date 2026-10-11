@@ -75,6 +75,29 @@
   extending that widget picker to a newly-charted report is a small,
   separate `loadXxx()` addition to `DashboardChartWidgetLoader`, not a
   new design.
+- Every `SimpleBarChartView`/`SimpleLineChartView` in a layout MUST be
+  wrapped in a plain `<HorizontalScrollView>` (the chart itself
+  `android:layout_width="wrap_content"` inside it, same
+  `android:scrollbars="none"` convention as every other scroll view in
+  this app) - never place one directly in a non-scrolling parent. Both
+  views compute their own minimum width from their entry count
+  (`MIN_SLOT_WIDTH_DP`) and report that as their measured width when
+  it's wider than the available space; without a `HorizontalScrollView`
+  parent, that wider-than-available width just gets clipped instead of
+  becoming scrollable, silently breaking the "always show every value
+  and label" guarantee below. Caught from real on-device screenshots:
+  Month-over-Month's 6 bars ("Sales (Last)/Sales (This)/Profit
+  (Last)/...") overlapping into unreadable text, and Item Monthly
+  Rank's 10 item-name labels overlapping into a solid unreadable block
+  - both reports already had a chart, the chart just wasn't readable.
+  Every bar/point always shows its own value and label now (the
+  earlier "thin labels out past 10 entries" approach is gone - it
+  still let long labels overlap at any entry count); a label still too
+  long for its own slot wraps onto a second line instead of
+  overlapping its neighbor (see either view's `wrapLabel()`). This is a
+  correctness requirement, not a style preference - a chart whose text
+  can't be read is a regression, not a finished feature, whatever its
+  data or type.
 - Swipe-left-to-reveal Edit/Delete on a list row uses `SwipeRevealLayout`
   (plain View/MotionEvent custom ViewGroup) - not RecyclerView's
   `ItemTouchHelper`. Every list in this app is a ListView/BaseAdapter and

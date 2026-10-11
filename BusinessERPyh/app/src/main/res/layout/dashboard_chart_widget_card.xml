@@ -18,10 +18,11 @@
         android:textSize="14sp"
         android:textStyle="bold" />
 
-    <FrameLayout
+    <HorizontalScrollView
         android:id="@+id/container_widget_card_chart"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp" />
+        android:layout_marginTop="6dp"
+        android:scrollbars="none" />
 
 </LinearLayout>

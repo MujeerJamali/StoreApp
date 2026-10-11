@@ -45,11 +45,18 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp" />
 
-        <com.mujeer.businesserp.SimpleLineChartView
-            android:id="@+id/chart_expense_ratio"
+        <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp" />
+            android:layout_marginBottom="12dp"
+            android:scrollbars="none">
+
+            <com.mujeer.businesserp.SimpleLineChartView
+                android:id="@+id/chart_expense_ratio"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </HorizontalScrollView>
 
         <LinearLayout
             android:id="@+id/container_expense_ratio"

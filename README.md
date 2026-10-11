@@ -848,8 +848,24 @@ data's own shape, not a fixed per-report choice:
 `SimplePieChartView`/`SimpleLineChartView` collapse to zero height
 (nothing drawn at all) when their data doesn't fit - fewer than 2
 positive entries for Pie, fewer than 2 points for Line - rather than
-render a misleading single-slice pie or a pointless one-point line;
-`SimpleBarChartView` always draws whatever it's given, same as before.
+render a misleading single-slice pie or a pointless one-point line.
+
+Every Bar/Line chart is wrapped in a plain `HorizontalScrollView` in its
+layout (the chart view itself is `wrap_content` width inside it), and
+every bar/point always shows its own value and label - nothing is ever
+thinned out or hidden to make room. Each entry gets a guaranteed
+minimum width (`SimpleBarChartView`/`SimpleLineChartView`'s own
+`MIN_SLOT_WIDTH_DP`); a chart with more entries than fit the screen at
+that width scrolls horizontally instead of squeezing everything in, and
+an individual label still too long for its own slot (a long item or
+party name) wraps onto a second line rather than overlapping its
+neighbors. This replaced an earlier "thin out labels past 10 entries"
+approach that still let overlap happen with long labels at any entry
+count - caught from an actual on-device screenshot where "Sales
+(Last)/Sales (This)/Profit (Last)/..." ran into each other on
+Month-over-Month's 6-bar chart, and a 10-bar item-name chart was
+completely unreadable. Apply the same wrap-in-`HorizontalScrollView`
+pattern to any future `SimpleBarChartView`/`SimpleLineChartView` usage.
 
 Four reports were deliberately left without a chart because their data
 doesn't fit any of the three types: **Total Sales by Period** and
@@ -865,22 +881,25 @@ added any time a report's own default view turns out to fit one.
 The Dashboard also has a Sales Trend sparkline (daily sales total for
 the last 7/30 days, including a day with zero sales - a quick "is the
 shop busy lately" glance, not a profit report) using the same
-`SimpleBarChartView`. Past 10 entries it switches to a sparser
-rendering (no per-bar value text, only every few bars labeled) so a
-30-point chart doesn't turn into overlapping text - every other chart
-above has far fewer entries and renders exactly as before. Below the
-chart, a spinner (`DatabaseHelper.getSalesTrendComparison()`) picks
-the comparison shown below it: **Today vs Last Week** (the default -
-today's sales so far against the same calendar weekday one week ago,
+`SimpleBarChartView`, wrapped in the same `HorizontalScrollView` as
+every other chart - a 30-day chart just scrolls, with every day's
+value and date label always shown, rather than thinning labels out.
+Below the chart, all three period comparisons
+(`DatabaseHelper.getSalesTrendComparison()`) are listed at once rather
+than picked one at a time from a spinner: **Today vs Last Week**
+(today's sales so far against the same calendar weekday one week ago,
 since a Monday is naturally busier or quieter than a Sunday, so
 comparing to a week ago rather than yesterday isolates a real trend
 instead of just that day-of-week mismatch), **This Week vs Last
-Week**, or **This Month vs Last Month** - the latter two compare an
+Week**, and **This Month vs Last Month** - the latter two compare an
 *elapsed* window (this week/month so far) against the same number of
 elapsed days of the prior one, never a partial period against a full
-one. The percent change is hidden (shown as "No sales in last
-week/month to compare") when the comparison period had no sales at
-all, since "0% change from zero" would be misleading. Below
+one. Each row's percent change is hidden (shown as "No sales in last
+week/month to compare") when that comparison period had no sales at
+all, since "0% change from zero" would be misleading.
+`MainActivity#loadTodayVsLastWeek()` loads all three in one background
+pass and `applyTodayVsLastWeek()` fills all three rows, rather than
+the previous one-query-per-spinner-selection approach. Below
 that, a streak badge (`DatabaseHelper.getSalesStreak()`) counts how
 many days in a row have had at least one sale, plus the best streak
 ever reached - a small motivational nudge, not a report. Today doesn't
