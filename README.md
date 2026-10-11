@@ -707,7 +707,10 @@ the Reorder List's suggestion engine now respects. A card's starting
 value is whatever's already explicitly set, or otherwise
 `DatabaseHelper.getEffectiveMinOrderQty()`'s own suggested default: 6
 for a shoe item, else whatever quantity that item was last Purchased
-in, else 1) ·
+in, else 1. Remembers which card was last showing (by item id,
+`SharedPreferences`) so reopening the screen resumes there instead of
+restarting at card 1 every time; a "Reset to First" link next to the
+progress counter jumps back to card 1 on demand) ·
 Cash Projection (today's cash balance projected across a from/to
 period you pick, defaulting to today through +30 days - adds Sales/
 Purchases due in that exact window, plus recurring expenses expected

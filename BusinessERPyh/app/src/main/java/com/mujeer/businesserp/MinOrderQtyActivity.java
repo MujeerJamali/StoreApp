@@ -24,6 +24,16 @@ import java.util.HashMap;
 // =====================
 public class MinOrderQtyActivity extends Activity {
 
+	// Remembers which item's card was last showing, so reopening this
+	// screen resumes where the shop owner left off instead of always
+	// restarting at card 1 of a potentially long item list. Keyed by
+	// item id (not the raw list position) so an item added/removed/
+	// deactivated between visits can't land the resume on the wrong
+	// card - lookupResumeIndex() falls back to card 1 if that id is no
+	// longer in the freshly-loaded list.
+	private static final String PREFS_NAME = "min_order_qty_progress";
+	private static final String KEY_LAST_ITEM_ID = "last_item_id";
+
 	private TextView tv_progress;
 	private TextView tv_all_done;
 	private View container_flashcard;
@@ -38,6 +48,7 @@ public class MinOrderQtyActivity extends Activity {
 	private Button btn_previous;
 	private Button btn_save_next;
 	private Button btn_finish;
+	private TextView btn_reset_to_first;
 
 	private DatabaseHelper db;
 
@@ -74,6 +85,7 @@ public class MinOrderQtyActivity extends Activity {
 		btn_previous = findViewById(R.id.btn_previous);
 		btn_save_next = findViewById(R.id.btn_save_next);
 		btn_finish = findViewById(R.id.btn_finish);
+		btn_reset_to_first = findViewById(R.id.btn_reset_to_first);
 
 		db = new DatabaseHelper(this);
 
@@ -148,6 +160,17 @@ public class MinOrderQtyActivity extends Activity {
 			}
 		);
 
+		btn_reset_to_first.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					saveCurrent();
+					currentIndex = 0;
+					showCurrentCard();
+				}
+			}
+		);
+
 		loadItems();
 	}
 
@@ -171,7 +194,7 @@ public class MinOrderQtyActivity extends Activity {
 								items.clear();
 								items.addAll(result);
 
-								currentIndex = 0;
+								currentIndex = lookupResumeIndex();
 								showCurrentCard();
 							}
 						}
@@ -199,6 +222,8 @@ public class MinOrderQtyActivity extends Activity {
 		tv_all_done.setVisibility(View.GONE);
 
 		HashMap<String, Object> item = items.get(currentIndex);
+
+		saveResumePosition((Integer) item.get("id"));
 
 		tv_progress.setText("Item " + (currentIndex + 1) + " of " + items.size());
 
@@ -242,5 +267,37 @@ public class MinOrderQtyActivity extends Activity {
 				}
 			}
 		).start();
+	}
+
+	// Finds the freshly-loaded list position of the item id saved from
+	// the last visit, so the flashcard resumes on that same item.
+	// Falls back to card 1 (index 0) when there's no saved position yet,
+	// or the saved item is no longer in the list (deleted/deactivated
+	// since the last visit).
+	private int lookupResumeIndex() {
+
+		int lastItemId = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+			.getInt(KEY_LAST_ITEM_ID, -1);
+
+		if (lastItemId == -1) {
+			return 0;
+		}
+
+		for (int i = 0; i < items.size(); i++) {
+
+			if (lastItemId == (Integer) items.get(i).get("id")) {
+				return i;
+			}
+		}
+
+		return 0;
+	}
+
+	private void saveResumePosition(int itemId) {
+
+		getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+			.edit()
+			.putInt(KEY_LAST_ITEM_ID, itemId)
+			.apply();
 	}
 }
