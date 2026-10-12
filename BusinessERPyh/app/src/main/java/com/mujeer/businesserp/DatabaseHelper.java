@@ -185,7 +185,17 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     // operationally, not business state itself - a restore brings back
     // the data as it stands, not a replay of every action that ever
     // produced it.
-    public static final int DATABASE_VERSION = 38;
+    // Bumped 38 -> 39 to add action_log.cash_balance_after - the running
+    // cash balance (getCashBalance()) at the exact moment each action was
+    // logged, snapshotted once at insert time rather than recomputed on
+    // display (recomputing "cash balance as of some past action" would
+    // need a full historical replay this app doesn't keep). Captured for
+    // EVERY logged action, not just cash-affecting ones, so
+    // ActionLogActivity can show "cash was X right after this happened"
+    // next to any row and, in its detail view, the previous row's own
+    // snapshot as "before". Still excluded from the Vyapar round-trip for
+    // the same reason as the rest of action_log.
+    public static final int DATABASE_VERSION = 39;
 
     // A party's customer tagging (default REGULAR) - see DATABASE_VERSION's
     // comment, Partieseditactivity's Customer Type spinner, and the
@@ -656,7 +666,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			"entity_type TEXT NOT NULL, " +
 			"label TEXT NOT NULL, " +
 			"action_date TEXT NOT NULL, " +
-			"action_time TEXT NOT NULL" +
+			"action_time TEXT NOT NULL, " +
+			"cash_balance_after REAL" +
 			")"
 		);
 
@@ -936,6 +947,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		// - falls back to the shoe/purchase-history-derived default) -
 		// see DATABASE_VERSION's comment and MinOrderQtyActivity.
 		addColumnIfMissing(db, TABLE_ITEMS, "min_order_qty", "REAL NOT NULL DEFAULT 0");
+
+		// The running cash balance at the moment each action was logged -
+		// see DATABASE_VERSION's comment. Deliberately nullable with no
+		// default: an upgrade's existing rows have no way to know what
+		// cash was at the time they were logged, and NULL lets
+		// ActionLogActivity tell "unknown" apart from a real, legitimate
+		// balance of exactly 0 - a 0-or-default value couldn't.
+		addColumnIfMissing(db, TABLE_ACTION_LOG, "cash_balance_after", "REAL");
 
 		dropPurchaseCodeColumnIfPresent(db);
 
@@ -9974,7 +9993,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return value;
 	}
 
+	// cash_balance_after is captured here for EVERY call, cash-affecting
+	// or not - see DATABASE_VERSION's comment. getCashBalance() reads
+	// through the same connection this insert runs on, so it already
+	// reflects whatever change this very action just made, even when
+	// called before the surrounding write's own transaction commits
+	// (same-connection reads always see that connection's own
+	// uncommitted writes).
 	public void logAction(String actionType, String entityType, String label) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
 
 		ContentValues values = new ContentValues();
 		values.put("action_type", actionType);
@@ -9982,17 +10010,29 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("label", label);
 		values.put("action_date", new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date()));
 		values.put("action_time", new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date()));
-
-		SQLiteDatabase db = this.getWritableDatabase();
+		values.put("cash_balance_after", getCashBalance());
 
 		db.insert(TABLE_ACTION_LOG, null, values);
 	}
 
 	public int getActionLogCount() {
+		return getActionLogCount(null);
+	}
+
+	// entityTypes null (or covering every known type) means no filter -
+	// ActionLogActivity's multi-select passes null when everything is
+	// selected rather than spelling out the full IN list.
+	public int getActionLogCount(Set<String> entityTypes) {
 
 		SQLiteDatabase db = this.getReadableDatabase();
 
-		Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_ACTION_LOG, null);
+		ArrayList<String> args = new ArrayList<String>();
+		String whereClause = buildEntityTypeFilter(entityTypes, args);
+
+		Cursor cursor = db.rawQuery(
+			"SELECT COUNT(*) FROM " + TABLE_ACTION_LOG + whereClause,
+			args.toArray(new String[0])
+		);
 
 		int count = 0;
 
@@ -10005,20 +10045,32 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return count;
 	}
 
+	public ArrayList<HashMap<String, Object>> getActionLogPage(int limit, int offset) {
+		return getActionLogPage(limit, offset, null);
+	}
+
 	// Newest first, same "Load More" 30-at-a-time pagination convention
 	// as ReorderLearningHistoryActivity - this table is append-only and
 	// can grow large over a shop's lifetime, so the whole thing is
-	// never loaded at once.
-	public ArrayList<HashMap<String, Object>> getActionLogPage(int limit, int offset) {
+	// never loaded at once. See getActionLogCount(Set) on entityTypes.
+	public ArrayList<HashMap<String, Object>> getActionLogPage(
+		int limit, int offset, Set<String> entityTypes) {
 
 		ArrayList<HashMap<String, Object>> list = new ArrayList<HashMap<String, Object>>();
 
 		SQLiteDatabase db = this.getReadableDatabase();
 
+		ArrayList<String> args = new ArrayList<String>();
+		String whereClause = buildEntityTypeFilter(entityTypes, args);
+
+		args.add(String.valueOf(limit));
+		args.add(String.valueOf(offset));
+
 		Cursor cursor = db.rawQuery(
-			"SELECT id, action_type, entity_type, label, action_date, action_time FROM " +
-			TABLE_ACTION_LOG + " ORDER BY id DESC LIMIT ? OFFSET ?",
-			new String[]{String.valueOf(limit), String.valueOf(offset)}
+			"SELECT id, action_type, entity_type, label, action_date, action_time, " +
+			"cash_balance_after FROM " + TABLE_ACTION_LOG + whereClause +
+			" ORDER BY id DESC LIMIT ? OFFSET ?",
+			args.toArray(new String[0])
 		);
 
 		while (cursor.moveToNext()) {
@@ -10030,6 +10082,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			row.put("label", cursor.getString(3));
 			row.put("action_date", cursor.getString(4));
 			row.put("action_time", cursor.getString(5));
+			row.put("cash_balance_after", cursor.isNull(6) ? null : cursor.getDouble(6));
 
 			list.add(row);
 		}
@@ -10038,6 +10091,69 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		return list;
 	}
+
+	// Appends a "WHERE entity_type IN (...)" clause (with its own bound
+	// args pushed onto argsOut) when entityTypes is a real, non-empty
+	// filter - an empty string (no filter) otherwise, including when
+	// entityTypes is null. Shared by getActionLogCount(Set)/
+	// getActionLogPage(int, int, Set) so the two always agree on what
+	// "filtered" means.
+	private String buildEntityTypeFilter(Set<String> entityTypes, ArrayList<String> argsOut) {
+
+		if (entityTypes == null || entityTypes.isEmpty()) {
+			return "";
+		}
+
+		StringBuilder clause = new StringBuilder(" WHERE entity_type IN (");
+
+		for (int i = 0; i < entityTypes.size(); i++) {
+			clause.append(i == 0 ? "?" : ",?");
+		}
+
+		clause.append(")");
+
+		argsOut.addAll(entityTypes);
+
+		return clause.toString();
+	}
+
+	// The immediately-preceding logged action's own cash_balance_after -
+	// i.e. "what cash was right before this one happened" - for
+	// ActionLogActivity's detail view. Null for the very first action
+	// this database ever logged (nothing earlier to compare against) or
+	// when that earlier snapshot itself was never captured (an upgraded
+	// pre-cash_balance_after row - see DATABASE_VERSION's comment).
+	public Double getPreviousCashBalance(int actionLogId) {
+
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		Cursor cursor = db.rawQuery(
+			"SELECT cash_balance_after FROM " + TABLE_ACTION_LOG +
+			" WHERE id < ? ORDER BY id DESC LIMIT 1",
+			new String[]{String.valueOf(actionLogId)}
+		);
+
+		Double result = null;
+
+		if (cursor.moveToFirst() && !cursor.isNull(0)) {
+			result = cursor.getDouble(0);
+		}
+
+		cursor.close();
+
+		return result;
+	}
+
+	// Every distinct entity_type value any logAction() call site can
+	// produce - ActionLogActivity's multi-select filter options. A
+	// fixed Java-side list (same reasoning as CashActivity's own
+	// LEDGER_TYPE_LABELS) rather than a live "SELECT DISTINCT" so a
+	// type with zero rows so far still shows up as a selectable option.
+	public static final String[] ACTION_LOG_ENTITY_TYPES = {
+		"Party", "Item", "Variety Value", "Purchase", "Sale",
+		"Payment In", "Payment Out", "Payment", "Expense", "Cash Adjustment",
+		"Cost Item", "Wanted Item", "Recurring Expense", "Seasonal Calendar Entry"
+	};
 
 	// The genuine user action - "Delete Permanently" on the Recently
 	// Deleted screen - logs it. The same removal also happens as a
@@ -13727,10 +13843,36 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		long id = db.insert(TABLE_DRAFTS, null, values);
 
 		if (id > 0) {
-			logAction("Saved Draft", type, label);
+			logAction("Saved Draft", draftEntityLabel(type), label);
 		}
 
 		return id;
+	}
+
+	// DRAFT_TYPE_* constants are lowercase raw strings ("sale", "payment",
+	// ...) - never shown directly. Maps one to the same capitalized form
+	// ACTION_LOG_ENTITY_TYPES/every other logAction() call site already
+	// uses, so a drafted Sale groups with every other Sale action under
+	// the Record of Changes filter instead of needing its own bucket.
+	private String draftEntityLabel(String type) {
+
+		if (DRAFT_TYPE_SALE.equals(type)) {
+			return "Sale";
+		}
+
+		if (DRAFT_TYPE_PURCHASE.equals(type)) {
+			return "Purchase";
+		}
+
+		if (DRAFT_TYPE_PAYMENT.equals(type)) {
+			return "Payment";
+		}
+
+		if (DRAFT_TYPE_EXPENSE.equals(type)) {
+			return "Expense";
+		}
+
+		return type;
 	}
 
 	public ArrayList<HashMap<String, Object>> getAllDrafts() {
@@ -13800,7 +13942,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		int rows = db.delete(TABLE_DRAFTS, "id=?", new String[]{String.valueOf(id)});
 
 		if (rows > 0 && label != null) {
-			logAction("Deleted Draft", type != null ? type : "Draft", label);
+			logAction("Deleted Draft", type != null ? draftEntityLabel(type) : "Draft", label);
 		}
 	}
 

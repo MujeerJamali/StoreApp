@@ -57,7 +57,16 @@
   Changes, Dashboard Tools card) deliberately separate from Recently
   Deleted - that screen is for actually restoring/undoing a specific
   Sale/Purchase; this one is a permanent, view-only record with no
-  edit/delete UI at all, by design, so never add one.
+  edit/delete UI at all, by design, so never add one. Whenever a new
+  `logAction()` call site introduces an `entityType` string that isn't
+  already in `DatabaseHelper.ACTION_LOG_ENTITY_TYPES`, add it to that
+  array in the same commit - it's the fixed list `ActionLogActivity`'s
+  Show filter offers, so a type missing from it can never be selected
+  there even though it's really being logged. Reuse an existing entry
+  (e.g. map a new draft type to "Sale"/"Purchase"/"Payment"/"Expense"
+  the same way `draftEntityLabel()` already does) rather than adding a
+  near-duplicate bucket when the new action is really about the same
+  kind of thing an existing entry already covers.
 - SUPERSEDED (see the next rule) - every filter/toggle row used to be a
   horizontally-scrollable row of buttons; that pattern is being replaced
   app-wide by plain dropdowns. Left here so the reasoning for the change

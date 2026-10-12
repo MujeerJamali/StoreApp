@@ -30,8 +30,27 @@
     <TextView
         style="@style/FieldLabel"
         android:layout_marginTop="0dp"
+        android:layout_marginBottom="8dp"
+        android:text="Every change that touched your data - what it was, and exactly when. Tap a row for details. View-only, newest first; nothing here can be edited or deleted." />
+
+    <TextView
+        style="@style/FieldLabel"
+        android:layout_marginTop="0dp"
+        android:layout_marginBottom="0dp"
+        android:text="Show" />
+
+    <TextView
+        android:id="@+id/tv_action_log_type_filter"
+        style="@style/FilterSpinner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:layout_marginBottom="10dp"
-        android:text="Every change that touched your data - what it was, and exactly when. View-only, newest first; nothing here can be edited or deleted." />
+        android:clickable="true"
+        android:focusable="true"
+        android:text="All Types"
+        android:textColor="@color/text_primary"
+        android:textSize="13sp" />
 
     <TextView
         android:id="@+id/tv_action_log_empty"

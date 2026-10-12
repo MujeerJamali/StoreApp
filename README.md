@@ -263,6 +263,26 @@ BusinessERPyh/                  Gradle project root
   round-trip, same reasoning as Recently Deleted - it's an operational
   log of what already happened in THIS database, not standing user
   data to carry into a restore.
+  Every row also shows the running **cash balance right after that
+  change** - `cash_balance_after`, a snapshot of `getCashBalance()`
+  taken once at the exact moment `logAction()` ran (not recomputed on
+  display - there's no historical replay to reconstruct "cash as of
+  some past action" from), captured for every logged action whether or
+  not it actually moved cash, so the figure beside a non-cash row (e.g.
+  a Variety Value) still reads as "cash stood at this when this
+  happened." A **Show** multi-select filter (same checkbox-dialog
+  pattern as Cash's own Show filter) narrows the list to any
+  combination of `DatabaseHelper.ACTION_LOG_ENTITY_TYPES` - Party,
+  Item, Variety Value, Purchase, Sale, Payment In, Payment Out,
+  Payment (an undifferentiated Payment Draft only), Expense, Cash
+  Adjustment, Cost Item, Wanted Item, Recurring Expense, Seasonal
+  Calendar Entry - all selected by default. Tapping a row opens a
+  detail dialog: the full Change Made label, the Previous Cash Balance
+  (the immediately-preceding logged action's own snapshot -
+  `getPreviousCashBalance()` - "Not available" for the very first
+  action ever logged, since nothing came before it to compare against),
+  the New Cash Balance (this row's own snapshot), and the signed
+  Change between them, colored green/red.
 - **Reorder List** (Dashboard Tools card, pinnable as a Favorite) —
   what's worth restocking right now, computed by `DatabaseHelper.
   getReorderSuggestions()` from each item's (or, for a variety item,
