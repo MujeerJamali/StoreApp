@@ -2687,6 +2687,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 			db.setTransactionSuccessful();
 
+			if (valueId > 0) {
+				String itemName = lookupSingleText(db, TABLE_ITEMS, "name", itemId);
+				String groupName = lookupSingleText(db, TABLE_VARIETY_GROUPS, "name", groupId);
+				logAction("Created", "Variety Value",
+					(itemName != null ? itemName : "Item #" + itemId) + " - " +
+					(groupName != null ? groupName : "Group #" + groupId) + ": " + label);
+			}
+
 			return valueId;
 
 		} finally {
@@ -2712,6 +2720,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		db.beginTransaction();
 
 		try {
+
+			String valueLabel = lookupSingleText(db, TABLE_VARIETY_VALUES, "label", valueId);
+			int groupIdForValue = (int) sumColumn(
+				db,
+				"SELECT group_id FROM " + TABLE_VARIETY_VALUES + " WHERE id=?",
+				new String[]{String.valueOf(valueId)}
+			);
 
 			ArrayList<Integer> comboIds = new ArrayList<Integer>();
 
@@ -2756,6 +2771,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			db.delete(TABLE_VARIETY_VALUES, "id=?", new String[]{String.valueOf(valueId)});
 
 			db.setTransactionSuccessful();
+
+			if (valueLabel != null) {
+				int itemIdForValue = getItemIdForGroup(db, groupIdForValue);
+				String itemName = lookupSingleText(db, TABLE_ITEMS, "name", itemIdForValue);
+				String groupName = lookupSingleText(db, TABLE_VARIETY_GROUPS, "name", groupIdForValue);
+				logAction("Deleted", "Variety Value",
+					(itemName != null ? itemName : "Item #" + itemIdForValue) + " - " +
+					(groupName != null ? groupName : "Group #" + groupIdForValue) + ": " + valueLabel);
+			}
 
 			return true;
 
@@ -4641,6 +4665,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 // =====================
 
 	public boolean deletePurchase(int purchaseId) {
+		return deletePurchase(purchaseId, true);
+	}
+
+	// logIt is false only for undoPurchaseEdit()'s internal "remove the
+	// post-edit row before re-inserting the pre-edit snapshot" step -
+	// see deleteSale(String, boolean)'s own comment for why.
+	private boolean deletePurchase(int purchaseId, boolean logIt) {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
@@ -4737,7 +4768,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 			db.setTransactionSuccessful();
 
-			if (rows > 0 && foundOldPurchase) {
+			if (rows > 0 && foundOldPurchase && logIt) {
 				String partyName = lookupSingleText(db, TABLE_PARTIES, "name", deletedPartyId);
 				logAction("Deleted", "Purchase", "Invoice " + deletedInvoiceNumber + " - " +
 					(partyName != null ? partyName : "Party #" + deletedPartyId) + " - " +
@@ -7460,7 +7491,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		values.put("month", month);
 		values.put("multiplier", multiplier);
 
-		return db.insert(TABLE_SEASONAL_CALENDAR, null, values);
+		long id = db.insert(TABLE_SEASONAL_CALENDAR, null, values);
+
+		if (id > 0) {
+			logAction("Created", "Seasonal Calendar Entry", label + " (Month " + month + ", " + multiplier + "x)");
+		}
+
+		return id;
 	}
 
 	public boolean updateSeasonalCalendarEntry(
@@ -7476,6 +7513,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		int rows = db.update(
 			TABLE_SEASONAL_CALENDAR, values, "id=?", new String[]{String.valueOf(id)});
 
+		if (rows > 0) {
+			logAction("Edited", "Seasonal Calendar Entry", label + " (Month " + month + ", " + multiplier + "x)");
+		}
+
 		return rows > 0;
 	}
 
@@ -7483,7 +7524,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
-		db.delete(TABLE_SEASONAL_CALENDAR, "id=?", new String[]{String.valueOf(id)});
+		String label = lookupSingleText(db, TABLE_SEASONAL_CALENDAR, "label", id);
+
+		int rows = db.delete(TABLE_SEASONAL_CALENDAR, "id=?", new String[]{String.valueOf(id)});
+
+		if (rows > 0 && label != null) {
+			logAction("Deleted", "Seasonal Calendar Entry", label);
+		}
 	}
 
 	public ArrayList<HashMap<String, Object>> getAllSeasonalCalendarEntries() {
@@ -9627,6 +9674,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	}
 
 	public void deleteSale(String saleId) {
+		deleteSale(saleId, true);
+	}
+
+	// logIt is false only for undoSaleEdit()'s internal "remove the
+	// post-edit row before re-inserting the pre-edit snapshot" step -
+	// that's not a user Delete action, it's a step inside an Edit Undo,
+	// which logs its own single Action Log entry instead.
+	private void deleteSale(String saleId, boolean logIt) {
 		SQLiteDatabase db = this.getWritableDatabase();
 
 		// This sale's unpaid portion (if any) shifted its party's
@@ -9665,7 +9720,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			new String[]{saleId}
 		);
 
-		if (rows > 0 && foundOldSale) {
+		if (rows > 0 && foundOldSale && logIt) {
 			String partyName = lookupSingleText(db, TABLE_PARTIES, "name", deletedPartyId);
 			logAction("Deleted", "Sale", "Invoice " + deletedInvoiceNo + " - " +
 				(partyName != null ? partyName : "Party #" + deletedPartyId) + " - " +
@@ -9984,13 +10039,47 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return list;
 	}
 
+	// The genuine user action - "Delete Permanently" on the Recently
+	// Deleted screen - logs it. The same removal also happens as a
+	// cleanup step right after a successful restore/undo (see
+	// restoreSaleFromTrash()/undoSaleEdit() etc. below), which is not a
+	// separate user action and uses the quiet overload instead so the
+	// Action Log doesn't show a confusing extra "permanently deleted"
+	// entry for something the user just restored.
 	public void deleteRecentlyDeletedPermanently(int trashId) {
+
+		SQLiteDatabase db = this.getWritableDatabase();
+
+		String type = lookupSingleText(db, TABLE_RECENTLY_DELETED, "type", trashId);
+		String label = lookupSingleText(db, TABLE_RECENTLY_DELETED, "label", trashId);
+
+		deleteRecentlyDeletedPermanentlyQuiet(trashId);
+
+		if (label != null) {
+			logAction("Deleted Permanently", recentlyDeletedTypeLabel(type), label);
+		}
+	}
+
+	private void deleteRecentlyDeletedPermanentlyQuiet(int trashId) {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
 		db.delete(
 			TABLE_RECENTLY_DELETED, "id=?", new String[]{String.valueOf(trashId)}
 		);
+	}
+
+	private String recentlyDeletedTypeLabel(String type) {
+
+		if ("sale".equals(type) || "sale_edit".equals(type)) {
+			return "Sale";
+		}
+
+		if ("purchase".equals(type) || "purchase_edit".equals(type)) {
+			return "Purchase";
+		}
+
+		return "Recently Deleted Entry";
 	}
 
 	// Purges every entry older than the given number of days - called
@@ -10053,11 +10142,30 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		try {
 
-			reinsertSaleSnapshot(db, new JSONObject(json));
+			JSONObject root = new JSONObject(json);
 
-			deleteRecentlyDeletedPermanently(trashId);
+			reinsertSaleSnapshot(db, root);
+
+			deleteRecentlyDeletedPermanentlyQuiet(trashId);
 
 			db.setTransactionSuccessful();
+
+			// Logging failure must never undo the success above (the
+			// transaction already committed) - a bad/missing field here
+			// only costs the log entry, not the restore itself.
+			try {
+
+				JSONObject saleJson = root.getJSONObject("sale");
+				int partyId = saleJson.getInt("party_id");
+				String partyName = lookupSingleText(db, TABLE_PARTIES, "name", partyId);
+				logAction("Restored", "Sale", "Invoice " + saleJson.getString("invoice_no") + " - " +
+					(partyName != null ? partyName : "Party #" + partyId) + " - " +
+					AmountFormat.format(saleJson.getDouble("grand_total")));
+
+			} catch (JSONException e) {
+				// Already restored - losing the log entry is far better
+				// than reporting a failed restore that actually worked.
+			}
 
 			return true;
 
@@ -10089,11 +10197,28 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		try {
 
-			reinsertPurchaseSnapshot(db, new JSONObject(json));
+			JSONObject root = new JSONObject(json);
 
-			deleteRecentlyDeletedPermanently(trashId);
+			reinsertPurchaseSnapshot(db, root);
+
+			deleteRecentlyDeletedPermanentlyQuiet(trashId);
 
 			db.setTransactionSuccessful();
+
+			// See restoreSaleFromTrash()'s own comment on this inner
+			// try/catch - logging must never undo an already-committed
+			// restore.
+			try {
+
+				JSONObject purchaseJson = root.getJSONObject("purchase");
+				int partyId = purchaseJson.getInt("party_id");
+				String partyName = lookupSingleText(db, TABLE_PARTIES, "name", partyId);
+				logAction("Restored", "Purchase", "Invoice " + purchaseJson.getString("invoice_number") + " - " +
+					(partyName != null ? partyName : "Party #" + partyId) + " - " +
+					AmountFormat.format(purchaseJson.getDouble("grand_total")));
+
+			} catch (JSONException e) {
+			}
 
 			return true;
 
@@ -10201,16 +10326,30 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		try {
 
 			JSONObject root = new JSONObject(json);
-			String saleId = String.valueOf(root.getJSONObject("sale").getInt("id"));
+			JSONObject saleJson = root.getJSONObject("sale");
+			String saleId = String.valueOf(saleJson.getInt("id"));
 
 			deleteSaleItems(saleId);
-			deleteSale(saleId);
+			deleteSale(saleId, false);
 
 			reinsertSaleSnapshot(db, root);
 
-			deleteRecentlyDeletedPermanently(trashId);
+			deleteRecentlyDeletedPermanentlyQuiet(trashId);
 
 			db.setTransactionSuccessful();
+
+			// See restoreSaleFromTrash()'s own comment - logging must
+			// never undo an already-committed undo.
+			try {
+
+				int partyId = saleJson.getInt("party_id");
+				String partyName = lookupSingleText(db, TABLE_PARTIES, "name", partyId);
+				logAction("Edit Undone", "Sale", "Invoice " + saleJson.getString("invoice_no") + " - " +
+					(partyName != null ? partyName : "Party #" + partyId) + " - " +
+					AmountFormat.format(saleJson.getDouble("grand_total")));
+
+			} catch (JSONException e) {
+			}
 
 			return true;
 
@@ -10239,15 +10378,29 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		try {
 
 			JSONObject root = new JSONObject(json);
-			int purchaseId = root.getJSONObject("purchase").getInt("id");
+			JSONObject purchaseJson = root.getJSONObject("purchase");
+			int purchaseId = purchaseJson.getInt("id");
 
-			deletePurchase(purchaseId);
+			deletePurchase(purchaseId, false);
 
 			reinsertPurchaseSnapshot(db, root);
 
-			deleteRecentlyDeletedPermanently(trashId);
+			deleteRecentlyDeletedPermanentlyQuiet(trashId);
 
 			db.setTransactionSuccessful();
+
+			// See restoreSaleFromTrash()'s own comment - logging must
+			// never undo an already-committed undo.
+			try {
+
+				int partyId = purchaseJson.getInt("party_id");
+				String partyName = lookupSingleText(db, TABLE_PARTIES, "name", partyId);
+				logAction("Edit Undone", "Purchase", "Invoice " + purchaseJson.getString("invoice_number") + " - " +
+					(partyName != null ? partyName : "Party #" + partyId) + " - " +
+					AmountFormat.format(purchaseJson.getDouble("grand_total")));
+
+			} catch (JSONException e) {
+			}
 
 			return true;
 
@@ -12306,6 +12459,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 		updateCostItemBudgetBulk(db, costItemId, monthlyBudget);
+
+		String name = lookupSingleText(db, TABLE_COST_ITEMS, "name", costItemId);
+		logAction("Edited", "Cost Item", (name != null ? name : "Cost Item #" + costItemId) +
+			" - Monthly Budget: " + AmountFormat.format(monthlyBudget));
 	}
 
 	public void updateCostItemBudgetBulk(SQLiteDatabase db, int costItemId, double monthlyBudget) {
@@ -12379,6 +12536,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			TABLE_COST_ITEMS, values, "id=?", new String[]{String.valueOf(id)}
 		);
 
+		if (rows > 0) {
+			logAction("Edited", "Cost Item", name.trim());
+		}
+
 		return rows > 0;
 	}
 
@@ -12386,7 +12547,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
-		db.delete(TABLE_COST_ITEMS, "id=?", new String[]{String.valueOf(id)});
+		String name = lookupSingleText(db, TABLE_COST_ITEMS, "name", id);
+
+		int rows = db.delete(TABLE_COST_ITEMS, "id=?", new String[]{String.valueOf(id)});
+
+		if (rows > 0 && name != null) {
+			logAction("Deleted", "Cost Item", name);
+		}
 	}
 
 	// Finds an existing catalog item by code (preferred) or name, or
@@ -13557,7 +13724,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
-		return db.insert(TABLE_DRAFTS, null, values);
+		long id = db.insert(TABLE_DRAFTS, null, values);
+
+		if (id > 0) {
+			logAction("Saved Draft", type, label);
+		}
+
+		return id;
 	}
 
 	public ArrayList<HashMap<String, Object>> getAllDrafts() {
@@ -13621,7 +13794,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
-		db.delete(TABLE_DRAFTS, "id=?", new String[]{String.valueOf(id)});
+		String type = lookupSingleText(db, TABLE_DRAFTS, "type", id);
+		String label = lookupSingleText(db, TABLE_DRAFTS, "label", id);
+
+		int rows = db.delete(TABLE_DRAFTS, "id=?", new String[]{String.valueOf(id)});
+
+		if (rows > 0 && label != null) {
+			logAction("Deleted Draft", type != null ? type : "Draft", label);
+		}
 	}
 
 	// =====================
@@ -14469,7 +14649,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
-		return db.insert(TABLE_WANTED_ITEMS, null, values);
+		long id = db.insert(TABLE_WANTED_ITEMS, null, values);
+
+		if (id > 0) {
+			logAction("Created", "Wanted Item", itemName);
+		}
+
+		return id;
 	}
 
 	public boolean updateWantedItem(
@@ -14486,6 +14672,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		int rows = db.update(
 			TABLE_WANTED_ITEMS, values, "id=?", new String[]{String.valueOf(id)}
 		);
+
+		if (rows > 0) {
+			logAction("Edited", "Wanted Item", itemName);
+		}
 
 		return rows > 0;
 	}
@@ -14548,6 +14738,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			new String[]{String.valueOf(wantedItemId)}
 		);
 
+		if (rows > 0) {
+			String itemName = lookupSingleText(db, TABLE_WANTED_ITEMS, "item_name", wantedItemId);
+			logAction(
+				fulfilled ? "Marked Fulfilled" : "Marked Unfulfilled",
+				"Wanted Item",
+				itemName != null ? itemName : "Wanted Item #" + wantedItemId
+			);
+		}
+
 		return rows > 0;
 	}
 
@@ -14555,10 +14754,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
+		String itemName = lookupSingleText(db, TABLE_WANTED_ITEMS, "item_name", wantedItemId);
+
 		int rows = db.delete(
 			TABLE_WANTED_ITEMS, "id=?",
 			new String[]{String.valueOf(wantedItemId)}
 		);
+
+		if (rows > 0 && itemName != null) {
+			logAction("Deleted", "Wanted Item", itemName);
+		}
 
 		return rows > 0;
 	}
@@ -14606,7 +14811,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
-		return db.insert(TABLE_RECURRING_EXPENSES, null, values);
+		long id = db.insert(TABLE_RECURRING_EXPENSES, null, values);
+
+		if (id > 0) {
+			logAction("Created", "Recurring Expense", item + " - " + AmountFormat.format(amount));
+		}
+
+		return id;
 	}
 
 	public boolean updateRecurringExpense(
@@ -14631,6 +14842,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			TABLE_RECURRING_EXPENSES, values, "id=?", new String[]{String.valueOf(id)}
 		);
 
+		if (rows > 0) {
+			logAction("Edited", "Recurring Expense", item + " - " + AmountFormat.format(amount));
+		}
+
 		return rows > 0;
 	}
 
@@ -14645,6 +14860,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 			TABLE_RECURRING_EXPENSES, values, "id=?", new String[]{String.valueOf(id)}
 		);
 
+		if (rows > 0) {
+			String item = lookupSingleText(db, TABLE_RECURRING_EXPENSES, "item", id);
+			logAction(
+				active ? "Activated" : "Deactivated", "Recurring Expense",
+				item != null ? item : "Recurring Expense #" + id
+			);
+		}
+
 		return rows > 0;
 	}
 
@@ -14652,9 +14875,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 		SQLiteDatabase db = this.getWritableDatabase();
 
+		String item = lookupSingleText(db, TABLE_RECURRING_EXPENSES, "item", id);
+
 		int rows = db.delete(
 			TABLE_RECURRING_EXPENSES, "id=?", new String[]{String.valueOf(id)}
 		);
+
+		if (rows > 0 && item != null) {
+			logAction("Deleted", "Recurring Expense", item);
+		}
 
 		return rows > 0;
 	}

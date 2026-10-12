@@ -657,6 +657,16 @@
                     android:background="@color/stroke" />
 
                 <Button
+                    android:id="@+id/btn_action_log"
+                    style="@style/ToolRow"
+                    android:text="Record of Changes" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/stroke" />
+
+                <Button
                     android:id="@+id/btn_reorder_list"
                     style="@style/ToolRow"
                     android:text="Reorder List" />

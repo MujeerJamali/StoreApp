@@ -237,6 +237,32 @@ BusinessERPyh/                  Gradle project root
   normal delete would, then re-inserts the pre-edit snapshot the same
   way restoring a deletion does - so undoing an edit and restoring a
   delete share the same re-insertion code underneath.
+- **Record of Changes** (Dashboard Tools card, pinnable as a Favorite,
+  right next to Recently Deleted but a deliberately separate screen) —
+  a permanent, view-only audit trail of every database-changing action
+  taken in the app: what it was (Created/Edited/Deleted/Restored/Edit
+  Undone/..., which table, and a one-line human label) and exactly
+  when (`DatabaseHelper.logAction()`, called from inside the write
+  methods themselves - Parties, Items, Purchases, Sales, Payments,
+  Expenses, Cash Adjustments, Cost Items, Varieties, Wanted Items,
+  Recurring Expenses, the Seasonal Calendar, explicit Drafts, and
+  Recently Deleted's own restore/undo/permanent-delete actions - so
+  nothing's missed regardless of which screen triggered it). Unlike
+  Recently Deleted, this screen has **no restore/undo/delete UI at
+  all** - a row can never be edited or removed, by design; Recently
+  Deleted is still the place to actually undo something, this is only
+  the record that it happened. Paginated 30 rows at a time, newest
+  first (same "Load More" convention as Reorder Learning History), via
+  `getActionLogCount()`/`getActionLogPage()`. A handful of
+  high-frequency/low-signal writes are deliberately NOT logged here -
+  bulk/import operations (logged as nothing extra, same as they never
+  showed up individually elsewhere), autosave drafts, and an edited
+  item's bundled location/seasonal-flag saves that ride along with the
+  same Update click `updateItem()` already logs - logging those too
+  would bury the signal in noise. Not part of the Vyapar backup
+  round-trip, same reasoning as Recently Deleted - it's an operational
+  log of what already happened in THIS database, not standing user
+  data to carry into a restore.
 - **Reorder List** (Dashboard Tools card, pinnable as a Favorite) —
   what's worth restocking right now, computed by `DatabaseHelper.
   getReorderSuggestions()` from each item's (or, for a variety item,

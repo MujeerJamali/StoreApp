@@ -31,6 +31,33 @@
   instead of failing. This was missed for an entire session's worth of
   features before being caught and fixed in one pass - don't let it
   drift again and require another catch-up audit later.
+- Keep the Record of Changes audit trail complete. Whenever a change
+  adds a new `DatabaseHelper` write method that changes real user data
+  (a new feature's insert/update/delete, not a bulk/import variant or
+  an internal step of another action), call `logAction(actionType,
+  entityType, label)` from inside that method itself (never from the
+  calling Activity - this is what guarantees every caller gets logged,
+  the same reasoning `ActionLogActivity`'s own doc comment gives) in
+  the same commit, matching the pattern already used throughout
+  (Parties/Items/Purchases/Sales/Payments/Expenses/Cash Adjustments/
+  Cost Items/Varieties/Wanted Items/Recurring Expenses/Seasonal
+  Calendar/explicit Drafts/Recently Deleted's restore-undo-permanent-
+  delete actions). Deliberately skip: a bulk/import variant (e.g.
+  `insertXBulk()`), autosave, and a save that's bundled into another
+  action's own click handler and would just duplicate its log entry
+  (e.g. `updateItemLocations()`/`updateItemHolidaySeasonal()`, which
+  ride along with the same Save click `updateItem()` already logs).
+  When an internal call to another write method would double-log
+  something that isn't really a separate user action (e.g.
+  `undoSaleEdit()` calling `deleteSale()` as a "remove the post-edit
+  row" step, not a real user Delete), give that method a quiet/logIt
+  overload instead of letting the inner call log - see
+  `deleteSale(String, boolean)`/`deletePurchase(int, boolean)` for the
+  pattern. This was built as its own dedicated screen (Record of
+  Changes, Dashboard Tools card) deliberately separate from Recently
+  Deleted - that screen is for actually restoring/undoing a specific
+  Sale/Purchase; this one is a permanent, view-only record with no
+  edit/delete UI at all, by design, so never add one.
 - SUPERSEDED (see the next rule) - every filter/toggle row used to be a
   horizontally-scrollable row of buttons; that pattern is being replaced
   app-wide by plain dropdowns. Left here so the reasoning for the change

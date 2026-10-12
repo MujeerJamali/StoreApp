@@ -48,6 +48,7 @@ public class MainActivity extends Activity {
 	Button btn_display_shoes;
 	Button btn_sample_shoes;
 	Button btn_recently_deleted;
+	Button btn_action_log;
 	Button btn_reorder_list;
 	Button btn_bulk_item_update;
 	Button btn_loyalty_points;
@@ -121,7 +122,7 @@ public class MainActivity extends Activity {
 		"btn_payments", "btn_expenses", "btn_reports",
 		"btn_import", "btn_generate_entries", "btn_cash", "btn_wanted_items",
 		"btn_recurring_expenses", "btn_drafts", "btn_cost_items",
-		"btn_display_shoes", "btn_sample_shoes", "btn_recently_deleted",
+		"btn_display_shoes", "btn_sample_shoes", "btn_recently_deleted", "btn_action_log",
 		"btn_reorder_list", "btn_bulk_item_update", "btn_loyalty_points",
 		"btn_stock_take", "btn_quick_sale", "btn_today_actions", "btn_customize_dashboard",
 		"btn_chart_widgets", "btn_swipe_gesture_settings"
@@ -132,7 +133,7 @@ public class MainActivity extends Activity {
 		"Payments", "Expenses", "Reports",
 		"Import", "Generate Entries", "Cash", "Wanted Items",
 		"Recurring Expenses", "Drafts", "Cost Items",
-		"Display Shoes", "Sample Shoes", "Recently Deleted",
+		"Display Shoes", "Sample Shoes", "Recently Deleted", "Record of Changes",
 		"Reorder List", "Bulk Item Update", "Loyalty Points",
 		"Stock Take", "Quick Sale", "What To Do Today", "Customize Dashboard",
 		"Dashboard Chart Widgets", "Swipe Gesture Settings"
@@ -168,6 +169,7 @@ public class MainActivity extends Activity {
 		btn_display_shoes = findViewById(R.id.btn_display_shoes);
 		btn_sample_shoes = findViewById(R.id.btn_sample_shoes);
 		btn_recently_deleted = findViewById(R.id.btn_recently_deleted);
+		btn_action_log = findViewById(R.id.btn_action_log);
 		btn_reorder_list = findViewById(R.id.btn_reorder_list);
 		btn_bulk_item_update = findViewById(R.id.btn_bulk_item_update);
 		btn_loyalty_points = findViewById(R.id.btn_loyalty_points);
@@ -254,6 +256,7 @@ public class MainActivity extends Activity {
 		attachFavoriteLongPress(btn_display_shoes, "btn_display_shoes");
 		attachFavoriteLongPress(btn_sample_shoes, "btn_sample_shoes");
 		attachFavoriteLongPress(btn_recently_deleted, "btn_recently_deleted");
+		attachFavoriteLongPress(btn_action_log, "btn_action_log");
 		attachFavoriteLongPress(btn_reorder_list, "btn_reorder_list");
 		attachFavoriteLongPress(btn_bulk_item_update, "btn_bulk_item_update");
 		attachFavoriteLongPress(btn_loyalty_points, "btn_loyalty_points");
@@ -506,6 +509,19 @@ public class MainActivity extends Activity {
 					Intent intent = new Intent(
 						MainActivity.this,
 						RecentlyDeletedActivity.class
+					);
+
+					startActivity(intent);
+				}
+			});
+
+		btn_action_log.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+
+					Intent intent = new Intent(
+						MainActivity.this,
+						ActionLogActivity.class
 					);
 
 					startActivity(intent);
@@ -1083,6 +1099,10 @@ public class MainActivity extends Activity {
 
 			case "btn_recently_deleted":
 				intent = new Intent(this, RecentlyDeletedActivity.class);
+				break;
+
+			case "btn_action_log":
+				intent = new Intent(this, ActionLogActivity.class);
 				break;
 
 			case "btn_reorder_list":

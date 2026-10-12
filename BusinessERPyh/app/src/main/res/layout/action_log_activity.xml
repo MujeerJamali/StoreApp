@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            style="@style/PageTitle"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginBottom="0dp"
+            android:text="Record of Changes" />
+
+        <com.mujeer.businesserp.InfoBubbleView
+            android:id="@+id/info_bubble"
+            android:layout_width="@dimen/info_bubble_size"
+            android:layout_height="@dimen/info_bubble_size" />
+
+    </LinearLayout>
+
+    <TextView
+        style="@style/FieldLabel"
+        android:layout_marginTop="0dp"
+        android:layout_marginBottom="10dp"
+        android:text="Every change that touched your data - what it was, and exactly when. View-only, newest first; nothing here can be edited or deleted." />
+
+    <TextView
+        android:id="@+id/tv_action_log_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="48dp"
+        android:gravity="center"
+        android:text="No changes recorded yet."
+        android:textColor="@color/text_secondary"
+        android:textSize="15sp"
+        android:visibility="gone" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/container_action_log"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <Button
+                android:id="@+id/btn_load_more_action_log"
+                style="@style/AppButton.Outline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Load More"
+                android:visibility="gone" />
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</LinearLayout>
